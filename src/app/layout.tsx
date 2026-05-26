@@ -1,6 +1,4 @@
-import "@/styles/fonts.css";
-import "@/styles/tailwind.css";
-import "@/styles/theme.css";
+import "@/styles/index.css";
 import Navbar from "@/components/Navbar";
 import { CartProvider } from "@/context/CartContext";
 import { ThemeProvider } from "@/context/ThemeContext";
@@ -8,8 +6,10 @@ import React from "react";
 
 export const metadata = {
   title: "Aquatic Emerald — Premium Plants, Shrimp & Snails",
-  description: "Curated home-grown freshwater botanicals, shrimp, and snails for the discerning aquarium hobbyist in Sydney Hills District.",
-  keywords: "aquarium plants, freshwater shrimp, bloody mary shrimp, trumpet snails, Hills District, Sydney aquariums",
+  description:
+    "Curated home-grown freshwater botanicals, shrimp, and snails for the discerning aquarium hobbyist in Sydney Hills District.",
+  keywords:
+    "aquarium plants, freshwater shrimp, bloody mary shrimp, trumpet snails, Hills District, Sydney aquariums",
   authors: [{ name: "Aquatic Emerald" }],
 };
 
@@ -30,9 +30,7 @@ export default function RootLayout({
           <CartProvider>
             <Navbar />
             <div className="flex flex-col min-h-screen">
-              <div className="flex-grow">
-                {children}
-              </div>
+              <div className="flex-grow">{children}</div>
             </div>
           </CartProvider>
         </ThemeProvider>
