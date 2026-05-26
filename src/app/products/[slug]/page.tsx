@@ -7,7 +7,6 @@ interface ProductPageProps {
   params: Promise<{ slug: string }>;
 }
 
-// Revalidate details every 60 seconds (ISR)
 export const revalidate = 60;
 
 export default async function ProductPage({ params }: ProductPageProps) {

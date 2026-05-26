@@ -2,7 +2,6 @@ import { Suspense } from "react";
 import { getProducts } from "@/lib/dataService";
 import ProductsClient from "@/components/ProductsClient";
 
-// Revalidate this page every 60 seconds (ISR)
 export const revalidate = 60;
 
 export default async function ProductsPage() {
