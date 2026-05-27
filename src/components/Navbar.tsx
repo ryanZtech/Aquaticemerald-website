@@ -5,7 +5,19 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCart } from "@/context/CartContext";
 import { useTheme } from "@/context/ThemeContext";
-import { ShoppingCart, ChevronDown, Sun, Moon, Leaf, X, Menu } from "lucide-react";
+import {
+  ShoppingCart,
+  ChevronDown,
+  Sun,
+  Moon,
+  X,
+  Menu,
+  Sprout,
+  Fish,
+  Shell,
+  Droplet,
+  Package,
+} from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Category } from "@/lib/staticData";
 
@@ -19,12 +31,36 @@ export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const dropRef = useRef<HTMLDivElement>(null);
 
-  const categories: { cat: Category; emoji: string; label: string }[] = [
-    { cat: "plants", emoji: "🌿", label: "Plants" },
-    { cat: "shrimp", emoji: "🦐", label: "Shrimp" },
-    { cat: "snails", emoji: "🐌", label: "Snails" },
-    { cat: "fish",   emoji: "🐟", label: "Fish" },
-  ];
+  // Dynamic database-driven categories
+  const [categories, setCategories] = useState<{ slug: string; name: string }[]>([
+    { slug: "plants", name: "Plants" },
+    { slug: "shrimp", name: "Shrimp" },
+    { slug: "snails", name: "Snails" },
+    { slug: "fish",   name: "Fish" },
+  ]);
+
+  useEffect(() => {
+    async function loadCategories() {
+      try {
+        const res = await fetch("/api/categories");
+        if (res.ok) {
+          const data = await res.json();
+          const activeCats = data
+            .filter((c: any) => c.active)
+            .map((c: any) => ({
+              slug: c.slug,
+              name: c.name,
+            }));
+          if (activeCats.length > 0) {
+            setCategories(activeCats);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load categories in navbar:", err);
+      }
+    }
+    loadCategories();
+  }, []);
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -44,9 +80,19 @@ export default function Navbar() {
     setMobileMenuOpen(false);
   }, [pathname]);
 
-  const handleCategoryClick = (cat: Category) => {
+  const handleCategoryClick = (cat: string) => {
     router.push(`/products?category=${cat}`);
     setDropOpen(false);
+  };
+
+  // Maps a category slug to a Lucide icon component
+  const getCategoryIcon = (slug: string) => {
+    const s = slug.toLowerCase();
+    if (s.includes("plant")) return Sprout;
+    if (s.includes("fish")) return Fish;
+    if (s.includes("snail")) return Shell;
+    if (s.includes("shrimp")) return Droplet;
+    return Package;
   };
 
   return (
@@ -55,9 +101,11 @@ export default function Navbar() {
         
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2.5 group">
-          <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center shadow-sm">
-            <Leaf className="w-4 h-4 text-primary-foreground" />
-          </div>
+          <img
+            src="/logo.png"
+            alt="Aquatic Emerald Logo"
+            className="w-8 h-8 object-contain group-hover:scale-[1.08] transition-transform"
+          />
           <span className="font-serif text-[17px] font-medium tracking-tight">
             Aquatic <em className="not-italic text-primary font-semibold">Emerald</em>
           </span>
@@ -103,16 +151,19 @@ export default function Navbar() {
                   transition={{ duration: 0.15 }}
                   className="absolute top-full left-1/2 -translate-x-1/2 mt-3 w-44 bg-card border border-border rounded-2xl shadow-2xl overflow-hidden"
                 >
-                  {categories.map((c) => (
-                    <button
-                      key={c.cat}
-                      onClick={() => handleCategoryClick(c.cat)}
-                      className="w-full flex items-center gap-3 px-4 py-3 text-sm hover:bg-accent transition-colors text-left font-medium"
-                    >
-                      <span className="text-base">{c.emoji}</span>
-                      <span>{c.label}</span>
-                    </button>
-                  ))}
+                  {categories.map((c) => {
+                    const IconComp = getCategoryIcon(c.slug);
+                    return (
+                      <button
+                        key={c.slug}
+                        onClick={() => handleCategoryClick(c.slug)}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-sm hover:bg-accent transition-colors text-left font-medium cursor-pointer"
+                      >
+                        <IconComp className="w-4 h-4 text-primary" />
+                        <span>{c.name}</span>
+                      </button>
+                    );
+                  })}
                 </motion.div>
               )}
             </AnimatePresence>
@@ -124,7 +175,16 @@ export default function Navbar() {
               pathname === "/info" ? "text-primary" : "text-muted-foreground"
             }`}
           >
-            Info & Guides
+            Info
+          </Link>
+
+          <Link
+            href="/guides"
+            className={`text-sm font-medium transition-colors hover:text-primary ${
+              pathname === "/guides" ? "text-primary" : "text-muted-foreground"
+            }`}
+          >
+            Guides
           </Link>
         </div>
 
@@ -133,7 +193,7 @@ export default function Navbar() {
           {/* Theme toggle */}
           <button
             onClick={toggleDark}
-            className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center hover:bg-accent transition-colors"
+            className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center hover:bg-accent transition-colors cursor-pointer"
             aria-label="Toggle theme"
           >
             {dark ? <Sun className="w-4 h-4 text-primary" /> : <Moon className="w-4 h-4 text-primary" />}
@@ -156,7 +216,7 @@ export default function Navbar() {
           {/* Mobile Menu Button */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="md:hidden w-9 h-9 rounded-full bg-secondary flex items-center justify-center hover:bg-accent transition-colors"
+            className="md:hidden w-9 h-9 rounded-full bg-secondary flex items-center justify-center hover:bg-accent transition-colors cursor-pointer"
             aria-label="Toggle menu"
           >
             {mobileMenuOpen ? <X className="w-4 h-4 text-primary" /> : <Menu className="w-4 h-4 text-primary" />}
@@ -195,15 +255,19 @@ export default function Navbar() {
                 >
                   All Products
                 </Link>
-                {categories.map((c) => (
-                  <button
-                    key={c.cat}
-                    onClick={() => handleCategoryClick(c.cat)}
-                    className="text-sm py-1.5 px-2 rounded-lg hover:bg-accent text-left text-foreground font-normal"
-                  >
-                    {c.emoji} {c.label}
-                  </button>
-                ))}
+                {categories.map((c) => {
+                  const IconComp = getCategoryIcon(c.slug);
+                  return (
+                    <button
+                      key={c.slug}
+                      onClick={() => handleCategoryClick(c.slug)}
+                      className="text-sm py-1.5 px-2 rounded-lg hover:bg-accent text-left text-foreground font-normal flex items-center gap-2 cursor-pointer"
+                    >
+                      <IconComp className="w-3.5 h-3.5 text-primary" />
+                      <span>{c.name}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 

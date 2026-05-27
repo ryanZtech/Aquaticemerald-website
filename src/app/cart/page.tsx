@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useCart } from "@/context/CartContext";
 import { ShoppingCart, Minus, Plus, X, ArrowLeft } from "lucide-react";
-import { PRODUCTS } from "@/lib/staticData";
 
 export default function CartPage() {
   const { cart, updateQty, removeItem, cartTotal } = useCart();
@@ -41,21 +40,22 @@ export default function CartPage() {
           {/* Cart Items List */}
           <div className="space-y-3 mb-8">
             {cart.map((item) => {
-              const product = PRODUCTS.find((p) => p.id === item.productId);
-              return (
-                <div
-                  key={`${item.productId}-${item.variantId}`}
-                  className="flex items-center gap-4 p-4 bg-card border border-border rounded-2xl transition-colors duration-200"
-                >
-                  <div className="w-16 h-16 rounded-xl overflow-hidden bg-muted flex-shrink-0 border border-border/10">
-                    {product && (
-                      <img 
-                        src={product.img} 
-                        alt={item.name} 
-                        className="w-full h-full object-cover" 
-                      />
-                    )}
-                  </div>
+                          return (
+                            <div
+                              key={`${item.productId}-${item.variantId}`}
+                              className="flex items-center gap-4 p-4 bg-card border border-border rounded-2xl transition-colors duration-200"
+                            >
+                              <div className="w-16 h-16 rounded-xl overflow-hidden bg-muted flex-shrink-0 border border-border/10">
+                                {item.img ? (
+                                  <img 
+                                    src={item.img} 
+                                    alt={item.name} 
+                                    className="w-full h-full object-cover" 
+                                  />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground">No img</div>
+                                )}
+                              </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-sm truncate">{item.name}</p>
                     <p className="text-xs text-muted-foreground mt-0.5">{item.variantLabel}</p>
