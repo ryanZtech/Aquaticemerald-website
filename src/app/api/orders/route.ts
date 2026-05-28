@@ -81,14 +81,23 @@ export async function POST(request: NextRequest) {
       `;
       if (variantRows.length > 0) {
         const variant = variantRows[0];
-        if (variant.stock_level === "none" || variant.stock_quantity === 0) {
+        const stockLevel = (variant.stock_level || "").toLowerCase();
+        const stockQty = Number(variant.stock_quantity || 0);
+
+        // It is out of stock IF level is 'none' OR (level is empty AND qty <= 0)
+        // If level is 'low', 'med', or 'high', we assume it has stock regardless of qty (to be safe with UI sync)
+        const isOutOfStock =
+          stockLevel === "none" || (stockLevel === "" && stockQty <= 0);
+
+        if (isOutOfStock) {
           return NextResponse.json(
             { error: `${it.name} is out of stock` },
             { status: 400 },
           );
         }
+
         // Check if stock is low and customer is trying to buy more than 1
-        if (variant.stock_level === "low" && it.qty > 1) {
+        if (stockLevel === "low" && it.qty > 1) {
           return NextResponse.json(
             { error: `${it.name} has low stock - only 1 can be purchased` },
             { status: 400 },
@@ -201,13 +210,7 @@ export async function POST(request: NextRequest) {
 
     // Send emails if Resend key present
     const RESEND_API_KEY = process.env.RESEND_API_KEY;
-    if (RESEND_API_KEY && (customer_email || sellerEmail)) {
-      const recipients: string[] = [];
-      if (customer_email) recipients.push(customer_email);
-      if (sellerEmail && !recipients.includes(sellerEmail)) {
-        recipients.push(sellerEmail);
-      }
-
+    if (RESEND_API_KEY) {
       const itemsHtml = (cart || [])
         .map(
           (i: any) =>
@@ -233,7 +236,8 @@ export async function POST(request: NextRequest) {
         <p><strong>Total:</strong> $${Number(total).toFixed(2)}</p>
       `;
 
-      for (const to of recipients) {
+      // 1. Send to Customer
+      if (customer_email) {
         try {
           await fetch("https://api.resend.com/emails", {
             method: "POST",
@@ -242,16 +246,35 @@ export async function POST(request: NextRequest) {
               "Content-Type": "application/json",
             },
             body: JSON.stringify({
-              from:
-                process.env.EMAIL_FROM ||
-                "Aquatic Emerald <no-reply@aquaticemerald.local>",
-              to,
+              from: process.env.EMAIL_FROM || "onboarding@resend.dev",
+              to: customer_email,
               subject: `Order Confirmation - ${orderRef || orderId}`,
-              html,
+              html: `<h1>Thanks for your order!</h1>${html}`,
             }),
           });
         } catch (e) {
-          console.error("Failed to send email to", to, e);
+          console.error("Failed to send email to customer:", customer_email, e);
+        }
+      }
+
+      // 2. Send to Seller
+      if (sellerEmail) {
+        try {
+          await fetch("https://api.resend.com/emails", {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${RESEND_API_KEY}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              from: process.env.EMAIL_FROM || "onboarding@resend.dev",
+              to: sellerEmail,
+              subject: `NEW ORDER RECEIVED - ${orderRef || orderId}`,
+              html: `<h1>New Order Received</h1>${html}`,
+            }),
+          });
+        } catch (e) {
+          console.error("Failed to send email to seller:", sellerEmail, e);
         }
       }
     }

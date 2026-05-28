@@ -176,13 +176,37 @@ export default function CategoryFormDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="imageUrl">Image URL</Label>
-            <Input
-              id="imageUrl"
-              value={imageUrl}
-              onChange={(e) => setImageUrl(e.target.value)}
-              placeholder="https://example.com/image.jpg"
-            />
+            <Label htmlFor="imageUrl">Icon / Image URL</Label>
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-md border bg-muted shrink-0 overflow-hidden">
+                {imageUrl ? (
+                  <img
+                    src={imageUrl}
+                    alt="Preview"
+                    className="h-full w-full object-contain"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src =
+                        "https://placehold.co/40x40?text=Error";
+                    }}
+                  />
+                ) : (
+                  <div className="text-[10px] text-muted-foreground uppercase font-bold px-1 text-center">
+                    No URL
+                  </div>
+                )}
+              </div>
+              <Input
+                id="imageUrl"
+                value={imageUrl}
+                onChange={(e) => setImageUrl(e.target.value)}
+                placeholder="e.g. https://example.com/icon.png"
+                className="flex-1"
+              />
+            </div>
+            <p className="text-[10px] text-muted-foreground font-light italic">
+              If provided, this image will be used in menus instead of the
+              Lucide icon.
+            </p>
           </div>
 
           <div className="space-y-2">
@@ -200,7 +224,8 @@ export default function CategoryFormDialog({
               />
             </div>
             <p className="text-[10px] text-muted-foreground font-light italic">
-              Try names like:{" "}
+              Used as a fallback if no <b>Icon URL</b> is provided. Try names
+              like:{" "}
               <span className="font-mono text-primary/70">
                 Waves, Fish, Sprout, Leaf, Anchor, Waves, Droplets
               </span>

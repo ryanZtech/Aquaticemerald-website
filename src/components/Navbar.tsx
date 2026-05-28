@@ -22,7 +22,7 @@ export default function Navbar() {
 
   // Dynamic database-driven categories
   const [categories, setCategories] = useState<
-    { slug: string; name: string; icon_name?: string }[]
+    { slug: string; name: string; icon_name?: string; image_url?: string }[]
   >([
     { slug: "plants", name: "Plants", icon_name: "sprout" },
     { slug: "shrimp", name: "Shrimp", icon_name: "shrimp" },
@@ -42,6 +42,7 @@ export default function Navbar() {
               slug: c.slug,
               name: c.name,
               icon_name: c.icon_name || "package",
+              image_url: c.image_url,
             }));
           if (activeCats.length > 0) {
             setCategories(activeCats);
@@ -152,7 +153,15 @@ export default function Navbar() {
                         onClick={() => handleCategoryClick(c.slug)}
                         className="w-full flex items-center gap-3 px-4 py-3 text-sm hover:bg-accent transition-colors text-left font-medium cursor-pointer"
                       >
-                        <IconComp className="w-4 h-4 text-primary" />
+                        {c.image_url ? (
+                          <img
+                            src={c.image_url}
+                            alt={c.name}
+                            className="w-4 h-4 object-contain rounded-sm"
+                          />
+                        ) : (
+                          <IconComp className="w-4 h-4 text-primary" />
+                        )}
                         <span>{c.name}</span>
                       </button>
                     );
@@ -268,7 +277,15 @@ export default function Navbar() {
                       onClick={() => handleCategoryClick(c.slug)}
                       className="text-sm py-1.5 px-2 rounded-lg hover:bg-accent text-left text-foreground font-normal flex items-center gap-2 cursor-pointer"
                     >
-                      <IconComp className="w-3.5 h-3.5 text-primary" />
+                      {c.image_url ? (
+                        <img
+                          src={c.image_url}
+                          alt={c.name}
+                          className="w-3.5 h-3.5 object-contain rounded-sm"
+                        />
+                      ) : (
+                        <IconComp className="w-3.5 h-3.5 text-primary" />
+                      )}
                       <span>{c.name}</span>
                     </button>
                   );

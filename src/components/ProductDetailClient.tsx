@@ -37,37 +37,40 @@ export default function ProductDetailClient({
   );
   const [matchedVariant, setMatchedVariant] = useState<any>(null);
 
-  const allImages = [
-    ...(product.images && product.images.length > 0
-      ? [...product.images].sort(
-          (a, b) => Number(b.is_primary) - Number(a.is_primary),
-        )
-      : product.img
-        ? [{ image_url: product.img, is_primary: true }]
-        : []),
-    ...product.variants
-      .filter((variant) => variant.image_url)
-      .map((variant) => ({
-        image_url: variant.image_url as string,
-        is_primary: false,
-      })),
-  ].reduce(
-    (acc, current) => {
-      const x = acc.find((item) => item.image_url === current.image_url);
-      if (!x) {
-        return acc.concat([current]);
-      } else {
-        // If we found a duplicate, but the current one is primary, prefer the primary one
-        if (current.is_primary) {
-          return acc.map((item) =>
-            item.image_url === current.image_url ? current : item,
-          );
-        }
-        return acc;
+  const allImages = (() => {
+    const rawImages = [
+      ...(product.images && product.images.length > 0
+        ? [...product.images].sort(
+            (a, b) => Number(b.is_primary) - Number(a.is_primary),
+          )
+        : product.img
+          ? [{ image_url: product.img, is_primary: true }]
+          : []),
+      ...product.variants
+        .filter((variant) => variant.image_url)
+        .map((variant) => ({
+          image_url: variant.image_url as string,
+          is_primary: false,
+        })),
+    ];
+
+    const uniqueMap = new Map<
+      string,
+      { image_url: string; is_primary?: boolean }
+    >();
+
+    rawImages.forEach((img) => {
+      const url = img.image_url.trim();
+      if (!url) return;
+
+      const existing = uniqueMap.get(url);
+      if (!existing || img.is_primary) {
+        uniqueMap.set(url, { ...img, image_url: url });
       }
-    },
-    [] as Array<{ image_url: string; is_primary?: boolean }>,
-  );
+    });
+
+    return Array.from(uniqueMap.values());
+  })();
 
   const imageUrls = allImages.map((img) => img.image_url);
   const maxQty =
@@ -144,7 +147,7 @@ export default function ProductDetailClient({
     } else {
       setMatchedVariant(product.variants?.[0] || null);
     }
-  }, [selectedValues, options, product, imageUrls, currentImageIndex]);
+  }, [selectedValues, options, product]);
 
   useEffect(() => {
     if (maxQty <= 0) {
@@ -216,43 +219,96 @@ export default function ProductDetailClient({
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-10 lg:gap-16">
         {/* Image Carousel */}
-        <div className="space-y-4">
-          <div className="relative rounded-3xl overflow-hidden bg-muted aspect-square shadow-xl border border-border group">
-            <img
-              src={imageUrls[currentImageIndex]}
-              alt={product.name}
-              className="w-full h-full object-cover"
-            />
+        <div className="space-y-3">
+          {/* Main image */}
+          <div className="relative rounded-3xl bg-muted aspect-square shadow-xl border border-border overflow-hidden">
+            {imageUrls[currentImageIndex] ? (
+              <img
+                src={imageUrls[currentImageIndex]}
+                alt={product.name}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                No Image
+              </div>
+            )}
+
+            {/* Nav buttons rendered OUTSIDE the overflow-hidden container via absolute positioning on a sibling overlay */}
             {imageUrls.length > 1 && (
               <>
                 <button
-                  onClick={prevImage}
-                  className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    prevImage();
+                  }}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-black/80 text-white p-2 rounded-full z-20 cursor-pointer transition-colors shadow-md"
+                  aria-label="Previous image"
                 >
                   <ChevronLeft className="w-5 h-5" />
                 </button>
                 <button
-                  onClick={nextImage}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    nextImage();
+                  }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-black/80 text-white p-2 rounded-full z-20 cursor-pointer transition-colors shadow-md"
+                  aria-label="Next image"
                 >
                   <ChevronRight className="w-5 h-5" />
                 </button>
+
+                {/* Dot indicators */}
+                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-20">
+                  {imageUrls.map((_, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => setCurrentImageIndex(i)}
+                      aria-label={`Go to image ${i + 1}`}
+                      className={`rounded-full transition-all cursor-pointer ${
+                        i === currentImageIndex
+                          ? "w-5 h-2 bg-white"
+                          : "w-2 h-2 bg-white/50 hover:bg-white/80"
+                      }`}
+                    />
+                  ))}
+                </div>
               </>
             )}
           </div>
+
+          {/* Thumbnail strip — horizontal scroll */}
           {imageUrls.length > 1 && (
-            <div className="grid grid-cols-4 gap-2">
+            <div
+              className="flex gap-2 overflow-x-auto px-1 pb-1"
+              style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+            >
               {imageUrls.map((url, index) => (
                 <button
                   key={index}
+                  type="button"
                   onClick={() => setCurrentImageIndex(index)}
-                  className={`rounded-lg overflow-hidden border-2 ${index === currentImageIndex ? "border-primary" : "border-transparent"}`}
+                  className={`flex-none w-[72px] h-[72px] rounded-xl overflow-hidden border-2 transition-all cursor-pointer focus:outline-none ${
+                    index === currentImageIndex
+                      ? "border-primary ring-2 ring-primary/30 opacity-100"
+                      : "border-transparent opacity-60 hover:opacity-100 hover:border-border"
+                  }`}
+                  aria-label={`View image ${index + 1}`}
                 >
-                  <img
-                    src={url}
-                    alt={`Thumbnail ${index + 1}`}
-                    className="w-full h-20 object-cover"
-                  />
+                  {url ? (
+                    <img
+                      src={url}
+                      alt={`Thumbnail ${index + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-secondary flex items-center justify-center text-[10px] text-muted-foreground">
+                      No Img
+                    </div>
+                  )}
                 </button>
               ))}
             </div>
