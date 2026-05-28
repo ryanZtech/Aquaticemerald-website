@@ -177,11 +177,17 @@ export async function PUT(
           variantImageFile,
           {
             access: "public",
+            addRandomSuffix: true,
           },
         );
         await sql`
           INSERT INTO variant_images (variant_id, image_url, alt_text, is_primary)
           VALUES (${variantId}, ${blob.url}, ${variant.label}, TRUE)
+        `;
+      } else if (variant.image_url) {
+        await sql`
+          INSERT INTO variant_images (variant_id, image_url, alt_text, is_primary)
+          VALUES (${variantId}, ${variant.image_url}, ${variant.label}, TRUE)
         `;
       }
     }
@@ -220,6 +226,7 @@ export async function PUT(
         const file = newImages[i];
         const blob = await put(`products/${id}/${file.name}`, file, {
           access: "public",
+          addRandomSuffix: true,
         });
         uploadedProductImages.push({
           image_url: blob.url,

@@ -11,8 +11,7 @@ export default async function InfoPage() {
   ]);
 
   const sceneImg =
-    settings.scene_image ||
-    "https://images.unsplash.com/photo-1779436853049-c19542e3c81c?w=1400&h=700&fit=crop&auto=format";
+    settings.scene_image || "https://aquaticemerald.com/front1.png";
 
   const guides = [
     {
@@ -115,7 +114,11 @@ export default async function InfoPage() {
       {/* Footer */}
       <div className="mt-16 pt-8 border-t border-border text-center">
         <div className="flex items-center justify-center gap-2 mb-2">
-          <img src="/logo.png" alt="Aquatic Emerald Logo" className="w-4 h-4 object-contain" />
+          <img
+            src="/logo.png"
+            alt="Aquatic Emerald Logo"
+            className="w-4 h-4 object-contain"
+          />
           <span className="font-serif text-sm font-medium">
             Aquatic Emerald
           </span>
