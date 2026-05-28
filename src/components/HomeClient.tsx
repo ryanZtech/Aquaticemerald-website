@@ -20,12 +20,9 @@ export default function HomeClient({ products, settings }: HomeClientProps) {
   // Filter out products that have variants (active items) and take first 4 for featured listing
   const featured = products.filter((p) => p.variants.length > 0).slice(0, 4);
 
-  const heroImg =
-    settings.hero_image ||
-    "https://images.unsplash.com/photo-1779436853149-2e7d501f71cf?w=1600&h=900&fit=crop&auto=format";
+  const heroImg = settings.hero_image || "https://aquaticemerald.com/hero.png";
   const sceneImg =
-    settings.scene_image ||
-    "https://images.unsplash.com/photo-1779436853049-c19542e3c81c?w=1400&h=700&fit=crop&auto=format";
+    settings.scene_image || "https://aquaticemerald.com/front1.png";
 
   return (
     <div className="pt-16">

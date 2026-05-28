@@ -1,5 +1,6 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
+import { buildCustomerHtml, buildSellerHtml } from "@/lib/emailTemplatesSimple";
 
 // GET all orders
 export async function GET() {
@@ -183,9 +184,97 @@ export async function POST(request: NextRequest) {
     const customerWaLink = waCustomerPhone ? `https://wa.me/${waCustomerPhone}?text=${encodeURIComponent(`Hi ${customer_name}, this is Aquatic Emerald regarding your order #${orderRef || orderId}!`)}` : '';
     const sellerWaLink = sellerWhatsApp ? `https://wa.me/${sellerWhatsApp}` : '';
 
-    // Skip sending large inline email templates to keep the route compact and parse-safe.
-    if (process.env.RESEND_API_KEY) {
-      console.log('RESEND_API_KEY present - email sending skipped in this build iteration.');
+    // compute pickup display values and year
+    const currentYear = new Date().getFullYear();
+    const pickupDetails = pickupLocationId ? await sql`SELECT name, detail FROM pickup_locations WHERE id = ${pickupLocationId}` : [];
+    const pickupName = pickupDetails[0]?.name || 'N/A';
+    const pickupDetail = pickupDetails[0]?.detail || '';
+    const pickupDateObj = pickup_slot_at ? new Date(pickup_slot_at) : null;
+    const formattedPickupDate = pickupDateObj
+      ? pickupDateObj.toLocaleDateString('en-AU', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+      : 'N/A';
+    const formattedPickupTime = pickupDateObj
+      ? pickupDateObj.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit', hour12: true })
+      : 'N/A';
+
+    // Send emails using extracted templates if Resend key is present
+    const RESEND_API_KEY = process.env.RESEND_API_KEY;
+    if (RESEND_API_KEY) {
+      const fromEmail = process.env.EMAIL_FROM || 'onboarding@resend.dev';
+
+      if (customer_email) {
+        const customerHtml = buildCustomerHtml({
+          customer_name,
+          customer_email,
+          customer_phone,
+          orderRef,
+          orderId,
+          cart,
+          subtotal,
+          total,
+          pickupName,
+          pickupDetail,
+          formattedPickupDate,
+          formattedPickupTime,
+          sellerWaLink,
+          currentYear,
+        });
+
+        try {
+          await fetch('https://api.resend.com/emails', {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${RESEND_API_KEY}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              from: fromEmail,
+              to: customer_email,
+              subject: `Order Confirmation - ${orderRef || orderId}`,
+              html: customerHtml,
+            }),
+          });
+        } catch (e) {
+          console.error('Failed to send email to customer:', customer_email, e);
+        }
+      }
+
+      if (sellerEmail) {
+        const sellerHtml = buildSellerHtml({
+          customer_name,
+          customer_email,
+          customer_phone,
+          orderRef,
+          orderId,
+          cart,
+          subtotal,
+          total,
+          pickupName,
+          pickupDetail,
+          formattedPickupDate,
+          formattedPickupTime,
+          customerWaLink,
+          currentYear,
+        });
+
+        try {
+          await fetch('https://api.resend.com/emails', {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${RESEND_API_KEY}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              from: fromEmail,
+              to: sellerEmail,
+              subject: `NEW ORDER RECEIVED - ${orderRef || orderId}`,
+              html: sellerHtml,
+            }),
+          });
+        } catch (e) {
+          console.error('Failed to send email to seller:', sellerEmail, e);
+        }
+      }
     }
 
     return NextResponse.json({ success: true, orderId });
