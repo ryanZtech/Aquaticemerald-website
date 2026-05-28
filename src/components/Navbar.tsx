@@ -5,14 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCart } from "@/context/CartContext";
 import { useTheme } from "@/context/ThemeContext";
-import {
-  ShoppingCart,
-  ChevronDown,
-  Sun,
-  Moon,
-  X,
-  Menu,
-} from "lucide-react";
+import { ShoppingCart, ChevronDown, Sun, Moon, X, Menu } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Category } from "@/lib/staticData";
 import { getLucideIconByName } from "@/lib/lucideIcon";
@@ -28,11 +21,13 @@ export default function Navbar() {
   const dropRef = useRef<HTMLDivElement>(null);
 
   // Dynamic database-driven categories
-  const [categories, setCategories] = useState<{ slug: string; name: string; icon_name?: string }[]>([
+  const [categories, setCategories] = useState<
+    { slug: string; name: string; icon_name?: string }[]
+  >([
     { slug: "plants", name: "Plants", icon_name: "sprout" },
     { slug: "shrimp", name: "Shrimp", icon_name: "shrimp" },
     { slug: "snails", name: "Snails", icon_name: "shell" },
-    { slug: "fish",   name: "Fish", icon_name: "fish" },
+    { slug: "fish", name: "Fish", icon_name: "fish" },
   ]);
 
   useEffect(() => {
@@ -85,7 +80,6 @@ export default function Navbar() {
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-background/90 backdrop-blur-lg border-b border-border transition-colors duration-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between h-16">
-        
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2.5 group">
           <img
@@ -94,7 +88,8 @@ export default function Navbar() {
             className="w-8 h-8 object-contain group-hover:scale-[1.08] transition-transform"
           />
           <span className="font-serif text-[17px] font-medium tracking-tight">
-            Aquatic <em className="not-italic text-primary font-semibold">Emerald</em>
+            Aquatic{" "}
+            <em className="not-italic text-primary font-semibold">Emerald</em>
           </span>
         </Link>
 
@@ -119,7 +114,9 @@ export default function Navbar() {
             <Link
               href="/products"
               className={`flex items-center gap-1 text-sm font-medium transition-colors hover:text-primary ${
-                pathname.startsWith("/products") ? "text-primary" : "text-muted-foreground"
+                pathname.startsWith("/products")
+                  ? "text-primary"
+                  : "text-muted-foreground"
               }`}
             >
               Products
@@ -142,11 +139,13 @@ export default function Navbar() {
                     onClick={() => handleCategoryClick("all")}
                     className="w-full flex items-center gap-3 px-4 py-3 text-sm hover:bg-accent transition-colors text-left font-medium cursor-pointer"
                   >
-                    <span className="w-4 h-4 flex items-center justify-center text-primary">All</span>
+                    <span className="w-4 h-4 flex items-center justify-center text-primary">
+                      All
+                    </span>
                     <span>All</span>
                   </button>
                   {categories.map((c) => {
-                    const IconComp = getLucideIconByName(c.icon_name);
+                    const IconComp = getLucideIconByName(c.icon_name) as any;
                     return (
                       <button
                         key={c.slug}
@@ -190,7 +189,11 @@ export default function Navbar() {
             className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center hover:bg-accent transition-colors cursor-pointer"
             aria-label="Toggle theme"
           >
-            {dark ? <Sun className="w-4 h-4 text-primary" /> : <Moon className="w-4 h-4 text-primary" />}
+            {dark ? (
+              <Sun className="w-4 h-4 text-primary" />
+            ) : (
+              <Moon className="w-4 h-4 text-primary" />
+            )}
           </button>
 
           {/* Cart */}
@@ -213,7 +216,11 @@ export default function Navbar() {
             className="md:hidden w-9 h-9 rounded-full bg-secondary flex items-center justify-center hover:bg-accent transition-colors cursor-pointer"
             aria-label="Toggle menu"
           >
-            {mobileMenuOpen ? <X className="w-4 h-4 text-primary" /> : <Menu className="w-4 h-4 text-primary" />}
+            {mobileMenuOpen ? (
+              <X className="w-4 h-4 text-primary" />
+            ) : (
+              <Menu className="w-4 h-4 text-primary" />
+            )}
           </button>
         </div>
       </div>
@@ -230,12 +237,14 @@ export default function Navbar() {
             <Link
               href="/"
               className={`block text-sm font-medium py-2 px-3 rounded-lg hover:bg-accent ${
-                pathname === "/" ? "text-primary bg-primary/5" : "text-foreground"
+                pathname === "/"
+                  ? "text-primary bg-primary/5"
+                  : "text-foreground"
               }`}
             >
               Home
             </Link>
-            
+
             <div className="py-2 px-3">
               <span className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
                 Products
@@ -244,13 +253,15 @@ export default function Navbar() {
                 <Link
                   href="/products"
                   className={`text-sm py-1.5 px-2 rounded-lg hover:bg-accent ${
-                    pathname === "/products" ? "text-primary font-medium" : "text-foreground"
+                    pathname === "/products"
+                      ? "text-primary font-medium"
+                      : "text-foreground"
                   }`}
                 >
                   All Products
                 </Link>
                 {categories.map((c) => {
-                  const IconComp = getLucideIconByName(c.icon_name);
+                  const IconComp = getLucideIconByName(c.icon_name) as any;
                   return (
                     <button
                       key={c.slug}
@@ -268,7 +279,9 @@ export default function Navbar() {
             <Link
               href="/info"
               className={`block text-sm font-medium py-2 px-3 rounded-lg hover:bg-accent ${
-                pathname === "/info" ? "text-primary bg-primary/5" : "text-foreground"
+                pathname === "/info"
+                  ? "text-primary bg-primary/5"
+                  : "text-foreground"
               }`}
             >
               Info & Guides
