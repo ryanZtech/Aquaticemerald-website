@@ -68,7 +68,7 @@ export async function PUT(
                 await fetch('https://api.resend.com/emails', {
                   method: 'POST',
                   headers: { Authorization: `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ from: process.env.EMAIL_FROM || 'Aquatic Emerald <no-reply@aquaticemerald.local>', to, subject: `Order ${o.id} ${status}`, html }),
+                  body: JSON.stringify({ from: process.env.EMAIL_FROM || 'Aquatic Emerald <no-reply@aquaticemerald.com>', to, subject: `Order ${o.id} ${status}`, html }),
                 });
               } catch (e) {
                 console.error('Failed to send status email to', to, e);
