@@ -31,16 +31,24 @@ export async function PUT(
       );
     }
 
-    if (stock_quantity !== undefined) {
-      stock_quantity = Math.max(0, Number(stock_quantity) || 0);
-      if (!stock_level) {
-        stock_level = getStockLevelFromQuantity(stock_quantity);
-      }
-    }
-
     if (stock_level && stock_quantity === undefined) {
       if (stock_level === "none") stock_quantity = 0;
       if (stock_level === "low") stock_quantity = 1;
+      if (stock_level === "med" || stock_level === "medium")
+        stock_quantity = 10;
+      if (stock_level === "high") stock_quantity = 25;
+    }
+
+    if (stock_quantity !== undefined && !stock_level) {
+      stock_level = getStockLevelFromQuantity(stock_quantity);
+    }
+
+    // If both are provided, ensure they are somewhat consistent if quantity is 0 but level is positive
+    if (stock_level && stock_quantity === 0) {
+      if (stock_level === "low") stock_quantity = 1;
+      if (stock_level === "med" || stock_level === "medium")
+        stock_quantity = 10;
+      if (stock_level === "high") stock_quantity = 25;
     }
 
     const updates: string[] = [];

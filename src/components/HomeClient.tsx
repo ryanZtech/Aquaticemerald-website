@@ -2,7 +2,13 @@
 
 import Link from "next/link";
 import { Product } from "@/lib/staticData";
-import { ChevronDown, ChevronRight, Sprout, MapPin, MessageCircle } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  Sprout,
+  MapPin,
+  MessageCircle,
+} from "lucide-react";
 import { motion } from "motion/react";
 
 interface HomeClientProps {
@@ -25,11 +31,15 @@ export default function HomeClient({ products, settings }: HomeClientProps) {
     <div className="pt-16">
       {/* Hero Section */}
       <section className="relative h-screen min-h-[560px] flex items-center justify-center overflow-hidden bg-black">
-        <img
-          src={heroImg}
-          alt="Lush Nature Aquarium aquascape with dense green plants"
-          className="absolute inset-0 w-full h-full object-cover scale-[1.03] opacity-80"
-        />
+        {heroImg ? (
+          <img
+            src={heroImg}
+            alt="Lush Nature Aquarium aquascape with dense green plants"
+            className="absolute inset-0 w-full h-full object-cover scale-[1.03] opacity-80"
+          />
+        ) : (
+          <div className="absolute inset-0 bg-secondary" />
+        )}
         <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/30 to-black/80" />
         <motion.div
           initial={{ opacity: 0, y: 32 }}
@@ -81,11 +91,17 @@ export default function HomeClient({ products, settings }: HomeClientProps) {
               className="group text-left bg-card border border-border rounded-2xl overflow-hidden hover:shadow-2xl hover:shadow-primary/10 hover:-translate-y-1.5 transition-all duration-300 flex flex-col"
             >
               <div className="relative h-52 overflow-hidden bg-muted flex-shrink-0">
-                <img
-                  src={p.img}
-                  alt={p.name}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                />
+                {p.img ? (
+                  <img
+                    src={p.img}
+                    alt={p.name}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                    No Image
+                  </div>
+                )}
                 <div className="absolute top-3 left-3 bg-black/50 backdrop-blur-sm text-white text-[10px] font-semibold tracking-widest uppercase px-2.5 py-1 rounded-full">
                   {p.category}
                 </div>
@@ -116,11 +132,15 @@ export default function HomeClient({ products, settings }: HomeClientProps) {
 
       {/* Aquascape banner */}
       <section className="relative h-60 sm:h-96 overflow-hidden bg-black">
-        <img
-          src={sceneImg}
-          alt="Curved aquarium filled with vibrant aquatic plants and moss"
-          className="w-full h-full object-cover opacity-70"
-        />
+        {sceneImg ? (
+          <img
+            src={sceneImg}
+            alt="Curved aquarium filled with vibrant aquatic plants and moss"
+            className="w-full h-full object-cover opacity-70"
+          />
+        ) : (
+          <div className="w-full h-full bg-secondary opacity-30" />
+        )}
         <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/40 to-transparent flex items-center">
           <div className="px-8 sm:px-16 max-w-lg">
             <h2 className="font-serif text-3xl sm:text-5xl text-white font-light leading-tight mb-3">
@@ -182,7 +202,11 @@ export default function HomeClient({ products, settings }: HomeClientProps) {
       {/* Footer */}
       <footer className="border-t border-border py-8 px-4 text-center">
         <div className="flex items-center justify-center gap-2 mb-2">
-          <img src="/logo.png" alt="Aquatic Emerald Logo" className="w-4 h-4 object-contain" />
+          <img
+            src="/logo.png"
+            alt="Aquatic Emerald Logo"
+            className="w-4 h-4 object-contain"
+          />
           <span className="font-serif text-sm font-medium">
             Aquatic Emerald
           </span>

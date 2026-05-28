@@ -1,11 +1,19 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/app/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/app/components/ui/table";
 import { Button } from "@/app/components/ui/button";
 import { Plus, Edit, Trash2 } from "lucide-react";
 import CategoryFormDialog from "./CategoryFormDialog";
 import { toast } from "sonner";
+import { getLucideIconByName } from "@/lib/lucideIcon";
 
 interface Category {
   id: number;
@@ -91,9 +99,14 @@ export default function CategoriesPageClient() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-serif text-3xl font-medium">Categories</h1>
-          <p className="text-muted-foreground text-sm">Manage product categories</p>
+          <p className="text-muted-foreground text-sm">
+            Manage product categories
+          </p>
         </div>
-        <Button className="gap-2 cursor-pointer" onClick={() => setDialogOpen(true)}>
+        <Button
+          className="gap-2 cursor-pointer"
+          onClick={() => setDialogOpen(true)}
+        >
           <Plus className="w-4 h-4" /> New Category
         </Button>
       </div>
@@ -114,7 +127,10 @@ export default function CategoriesPageClient() {
           <TableBody>
             {categories.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-12 text-muted-foreground font-light">
+                <TableCell
+                  colSpan={7}
+                  className="text-center py-12 text-muted-foreground font-light"
+                >
                   No categories found. Create your first category!
                 </TableCell>
               </TableRow>
@@ -123,14 +139,39 @@ export default function CategoriesPageClient() {
                 <TableRow key={cat.id}>
                   <TableCell className="font-medium">{cat.name}</TableCell>
                   <TableCell>
-                    <code className="text-xs bg-muted px-2 py-1 rounded">{cat.slug}</code>
+                    <code className="text-xs bg-muted px-2 py-1 rounded">
+                      {cat.slug}
+                    </code>
                   </TableCell>
                   <TableCell className="max-w-md truncate text-muted-foreground text-sm">
                     {cat.description || "—"}
                   </TableCell>
                   <TableCell>
-                    <code className="text-xs bg-muted px-2 py-1 rounded">{cat.icon_name || "Package"}</code>
+                    <div className="flex items-center gap-2">
+                      <div className="h-8 w-8 rounded border bg-muted flex items-center justify-center overflow-hidden shrink-0">
+                        {cat.image_url ? (
+                          <img
+                            src={cat.image_url}
+                            alt={cat.name}
+                            className="h-full w-full object-contain"
+                          />
+                        ) : (
+                          (() => {
+                            const Icon = getLucideIconByName(
+                              cat.icon_name,
+                            ) as any;
+                            return <Icon className="h-4 w-4 text-primary" />;
+                          })()
+                        )}
+                      </div>
+                      <code className="text-[10px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground truncate max-w-[80px]">
+                        {cat.image_url
+                          ? "Custom URL"
+                          : cat.icon_name || "Package"}
+                      </code>
+                    </div>
                   </TableCell>
+
                   <TableCell>{cat.sort_order}</TableCell>
                   <TableCell>
                     <span

@@ -5,11 +5,8 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Product } from "@/lib/staticData";
 import { motion, AnimatePresence } from "motion/react";
-import {
-  Search,
-  Layers,
-  HelpCircle,
-} from "lucide-react";
+import { Search, Layers, HelpCircle } from "lucide-react";
+import { getLucideIconByName } from "@/lib/lucideIcon";
 
 interface ProductsClientProps {
   products: Product[];
@@ -21,9 +18,11 @@ export default function ProductsClient({ products }: ProductsClientProps) {
 
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
-  
+
   // Dynamic categories from database
-  const [categories, setCategories] = useState<{ slug: string; name: string }[]>([]);
+  const [categories, setCategories] = useState<
+    { slug: string; name: string; icon_name?: string; image_url?: string }[]
+  >([]);
 
   useEffect(() => {
     async function loadCategories() {
@@ -31,10 +30,14 @@ export default function ProductsClient({ products }: ProductsClientProps) {
         const res = await fetch("/api/categories");
         if (res.ok) {
           const data = await res.json();
-          const activeCats = data.filter((c: any) => c.active).map((c: any) => ({
-            slug: c.slug,
-            name: c.name,
-          }));
+          const activeCats = data
+            .filter((c: any) => c.active)
+            .map((c: any) => ({
+              slug: c.slug,
+              name: c.name,
+              icon_name: c.icon_name,
+              image_url: c.image_url,
+            }));
           setCategories(activeCats);
         }
       } catch (err) {
@@ -61,8 +64,6 @@ export default function ProductsClient({ products }: ProductsClientProps) {
       router.push(`/products?category=${cat}`, { scroll: false });
     }
   };
-
-
 
   // Perform multi-dimensional filter: both category AND search query
   const filtered = products
@@ -112,42 +113,62 @@ export default function ProductsClient({ products }: ProductsClientProps) {
       <div className="flex gap-2 flex-wrap mb-10 items-center">
         <button
           onClick={() => handleCategoryChange("all")}
-          className={`px-5 py-2.5 rounded-full text-sm font-medium transition-all duration-200 cursor-pointer
-            ${activeCategory === "all"
-              ? "bg-primary text-primary-foreground shadow-sm shadow-primary/25"
-              : "bg-secondary text-secondary-foreground hover:bg-accent"}`}
+          className={`px-5 py-2.5 rounded-full text-sm font-medium transition-all duration-200 cursor-pointer flex items-center gap-2
+            ${
+              activeCategory === "all"
+                ? "bg-primary text-primary-foreground shadow-sm shadow-primary/25"
+                : "bg-secondary text-secondary-foreground hover:bg-accent"
+            }`}
         >
+          <Layers className="w-3.5 h-3.5" />
           <span>All</span>
         </button>
 
-        {categories.map((c) => (
-          <button
-            key={c.slug}
-            onClick={() => handleCategoryChange(c.slug)}
-            className={`px-5 py-2.5 rounded-full text-sm font-medium transition-all duration-200 cursor-pointer
-                ${activeCategory === c.slug
-                  ? "bg-primary text-primary-foreground shadow-sm shadow-primary/25"
-                  : "bg-secondary text-secondary-foreground hover:bg-accent"}`}
-          >
-            <span>{c.name}</span>
-          </button>
-        ))}
+        {categories.map((c) => {
+          const Icon = getLucideIconByName(c.icon_name) as any;
+          return (
+            <button
+              key={c.slug}
+              onClick={() => handleCategoryChange(c.slug)}
+              className={`px-5 py-2.5 rounded-full text-sm font-medium transition-all duration-200 cursor-pointer flex items-center gap-2
+                ${
+                  activeCategory === c.slug
+                    ? "bg-primary text-primary-foreground shadow-sm shadow-primary/25"
+                    : "bg-secondary text-secondary-foreground hover:bg-accent"
+                }`}
+            >
+              {c.image_url ? (
+                <img
+                  src={c.image_url}
+                  alt={c.name}
+                  className="w-3.5 h-3.5 object-contain"
+                />
+              ) : (
+                <Icon className="w-3.5 h-3.5" />
+              )}
+              <span>{c.name}</span>
+            </button>
+          );
+        })}
       </div>
 
       {/* Grid */}
-      <motion.div 
+      <motion.div
         layout
         className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
       >
-        <AnimatePresence mode="popLayout">
+        <AnimatePresence mode="popLayout" initial={false}>
           {filtered.map((p) => (
             <motion.div
               key={p.id}
               layout
-              initial={{ opacity: 0, scale: 0.9 }}
+              initial={{ opacity: 0, scale: 0.96 }}
               animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              transition={{ duration: 0.25 }}
+              exit={{ opacity: 0, scale: 0.96 }}
+              transition={{
+                duration: 0.2,
+                ease: [0.23, 1, 0.32, 1], // Custom ease-out quint for a snappy feel
+              }}
               className="flex"
             >
               <Link
@@ -155,11 +176,17 @@ export default function ProductsClient({ products }: ProductsClientProps) {
                 className="group text-left bg-card border border-border rounded-2xl overflow-hidden hover:shadow-2xl hover:shadow-primary/10 hover:-translate-y-1.5 transition-all duration-300 flex flex-col w-full"
               >
                 <div className="relative h-52 overflow-hidden bg-muted flex-shrink-0">
-                  <img
-                    src={p.img}
-                    alt={p.name}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                  />
+                  {p.img ? (
+                    <img
+                      src={p.img}
+                      alt={p.name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                      No Image
+                    </div>
+                  )}
                   {p.variants.length === 0 && (
                     <div className="absolute inset-0 bg-black/55 flex items-center justify-center">
                       <span className="text-white text-xs font-semibold tracking-widest uppercase">
@@ -173,16 +200,32 @@ export default function ProductsClient({ products }: ProductsClientProps) {
                   {p.variants.length > 0 && (
                     <div className="absolute top-3 right-3 bg-black/50 backdrop-blur-sm text-white text-[9px] px-2 py-0.5 rounded-full font-light">
                       {(() => {
-                        const stockLevels = p.variants.map((v) => v.stock_level || (v.stock_quantity && v.stock_quantity > 20 ? 'high' : v.stock_quantity && v.stock_quantity > 10 ? 'med' : v.stock_quantity && v.stock_quantity > 0 ? 'low' : 'none'));
-                        const allSame = stockLevels.every((s) => s === stockLevels[0]);
-                        const stockLabel = allSame ? (stockLevels[0] || 'none') : 'Mixed';
+                        const stockLevels = p.variants.map(
+                          (v) =>
+                            v.stock_level ||
+                            (v.stock_quantity && v.stock_quantity > 20
+                              ? "high"
+                              : v.stock_quantity && v.stock_quantity > 10
+                                ? "med"
+                                : v.stock_quantity && v.stock_quantity > 0
+                                  ? "low"
+                                  : "none"),
+                        );
+                        const allSame = stockLevels.every(
+                          (s) => s === stockLevels[0],
+                        );
+                        const stockLabel = allSame
+                          ? stockLevels[0] || "none"
+                          : "Mixed";
                         return `Stock: ${stockLabel.charAt(0).toUpperCase() + stockLabel.slice(1)}`;
                       })()}
                     </div>
                   )}
                 </div>
                 <div className="p-5 flex-grow flex flex-col">
-                  <h3 className="font-serif font-medium text-base mb-2">{p.name}</h3>
+                  <h3 className="font-serif font-medium text-base mb-2">
+                    {p.name}
+                  </h3>
                   <p className="text-xs text-muted-foreground line-clamp-3 mb-4 leading-relaxed flex-grow font-light">
                     {p.description}
                   </p>
@@ -194,7 +237,9 @@ export default function ProductsClient({ products }: ProductsClientProps) {
                           : `$${p.variants[0].price.toFixed(2)}`}
                       </p>
                     ) : (
-                      <p className="text-muted-foreground text-sm font-light">Coming Soon</p>
+                      <p className="text-muted-foreground text-sm font-light">
+                        Coming Soon
+                      </p>
                     )}
                   </div>
                 </div>
@@ -203,11 +248,13 @@ export default function ProductsClient({ products }: ProductsClientProps) {
           ))}
         </AnimatePresence>
       </motion.div>
-      
+
       {filtered.length === 0 && (
         <div className="text-center py-20 bg-card border border-border border-dashed rounded-3xl flex flex-col items-center justify-center">
           <HelpCircle className="w-10 h-10 text-muted-foreground mb-3" />
-          <p className="text-muted-foreground text-sm font-serif font-light">No products found matching your criteria.</p>
+          <p className="text-muted-foreground text-sm font-serif font-light">
+            No products found matching your criteria.
+          </p>
         </div>
       )}
     </div>
