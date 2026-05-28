@@ -12,14 +12,10 @@ import {
   Moon,
   X,
   Menu,
-  Sprout,
-  Fish,
-  Shell,
-  Droplet,
-  Package,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Category } from "@/lib/staticData";
+import { getLucideIconByName } from "@/lib/lucideIcon";
 
 export default function Navbar() {
   const { cartCount } = useCart();
@@ -32,11 +28,11 @@ export default function Navbar() {
   const dropRef = useRef<HTMLDivElement>(null);
 
   // Dynamic database-driven categories
-  const [categories, setCategories] = useState<{ slug: string; name: string }[]>([
-    { slug: "plants", name: "Plants" },
-    { slug: "shrimp", name: "Shrimp" },
-    { slug: "snails", name: "Snails" },
-    { slug: "fish",   name: "Fish" },
+  const [categories, setCategories] = useState<{ slug: string; name: string; icon_name?: string }[]>([
+    { slug: "plants", name: "Plants", icon_name: "sprout" },
+    { slug: "shrimp", name: "Shrimp", icon_name: "shrimp" },
+    { slug: "snails", name: "Snails", icon_name: "shell" },
+    { slug: "fish",   name: "Fish", icon_name: "fish" },
   ]);
 
   useEffect(() => {
@@ -50,6 +46,7 @@ export default function Navbar() {
             .map((c: any) => ({
               slug: c.slug,
               name: c.name,
+              icon_name: c.icon_name || "package",
             }));
           if (activeCats.length > 0) {
             setCategories(activeCats);
@@ -83,16 +80,6 @@ export default function Navbar() {
   const handleCategoryClick = (cat: string) => {
     router.push(`/products?category=${cat}`);
     setDropOpen(false);
-  };
-
-  // Maps a category slug to a Lucide icon component
-  const getCategoryIcon = (slug: string) => {
-    const s = slug.toLowerCase();
-    if (s.includes("plant")) return Sprout;
-    if (s.includes("fish")) return Fish;
-    if (s.includes("snail")) return Shell;
-    if (s.includes("shrimp")) return Droplet;
-    return Package;
   };
 
   return (
@@ -151,8 +138,15 @@ export default function Navbar() {
                   transition={{ duration: 0.15 }}
                   className="absolute top-full left-1/2 -translate-x-1/2 mt-3 w-44 bg-card border border-border rounded-2xl shadow-2xl overflow-hidden"
                 >
+                  <button
+                    onClick={() => handleCategoryClick("all")}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-sm hover:bg-accent transition-colors text-left font-medium cursor-pointer"
+                  >
+                    <span className="w-4 h-4 flex items-center justify-center text-primary">All</span>
+                    <span>All</span>
+                  </button>
                   {categories.map((c) => {
-                    const IconComp = getCategoryIcon(c.slug);
+                    const IconComp = getLucideIconByName(c.icon_name);
                     return (
                       <button
                         key={c.slug}
@@ -256,7 +250,7 @@ export default function Navbar() {
                   All Products
                 </Link>
                 {categories.map((c) => {
-                  const IconComp = getCategoryIcon(c.slug);
+                  const IconComp = getLucideIconByName(c.icon_name);
                   return (
                     <button
                       key={c.slug}

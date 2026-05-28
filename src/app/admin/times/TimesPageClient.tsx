@@ -263,27 +263,27 @@ export default function TimesPageClient() {
               <Button
                 variant="ghost"
                 onClick={() => handleBulkToggleActive(true)}
-                className="text-green-600 hover:text-green-700"
+                className="text-green-600 hover:text-green-700 cursor-pointer"
               >
                 <CheckCircle2 className="w-4 h-4 mr-1" /> Enable Selected
               </Button>
               <Button
                 variant="ghost"
                 onClick={() => handleBulkToggleActive(false)}
-                className="text-yellow-600 hover:text-yellow-700"
+                className="text-yellow-600 hover:text-yellow-700 cursor-pointer"
               >
                 <XCircle className="w-4 h-4 mr-1" /> Disable Selected
               </Button>
               <Button
                 variant="ghost"
                 onClick={handleBulkDelete}
-                className="text-destructive hover:text-destructive"
+                className="text-destructive hover:text-destructive cursor-pointer"
               >
                 <Trash2 className="w-4 h-4 mr-1" /> Delete Selected
               </Button>
             </>
           )}
-          <Button className="gap-2" onClick={handleCreate}>
+          <Button className="gap-2 cursor-pointer" onClick={handleCreate}>
             <Plus className="w-4 h-4" /> New Time Rule
           </Button>
         </div>
@@ -349,7 +349,7 @@ export default function TimesPageClient() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8"
+                        className="h-8 w-8 cursor-pointer"
                         onClick={() => handleEdit(rule)}
                       >
                         <Edit className="w-4 h-4" />
@@ -357,7 +357,7 @@ export default function TimesPageClient() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 text-destructive hover:text-destructive"
+                        className="h-8 w-8 text-destructive hover:text-destructive cursor-pointer"
                         onClick={() => handleDelete(rule.id)}
                       >
                         <Trash2 className="w-4 h-4" />
@@ -466,10 +466,10 @@ export default function TimesPageClient() {
             </div>
           </div>
           <DialogFooter className="mt-6">
-            <Button variant="ghost" onClick={handleDialogClose}>
+            <Button variant="ghost" className="cursor-pointer" onClick={handleDialogClose}>
               Cancel
             </Button>
-            <Button onClick={handleSave}>
+            <Button className="cursor-pointer" onClick={handleSave}>
               {editingRule ? "Update" : "Create Rules"}
             </Button>
           </DialogFooter>

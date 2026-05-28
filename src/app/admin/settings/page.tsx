@@ -3,7 +3,14 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/app/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  CardFooter,
+} from "@/app/components/ui/card";
 import { MessageSquare, Mail, Save, ShieldCheck, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -12,7 +19,7 @@ export default function AdminSettingsPage() {
   const [saving, setSaving] = useState(false);
 
   const [whatsapp, setWhatsapp] = useState("");
-  const [email, setEmail] = useState("ryan.zhao254@gmail.com");
+  const [email, setEmail] = useState("");
 
   useEffect(() => {
     async function loadSettings() {
@@ -64,7 +71,9 @@ export default function AdminSettingsPage() {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-2">
         <Loader2 className="w-8 h-8 text-primary animate-spin" />
-        <span className="text-muted-foreground text-sm font-light">Loading configurations...</span>
+        <span className="text-muted-foreground text-sm font-light">
+          Loading configurations...
+        </span>
       </div>
     );
   }
@@ -73,7 +82,9 @@ export default function AdminSettingsPage() {
     <div className="space-y-6 max-w-2xl">
       <div>
         <h1 className="font-serif text-3xl font-medium">Store Settings</h1>
-        <p className="text-muted-foreground text-sm">Global configurations for your shop</p>
+        <p className="text-muted-foreground text-sm">
+          Global configurations for your shop
+        </p>
       </div>
 
       <form onSubmit={handleSave}>
@@ -84,7 +95,8 @@ export default function AdminSettingsPage() {
               <CardTitle className="text-lg">Contact & Communication</CardTitle>
             </div>
             <CardDescription>
-              Configure the seller coordinates used for WhatsApp messaging and order receipt notifications.
+              Configure the seller coordinates used for WhatsApp messaging and
+              order receipt notifications.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -107,7 +119,8 @@ export default function AdminSettingsPage() {
                 />
               </div>
               <p className="text-xs text-muted-foreground">
-                Used for the "Message on WhatsApp" button after checkout. Include country code without "+" or spaces.
+                Used for the "Message on WhatsApp" button after checkout.
+                Include country code without "+" or spaces.
               </p>
             </div>
 
@@ -121,11 +134,12 @@ export default function AdminSettingsPage() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="ryan.zhao254@gmail.com"
+                placeholder="seller@example.com"
                 required
               />
               <p className="text-xs text-muted-foreground">
-                Order confirmation receipts will be carbon-copied to this address automatically.
+                Order confirmation receipts will be carbon-copied to this
+                address automatically.
               </p>
             </div>
           </CardContent>

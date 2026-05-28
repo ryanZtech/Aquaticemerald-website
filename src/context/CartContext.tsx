@@ -3,6 +3,15 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { CartItem } from "@/lib/staticData";
 
+function getMaxAllowedQty(item: CartItem) {
+  if (item.stock_level === "none") return 0;
+  if (item.stock_level === "low") return 1;
+  if (typeof item.stock_quantity === "number" && item.stock_quantity > 0) {
+    return item.stock_quantity;
+  }
+  return 999;
+}
+
 interface CartContextType {
   cart: CartItem[];
   addToCart: (item: CartItem) => void;
@@ -41,17 +50,26 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const addToCart = (item: CartItem) => {
     setCart((prev) => {
+      const maxAllowed = getMaxAllowedQty(item);
+      if (maxAllowed <= 0) {
+        return prev;
+      }
+
       const exists = prev.find(
         (i) => i.productId === item.productId && i.variantId === item.variantId
       );
       if (exists) {
         return prev.map((i) =>
           i.productId === item.productId && i.variantId === item.variantId
-            ? { ...i, qty: i.qty + item.qty }
+            ? {
+                ...i,
+                ...item,
+                qty: Math.min(maxAllowed, i.qty + item.qty),
+              }
             : i
         );
       }
-      return [...prev, item];
+      return [...prev, { ...item, qty: Math.min(maxAllowed, item.qty) }];
     });
   };
 
@@ -63,7 +81,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     } else {
       setCart((prev) =>
         prev.map((i) =>
-          i.productId === productId && i.variantId === variantId ? { ...i, qty } : i
+          i.productId === productId && i.variantId === variantId
+            ? { ...i, qty: Math.min(getMaxAllowedQty(i), qty) }
+            : i
         )
       );
     }

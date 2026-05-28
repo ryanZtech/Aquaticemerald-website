@@ -14,6 +14,7 @@ import { Label } from "@/app/components/ui/label";
 import { Textarea } from "@/app/components/ui/textarea";
 import { Switch } from "@/app/components/ui/switch";
 import { toast } from "sonner";
+import { getLucideIconByName, normalizeLucideIconName } from "@/lib/lucideIcon";
 
 interface CategoryFormDialogProps {
   open: boolean;
@@ -33,8 +34,10 @@ export default function CategoryFormDialog({
   const [slug, setSlug] = useState("");
   const [description, setDescription] = useState("");
   const [imageUrl, setImageUrl] = useState("");
+  const [iconName, setIconName] = useState("package");
   const [sortOrder, setSortOrder] = useState(0);
   const [active, setActive] = useState(true);
+  const IconPreview = getLucideIconByName(iconName) as any;
 
   useEffect(() => {
     if (open) {
@@ -43,6 +46,7 @@ export default function CategoryFormDialog({
         setSlug(editingCategory.slug);
         setDescription(editingCategory.description || "");
         setImageUrl(editingCategory.image_url || "");
+        setIconName(editingCategory.icon_name || "package");
         setSortOrder(editingCategory.sort_order || 0);
         setActive(editingCategory.active);
       } else {
@@ -56,6 +60,7 @@ export default function CategoryFormDialog({
     setSlug("");
     setDescription("");
     setImageUrl("");
+    setIconName("package");
     setSortOrder(0);
     setActive(true);
   };
@@ -90,6 +95,7 @@ export default function CategoryFormDialog({
         slug,
         description,
         imageUrl,
+        iconName,
         sortOrder,
         active,
       };
@@ -109,7 +115,7 @@ export default function CategoryFormDialog({
         toast.success(
           editingCategory
             ? "Category updated successfully"
-            : "Category created successfully"
+            : "Category created successfully",
         );
         onSaved();
       } else {
@@ -179,6 +185,30 @@ export default function CategoryFormDialog({
             />
           </div>
 
+          <div className="space-y-2">
+            <Label htmlFor="iconName">Lucide Icon Name</Label>
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-md border bg-muted shrink-0">
+                <IconPreview className="h-5 w-5 text-primary" />
+              </div>
+              <Input
+                id="iconName"
+                value={iconName}
+                onChange={(e) => setIconName(e.target.value)}
+                placeholder="e.g. Fish, Waves, Sprout, ShoppingCart"
+                className="flex-1"
+              />
+            </div>
+            <p className="text-[10px] text-muted-foreground font-light italic">
+              Try names like:{" "}
+              <span className="font-mono text-primary/70">
+                Waves, Fish, Sprout, Leaf, Anchor, Waves, Droplets
+              </span>
+              . Auto-normalized to:{" "}
+              <code>{normalizeLucideIconName(iconName)}</code>
+            </p>
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="sortOrder">Sort Order</Label>
@@ -207,15 +237,21 @@ export default function CategoryFormDialog({
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              disabled={loading}
+              className="cursor-pointer"
+            >
               Cancel
             </Button>
-            <Button type="submit" disabled={loading}>
+            <Button type="submit" disabled={loading} className="cursor-pointer">
               {loading
                 ? "Saving..."
                 : editingCategory
-                ? "Update Category"
-                : "Create Category"}
+                  ? "Update Category"
+                  : "Create Category"}
             </Button>
           </DialogFooter>
         </form>

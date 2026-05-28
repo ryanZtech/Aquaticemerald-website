@@ -13,6 +13,7 @@ interface Category {
   slug: string;
   description: string;
   image_url: string;
+  icon_name: string;
   parent_id: number | null;
   sort_order: number;
   active: boolean;
@@ -92,7 +93,7 @@ export default function CategoriesPageClient() {
           <h1 className="font-serif text-3xl font-medium">Categories</h1>
           <p className="text-muted-foreground text-sm">Manage product categories</p>
         </div>
-        <Button className="gap-2" onClick={() => setDialogOpen(true)}>
+        <Button className="gap-2 cursor-pointer" onClick={() => setDialogOpen(true)}>
           <Plus className="w-4 h-4" /> New Category
         </Button>
       </div>
@@ -104,6 +105,7 @@ export default function CategoriesPageClient() {
               <TableHead>Name</TableHead>
               <TableHead>Slug</TableHead>
               <TableHead>Description</TableHead>
+              <TableHead>Icon</TableHead>
               <TableHead>Sort Order</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Actions</TableHead>
@@ -112,7 +114,7 @@ export default function CategoriesPageClient() {
           <TableBody>
             {categories.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-12 text-muted-foreground font-light">
+                <TableCell colSpan={7} className="text-center py-12 text-muted-foreground font-light">
                   No categories found. Create your first category!
                 </TableCell>
               </TableRow>
@@ -125,6 +127,9 @@ export default function CategoriesPageClient() {
                   </TableCell>
                   <TableCell className="max-w-md truncate text-muted-foreground text-sm">
                     {cat.description || "—"}
+                  </TableCell>
+                  <TableCell>
+                    <code className="text-xs bg-muted px-2 py-1 rounded">{cat.icon_name || "Package"}</code>
                   </TableCell>
                   <TableCell>{cat.sort_order}</TableCell>
                   <TableCell>
@@ -143,7 +148,7 @@ export default function CategoriesPageClient() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8"
+                        className="h-8 w-8 cursor-pointer"
                         onClick={() => handleEdit(cat)}
                       >
                         <Edit className="w-4 h-4" />
@@ -151,7 +156,7 @@ export default function CategoriesPageClient() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 text-destructive hover:text-destructive"
+                        className="h-8 w-8 text-destructive hover:text-destructive cursor-pointer"
                         onClick={() => handleDelete(cat.id, cat.name)}
                       >
                         <Trash2 className="w-4 h-4" />

@@ -1,20 +1,46 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 
+function getStockLevelFromQuantity(quantity: number) {
+  if (quantity <= 0) return "none";
+  if (quantity <= 1) return "low";
+  if (quantity <= 10) return "med";
+  return "high";
+}
+
 export async function PUT(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   if (!sql) {
-    return NextResponse.json({ error: "Database not configured" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Database not configured" },
+      { status: 500 },
+    );
   }
 
   try {
     const { id } = await params;
-    const { stock_level, stock_quantity } = await request.json();
+    const body = await request.json();
+    let { stock_level, stock_quantity } = body;
 
     if (!stock_level && stock_quantity === undefined) {
-      return NextResponse.json({ error: "No stock data provided" }, { status: 400 });
+      return NextResponse.json(
+        { error: "No stock data provided" },
+        { status: 400 },
+      );
+    }
+
+    if (stock_quantity !== undefined) {
+      stock_quantity = Math.max(0, Number(stock_quantity) || 0);
+      if (!stock_level) {
+        stock_level = getStockLevelFromQuantity(stock_quantity);
+      }
+    }
+
+    if (stock_level && stock_quantity === undefined) {
+      if (stock_level === "none") stock_quantity = 0;
+      if (stock_level === "low") stock_quantity = 1;
     }
 
     const updates: string[] = [];
@@ -43,6 +69,9 @@ export async function PUT(
     return NextResponse.json(result[0]);
   } catch (error) {
     console.error("Error updating variant:", error);
-    return NextResponse.json({ error: "Failed to update variant" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to update variant" },
+      { status: 500 },
+    );
   }
 }

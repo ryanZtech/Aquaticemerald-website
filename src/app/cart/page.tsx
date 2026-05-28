@@ -40,6 +40,12 @@ export default function CartPage() {
           {/* Cart Items List */}
           <div className="space-y-3 mb-8">
             {cart.map((item) => {
+              const maxQty =
+                item.stock_level === "none"
+                  ? 0
+                  : item.stock_level === "low"
+                    ? 1
+                    : Math.max(1, Number(item.stock_quantity || 999));
                           return (
                             <div
                               key={`${item.productId}-${item.variantId}`}
@@ -71,6 +77,7 @@ export default function CartPage() {
                         onClick={() => updateQty(item.productId, item.variantId, item.qty - 1)}
                         className="w-7 h-7 flex items-center justify-center hover:bg-accent transition-colors cursor-pointer"
                         aria-label="Decrease quantity"
+                        disabled={maxQty <= 1}
                       >
                         <Minus className="w-3 h-3" />
                       </button>
@@ -79,6 +86,7 @@ export default function CartPage() {
                         onClick={() => updateQty(item.productId, item.variantId, item.qty + 1)}
                         className="w-7 h-7 flex items-center justify-center hover:bg-accent transition-colors cursor-pointer"
                         aria-label="Increase quantity"
+                        disabled={maxQty <= 0 || item.qty >= maxQty}
                       >
                         <Plus className="w-3 h-3" />
                       </button>
