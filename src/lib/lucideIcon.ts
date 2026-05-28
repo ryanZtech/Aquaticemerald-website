@@ -22,9 +22,9 @@ export function normalizeLucideIconName(value?: string) {
 
 export function getLucideIconByName(value?: string) {
   const normalized = normalizeLucideIconName(value);
-  const icon = (LucideIcons as LucideModule)[normalized];
+  const icon = (LucideIcons as any)[normalized];
 
-  if (typeof icon === "function") {
+  if (typeof icon === "function" || (icon && typeof icon === "object")) {
     return icon as LucideIconComponent;
   }
 
