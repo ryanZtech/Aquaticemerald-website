@@ -317,7 +317,7 @@ export default function ProductDetailClient({
 
         {/* Details Section */}
         <div className="flex flex-col">
-          <p className="text-xs text-primary uppercase tracking-widest mb-2.5 capitalize font-semibold">
+          <p className="text-xs text-primary tracking-widest mb-2.5 capitalize font-semibold">
             {product.category}
           </p>
           <h1 className="font-serif text-3xl sm:text-4xl font-medium mb-4 leading-snug">

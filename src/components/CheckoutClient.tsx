@@ -110,6 +110,7 @@ export default function CheckoutClient({
   const [day, setDay] = useState<number | null>(null);
   const [timeWindow, setTimeWindow] = useState("");
   const [phoneError, setPhoneError] = useState(false);
+  const [nameError, setNameError] = useState(false);
   const [orderId, setOrderId] = useState("");
   const [timeRules, setTimeRules] = useState<TimeRule[]>([]);
   const [bookedSlotCounts, setBookedSlotCounts] = useState<
@@ -275,6 +276,7 @@ export default function CheckoutClient({
   };
 
   const canConfirm =
+    name.trim().length >= 2 &&
     phone.trim().length >= 8 &&
     email.trim().includes("@") &&
     location &&
@@ -282,10 +284,18 @@ export default function CheckoutClient({
     timeWindow;
 
   const handleConfirm = async () => {
+    let hasError = false;
+    if (!name.trim() || name.trim().length < 2) {
+      setNameError(true);
+      hasError = true;
+    }
     if (!phone.trim() || phone.trim().length < 8) {
       setPhoneError(true);
-      return;
+      hasError = true;
     }
+
+    if (hasError) return;
+
     if (!email.trim() || !email.includes("@")) {
       alert("Please enter a valid email address");
       return;
@@ -448,18 +458,23 @@ export default function CheckoutClient({
             </div>
             <div>
               <label className="flex items-center gap-2 text-sm font-medium mb-2">
-                <User className="w-4 h-4 text-muted-foreground" /> Name{" "}
-                <span className="text-xs text-muted-foreground font-normal ml-1">
-                  (optional)
-                </span>
+                <User className="w-4 h-4 text-muted-foreground" /> Name *
               </label>
               <input
                 type="text"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  setNameError(false);
+                }}
                 placeholder="Your name"
-                className="w-full px-4 py-3 rounded-xl bg-secondary border border-border focus:border-primary text-sm outline-none focus:ring-2 focus:ring-ring transition"
+                className={`w-full px-4 py-3 rounded-xl bg-secondary border text-sm outline-none focus:ring-2 focus:ring-ring transition ${nameError ? "border-red-500" : "border-border focus:border-primary"}`}
               />
+              {nameError && (
+                <p className="text-xs text-red-500 mt-1">
+                  Please enter your name (min 2 characters).
+                </p>
+              )}
             </div>
           </div>
         </div>

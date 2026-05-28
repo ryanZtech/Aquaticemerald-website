@@ -28,8 +28,8 @@ interface CartItem {
 
 // ── IMAGES ────────────────────────────────────────────────────────────────────
 const IMG = {
-  hero:   "https://images.unsplash.com/photo-1779436853149-2e7d501f71cf?w=1600&h=900&fit=crop&auto=format",
-  scene1: "https://images.unsplash.com/photo-1779436853049-c19542e3c81c?w=1400&h=700&fit=crop&auto=format",
+  hero:   "/hero.png",
+  scene1: "/front1.png",
   t1:     "https://images.unsplash.com/photo-1691387824643-227cc84127cf?w=600&h=600&fit=crop&auto=format",
   t2:     "https://images.unsplash.com/photo-1691387896833-dba10ea7d614?w=600&h=600&fit=crop&auto=format",
   t3:     "https://images.unsplash.com/photo-1691387747539-f681c5fa73d9?w=600&h=600&fit=crop&auto=format",
@@ -600,7 +600,7 @@ function ProductDetailPage({
 
         {/* Details */}
         <div className="flex flex-col">
-          <p className="text-xs text-muted-foreground uppercase tracking-widest mb-2 capitalize font-semibold">
+          <p className="text-xs text-muted-foreground tracking-widest mb-2 capitalize font-semibold">
             {product.category}
           </p>
           <h1 className="font-serif text-3xl sm:text-4xl font-medium mb-4 leading-snug">

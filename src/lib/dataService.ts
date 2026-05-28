@@ -326,7 +326,12 @@ export async function getSellerWhatsApp(): Promise<string> {
     `;
 
     if (rows.length === 0) return "";
-    return rows[0].value;
+    let val = String(rows[0].value || "").replace(/\D/g, "");
+    // If value starts with 0, assume AU country code +61
+    if (val.startsWith("0")) {
+      val = "61" + val.substring(1);
+    }
+    return val;
   } catch (error) {
     console.error("Neon Database query failed for WhatsApp setting:", error);
     return "";
