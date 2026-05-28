@@ -171,6 +171,7 @@ export async function POST(request: NextRequest) {
       const file = newImages[i];
       const blob = await put(`products/${productId}/${file.name}`, file, {
         access: "public",
+        addRandomSuffix: true,
       });
       uploadedProductImages.push({
         image_url: blob.url,
@@ -218,6 +219,7 @@ export async function POST(request: NextRequest) {
           variantImageFile,
           {
             access: "public",
+            addRandomSuffix: true,
           },
         );
         await sql`
