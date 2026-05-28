@@ -1,4 +1,4 @@
-﻿﻿import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { buildCustomerHtml, buildSellerHtml } from "@/lib/emailTemplatesSimple";
 
@@ -186,7 +186,7 @@ export async function POST(request: NextRequest) {
 
     // compute pickup display values and year
     const currentYear = new Date().getFullYear();
-    const pickupDetails = pickupLocationId ? await sql`SELECT name, detail FROM pickup_locations WHERE id = ${pickupLocationId}` : [];
+    const pickupDetails = pickupLocationId ? await sql`SELECT name, address AS detail FROM pickup_locations WHERE id = ${pickupLocationId}` : [];
     const pickupName = pickupDetails[0]?.name || 'N/A';
     const pickupDetail = pickupDetails[0]?.detail || '';
     const pickupDateObj = pickup_slot_at ? new Date(pickup_slot_at) : null;
@@ -200,7 +200,7 @@ export async function POST(request: NextRequest) {
     // Send emails using extracted templates if Resend key is present
     const RESEND_API_KEY = process.env.RESEND_API_KEY;
     if (RESEND_API_KEY) {
-      const fromEmail = process.env.EMAIL_FROM || 'onboarding@resend.dev';
+      const fromEmail = process.env.EMAIL_FROM || 'Aquatic Emerald <orders@aquaticemerald.com>';
 
       if (customer_email) {
         const customerHtml = buildCustomerHtml({

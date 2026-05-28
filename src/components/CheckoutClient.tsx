@@ -22,6 +22,7 @@ import {
   Check,
   MessageCircle,
   Mail,
+  Loader2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -627,10 +628,20 @@ export default function CheckoutClient({
           >
             <button
               onClick={handleConfirm}
-              className="w-full py-5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-full font-semibold text-sm tracking-wide transition-all duration-300 flex items-center justify-center gap-3 hover:shadow-xl hover:shadow-emerald-600/30 hover:-translate-y-0.5 cursor-pointer"
+              disabled={saving}
+              className={`w-full py-5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-full font-semibold text-sm tracking-wide transition-all duration-300 flex items-center justify-center gap-3 hover:shadow-xl hover:shadow-emerald-600/30 hover:-translate-y-0.5 cursor-pointer ${saving ? "opacity-75 cursor-not-allowed" : ""}`}
             >
-              <MessageCircle className="w-5 h-5" />
-              Confirm & Message on WhatsApp
+              {saving ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span>Processing Order...</span>
+                </>
+              ) : (
+                <>
+                  <MessageCircle className="w-5 h-5" />
+                  <span>Confirm & Message on WhatsApp</span>
+                </>
+              )}
             </button>
             <p className="text-center text-xs text-muted-foreground mt-3 leading-relaxed font-light">
               This opens WhatsApp with your order reference number pre-filled.
