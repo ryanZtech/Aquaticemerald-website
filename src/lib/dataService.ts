@@ -29,6 +29,12 @@ function mapDbProduct(row: any): Product {
   let dbImages = [];
   if (Array.isArray(row.images)) {
     dbImages = row.images;
+  } else if (typeof row.images === "string") {
+    try {
+      dbImages = JSON.parse(row.images);
+    } catch {
+      dbImages = [];
+    }
   }
 
   let dbVariantOptions = [];
@@ -83,21 +89,42 @@ export async function getProducts(category?: string): Promise<Product[]> {
         (SELECT value FROM product_attribute_values pav JOIN product_attributes pa ON pav.attribute_id = pa.id WHERE pav.product_id = p.id AND pa.name = 'Average Size') as avg_size,
         (SELECT value FROM product_attribute_values pav JOIN product_attributes pa ON pav.attribute_id = pa.id WHERE pav.product_id = p.id AND pa.name = 'Origin') as origin,
         (SELECT value FROM product_attribute_values pav JOIN product_attributes pa ON pav.attribute_id = pa.id WHERE pav.product_id = p.id AND pa.name = 'Variant Options') as variant_options,
-        coalesce(
-          json_agg(
-            json_build_object('id', v.id, 'label', v.label, 'price', v.price, 'stock_level', v.stock_level, 'stock_quantity', v.stock_quantity, 'image_url', (SELECT image_url FROM variant_images WHERE variant_id = v.id AND is_primary = TRUE LIMIT 1))
-          ) FILTER (WHERE v.id IS NOT NULL), '[]'
-        ) as variants,
-        coalesce(
-          json_agg(
-            json_build_object('id', img.id, 'image_url', img.image_url, 'alt_text', img.alt_text, 'is_primary', img.is_primary)
-          ) FILTER (WHERE img.id IS NOT NULL), '[]'
-        ) as images
+        coalesce((
+          SELECT json_agg(
+            json_build_object(
+              'id', v.id,
+              'label', v.label,
+              'price', v.price,
+              'stock_level', v.stock_level,
+              'stock_quantity', v.stock_quantity,
+              'image_url', (
+                SELECT vi.image_url
+                FROM variant_images vi
+                WHERE vi.variant_id = v.id AND vi.is_primary = TRUE
+                LIMIT 1
+              )
+            )
+            ORDER BY v.label
+          )
+          FROM product_variants v
+          WHERE v.product_id = p.id
+        ), '[]'::json) as variants,
+        coalesce((
+          SELECT json_agg(
+            json_build_object(
+              'id', img.id,
+              'image_url', img.image_url,
+              'alt_text', img.alt_text,
+              'is_primary', img.is_primary
+            )
+            ORDER BY img.is_primary DESC, img.id ASC
+          )
+          FROM images img
+          WHERE img.product_id = p.id
+        ), '[]'::json) as images
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
       LEFT JOIN images i ON p.id = i.product_id AND i.is_primary = TRUE
-      LEFT JOIN images img ON p.id = img.product_id
-      LEFT JOIN product_variants v ON p.id = v.product_id
       GROUP BY p.id, p.slug, p.name, c.slug, p.full_description, i.image_url
     `;
 
@@ -129,21 +156,42 @@ export async function getProductBySlug(slug: string): Promise<Product | null> {
         (SELECT value FROM product_attribute_values pav JOIN product_attributes pa ON pav.attribute_id = pa.id WHERE pav.product_id = p.id AND pa.name = 'Average Size') as avg_size,
         (SELECT value FROM product_attribute_values pav JOIN product_attributes pa ON pav.attribute_id = pa.id WHERE pav.product_id = p.id AND pa.name = 'Origin') as origin,
         (SELECT value FROM product_attribute_values pav JOIN product_attributes pa ON pav.attribute_id = pa.id WHERE pav.product_id = p.id AND pa.name = 'Variant Options') as variant_options,
-        coalesce(
-          json_agg(
-            json_build_object('id', v.id, 'label', v.label, 'price', v.price, 'stock_level', v.stock_level, 'stock_quantity', v.stock_quantity, 'image_url', (SELECT image_url FROM variant_images WHERE variant_id = v.id AND is_primary = TRUE LIMIT 1))
-          ) FILTER (WHERE v.id IS NOT NULL), '[]'
-        ) as variants,
-        coalesce(
-          json_agg(
-            json_build_object('id', img.id, 'image_url', img.image_url, 'alt_text', img.alt_text, 'is_primary', img.is_primary)
-          ) FILTER (WHERE img.id IS NOT NULL), '[]'
-        ) as images
+        coalesce((
+          SELECT json_agg(
+            json_build_object(
+              'id', v.id,
+              'label', v.label,
+              'price', v.price,
+              'stock_level', v.stock_level,
+              'stock_quantity', v.stock_quantity,
+              'image_url', (
+                SELECT vi.image_url
+                FROM variant_images vi
+                WHERE vi.variant_id = v.id AND vi.is_primary = TRUE
+                LIMIT 1
+              )
+            )
+            ORDER BY v.label
+          )
+          FROM product_variants v
+          WHERE v.product_id = p.id
+        ), '[]'::json) as variants,
+        coalesce((
+          SELECT json_agg(
+            json_build_object(
+              'id', img.id,
+              'image_url', img.image_url,
+              'alt_text', img.alt_text,
+              'is_primary', img.is_primary
+            )
+            ORDER BY img.is_primary DESC, img.id ASC
+          )
+          FROM images img
+          WHERE img.product_id = p.id
+        ), '[]'::json) as images
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
       LEFT JOIN images i ON p.id = i.product_id AND i.is_primary = TRUE
-      LEFT JOIN images img ON p.id = img.product_id
-      LEFT JOIN product_variants v ON p.id = v.product_id
       WHERE p.slug = ${slug} OR p.id = ${slug}
       GROUP BY p.id, p.slug, p.name, c.slug, p.full_description, i.image_url
       LIMIT 1

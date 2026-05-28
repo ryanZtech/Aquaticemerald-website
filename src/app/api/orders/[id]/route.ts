@@ -87,3 +87,47 @@ export async function PUT(
     return NextResponse.json({ error: "Failed to update order" }, { status: 500 });
   }
 }
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  if (!sql) {
+    return NextResponse.json({ error: "Database not configured" }, { status: 500 });
+  }
+
+  try {
+    const { id } = await params;
+    const orderId = parseInt(id);
+
+    const existing = await sql`
+      SELECT pickup_location_id, pickup_slot_at
+      FROM orders
+      WHERE id = ${orderId}
+      LIMIT 1
+    `;
+
+    if (existing.length === 0) {
+      return NextResponse.json({ error: "Order not found" }, { status: 404 });
+    }
+
+    await sql`DELETE FROM orders WHERE id = ${orderId}`;
+
+    const locationId = existing[0].pickup_location_id;
+    const slotAt = existing[0].pickup_slot_at;
+
+    if (locationId && slotAt) {
+      await sql`
+        UPDATE slot_reservations
+        SET current_count = GREATEST(current_count - 1, 0)
+        WHERE pickup_location_id = ${locationId}
+          AND slot_at = ${slotAt}
+      `;
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Error deleting order:", error);
+    return NextResponse.json({ error: "Failed to delete order" }, { status: 500 });
+  }
+}

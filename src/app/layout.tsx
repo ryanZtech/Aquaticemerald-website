@@ -3,9 +3,10 @@ import Navbar from "@/components/Navbar";
 import { CartProvider } from "@/context/CartContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import React from "react";
+import type { Metadata } from "next";
 
-export const metadata = {
-  title: "Aquatic Emerald — Premium Plants, Shrimp & Snails",
+export const metadata: Metadata = {
+  title: "Aquatic Emerald",
   description:
     "Curated home-grown freshwater botanicals, shrimp, and snails for the discerning aquarium hobbyist in Sydney Hills District.",
   keywords:
@@ -22,12 +23,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="dark">
-      <head>
-        <title>{metadata.title}</title>
-        <meta name="description" content={metadata.description} />
-        <meta name="keywords" content={metadata.keywords} />
-      </head>
+    <html lang="en" className="dark" suppressHydrationWarning>
       <body className="antialiased min-h-screen bg-background text-foreground transition-colors duration-200">
         <ThemeProvider>
           <CartProvider>

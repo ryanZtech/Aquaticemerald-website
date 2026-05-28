@@ -2,10 +2,27 @@ import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { put } from "@vercel/blob";
 
+function getDefaultQuantityForLevel(level?: string) {
+  switch ((level || "").toLowerCase()) {
+    case "low":
+      return 1;
+    case "med":
+    case "medium":
+      return 10;
+    case "high":
+      return 25;
+    default:
+      return 0;
+  }
+}
+
 // GET all products with optional search
 export async function GET(request: NextRequest) {
   if (!sql) {
-    return NextResponse.json({ error: "Database not configured" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Database not configured" },
+      { status: 500 },
+    );
   }
 
   try {
@@ -15,31 +32,54 @@ export async function GET(request: NextRequest) {
 
     let query = `
       SELECT
-        p.id, p.slug, p.name, c.slug as category, c.name as category_name, 
+        p.id, p.slug, p.name, c.slug as category, c.name as category_name,
         p.short_description, p.full_description,
         i.image_url as img,
-        coalesce(
-          json_agg(
-            json_build_object('id', v.id, 'label', v.label, 'price', v.price, 'stock_quantity', v.stock_quantity, 'stock_level', v.stock_level, 'image_url', (SELECT image_url FROM variant_images WHERE variant_id = v.id AND is_primary = TRUE LIMIT 1))
-          ) FILTER (WHERE v.id IS NOT NULL), '[]'
-        ) as variants,
-        coalesce(
-          json_agg(
-            json_build_object('id', img.id, 'image_url', img.image_url, 'alt_text', img.alt_text, 'is_primary', img.is_primary)
-          ) FILTER (WHERE img.id IS NOT NULL), '[]'
-        ) as images
+        coalesce((
+          SELECT json_agg(
+            json_build_object(
+              'id', v.id,
+              'label', v.label,
+              'price', v.price,
+              'stock_quantity', v.stock_quantity,
+              'stock_level', v.stock_level,
+              'image_url', (
+                SELECT vi.image_url
+                FROM variant_images vi
+                WHERE vi.variant_id = v.id AND vi.is_primary = TRUE
+                LIMIT 1
+              )
+            )
+            ORDER BY v.label
+          )
+          FROM product_variants v
+          WHERE v.product_id = p.id
+        ), '[]'::json) as variants,
+        coalesce((
+          SELECT json_agg(
+            json_build_object(
+              'id', img.id,
+              'image_url', img.image_url,
+              'alt_text', img.alt_text,
+              'is_primary', img.is_primary
+            )
+            ORDER BY img.is_primary DESC, img.id ASC
+          )
+          FROM images img
+          WHERE img.product_id = p.id
+        ), '[]'::json) as images
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
       LEFT JOIN images i ON p.id = i.product_id AND i.is_primary = TRUE
-      LEFT JOIN images img ON p.id = img.product_id
-      LEFT JOIN product_variants v ON p.id = v.product_id
     `;
 
     const conditions = [];
     const params: any[] = [];
 
     if (search) {
-      conditions.push(`(p.name ILIKE $${params.length + 1} OR p.short_description ILIKE $${params.length + 1})`);
+      conditions.push(
+        `(p.name ILIKE $${params.length + 1} OR p.short_description ILIKE $${params.length + 1})`,
+      );
       params.push(`%${search}%`);
     }
 
@@ -86,14 +126,20 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(rows);
   } catch (error) {
     console.error("Error fetching products:", error);
-    return NextResponse.json({ error: "Failed to fetch products" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to fetch products" },
+      { status: 500 },
+    );
   }
 }
 
 // POST create new product
 export async function POST(request: NextRequest) {
   if (!sql) {
-    return NextResponse.json({ error: "Database not configured" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Database not configured" },
+      { status: 500 },
+    );
   }
 
   try {
@@ -104,15 +150,23 @@ export async function POST(request: NextRequest) {
     const shortDescription = formData.get("shortDescription") as string;
     const fullDescription = formData.get("fullDescription") as string;
     const variants = JSON.parse(formData.get("variants") as string);
-    const attributes = JSON.parse(formData.get("attributes") as string || "{}");
-    const productImages = JSON.parse(formData.get("productImages") as string || "[]");
+    const attributes = JSON.parse(
+      (formData.get("attributes") as string) || "{}",
+    );
+    const productImages = JSON.parse(
+      (formData.get("productImages") as string) || "[]",
+    );
     const newImages = formData.getAll("newImages") as File[];
 
     // Generate product ID
     const productId = `prod_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
     // Upload new images to Vercel Blob
-    const uploadedProductImages: Array<{ image_url: string; alt_text: string; is_primary: boolean }> = [];
+    const uploadedProductImages: Array<{
+      image_url: string;
+      alt_text: string;
+      is_primary: boolean;
+    }> = [];
     for (let i = 0; i < newImages.length; i++) {
       const file = newImages[i];
       const blob = await put(`products/${productId}/${file.name}`, file, {
@@ -134,34 +188,38 @@ export async function POST(request: NextRequest) {
     // Insert variants
     for (const variant of variants) {
       const variantId = `${productId}-${variant.id}`;
-      const levelToNumber = (lvl: any) => {
-        if (!lvl) return 0;
-        if (typeof lvl === "string") {
-          const s = lvl.toLowerCase();
-          if (s === "low") return 0;
-          if (s === "med" || s === "medium") return 10;
-          if (s === "high") return 100;
-          const n = parseInt(s, 10);
-          return isNaN(n) ? 0 : Math.max(0, n);
-        }
-        if (typeof lvl === "number") return Math.max(0, Math.floor(lvl));
-        const parsed = parseInt(String(lvl), 10);
-        return isNaN(parsed) ? 0 : Math.max(0, parsed);
-      };
-
-      const stockQty = levelToNumber(variant.stockLevel ?? variant.stock);
+      const stockLevel = (
+        variant.stock_level ||
+        variant.stockLevel ||
+        "none"
+      ).toLowerCase();
+      const stockQty = Math.max(
+        0,
+        Number(
+          variant.stock_quantity ??
+            variant.stockQuantity ??
+            variant.stock ??
+            getDefaultQuantityForLevel(stockLevel),
+        ) || 0,
+      );
 
       await sql`
         INSERT INTO product_variants (id, product_id, label, price, stock_quantity, stock_level, active)
-        VALUES (${variantId}, ${productId}, ${variant.label}, ${variant.price}, ${stockQty}, ${variant.stockLevel ?? 'none'}, TRUE)
+        VALUES (${variantId}, ${productId}, ${variant.label}, ${variant.price}, ${stockQty}, ${stockLevel}, TRUE)
       `;
 
       // Handle variant image
-      const variantImageFile = formData.get(`variantImage_${variant.id}`) as File | null;
+      const variantImageFile = formData.get(
+        `variantImage_${variant.id}`,
+      ) as File | null;
       if (variantImageFile) {
-        const blob = await put(`products/${productId}/variants/${variantId}/${variantImageFile.name}`, variantImageFile, {
-          access: "public",
-        });
+        const blob = await put(
+          `products/${productId}/variants/${variantId}/${variantImageFile.name}`,
+          variantImageFile,
+          {
+            access: "public",
+          },
+        );
         await sql`
           INSERT INTO variant_images (variant_id, image_url, alt_text, is_primary)
           VALUES (${variantId}, ${blob.url}, ${variant.label}, TRUE)
@@ -182,7 +240,8 @@ export async function POST(request: NextRequest) {
     for (const [attrName, attrValue] of Object.entries(attributes)) {
       if (attrValue) {
         let attrId;
-        const attrResult = await sql`SELECT id FROM product_attributes WHERE name = ${attrName}`;
+        const attrResult =
+          await sql`SELECT id FROM product_attributes WHERE name = ${attrName}`;
         if (attrResult.length > 0) {
           attrId = attrResult[0].id;
         } else {
@@ -204,6 +263,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, productId });
   } catch (error) {
     console.error("Error creating product:", error);
-    return NextResponse.json({ error: "Failed to create product" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to create product" },
+      { status: 500 },
+    );
   }
 }

@@ -1,44 +1,96 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Product } from "@/lib/staticData";
 import { useCart } from "@/context/CartContext";
-import { ArrowLeft, Minus, Plus, ShoppingCart, HelpCircle, ShieldCheck, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  ArrowLeft,
+  Minus,
+  Plus,
+  ShoppingCart,
+  HelpCircle,
+  ShieldCheck,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 
 interface ProductDetailClientProps {
   product: Product;
 }
 
-export default function ProductDetailClient({ product }: ProductDetailClientProps) {
+export default function ProductDetailClient({
+  product,
+}: ProductDetailClientProps) {
   const { addToCart } = useCart();
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const carouselRef = useRef<HTMLDivElement>(null);
 
   // Dynamic multiple variant option dropdowns structure
-  const [options, setOptions] = useState<{ name: string; values: string[] }[]>([]);
-  const [selectedValues, setSelectedValues] = useState<Record<string, string>>({});
+  const [options, setOptions] = useState<{ name: string; values: string[] }[]>(
+    [],
+  );
+  const [selectedValues, setSelectedValues] = useState<Record<string, string>>(
+    {},
+  );
   const [matchedVariant, setMatchedVariant] = useState<any>(null);
 
-  // Get all product images
-  const allImages = product.images && product.images.length > 0 
-    ? product.images.sort((a, b) => Number(b.is_primary) - Number(a.is_primary))
-    : [{ image_url: product.img, is_primary: true }];
+  const allImages = [
+    ...(product.images && product.images.length > 0
+      ? [...product.images].sort(
+          (a, b) => Number(b.is_primary) - Number(a.is_primary),
+        )
+      : product.img
+        ? [{ image_url: product.img, is_primary: true }]
+        : []),
+    ...product.variants
+      .filter((variant) => variant.image_url)
+      .map((variant) => ({
+        image_url: variant.image_url as string,
+        is_primary: false,
+      })),
+  ].reduce(
+    (acc, current) => {
+      const x = acc.find((item) => item.image_url === current.image_url);
+      if (!x) {
+        return acc.concat([current]);
+      } else {
+        // If we found a duplicate, but the current one is primary, prefer the primary one
+        if (current.is_primary) {
+          return acc.map((item) =>
+            item.image_url === current.image_url ? current : item,
+          );
+        }
+        return acc;
+      }
+    },
+    [] as Array<{ image_url: string; is_primary?: boolean }>,
+  );
 
-  const imageUrls = allImages.map(img => img.image_url);
+  const imageUrls = allImages.map((img) => img.image_url);
+  const maxQty =
+    matchedVariant?.stock_level === "none"
+      ? 0
+      : matchedVariant?.stock_level === "low"
+        ? 1
+        : Math.max(1, Number(matchedVariant?.stock_quantity || 999));
 
   useEffect(() => {
     if (product.variants && product.variants.length > 0) {
       // Determine if the product has multiple options based on labels
       const firstVariantLabel = product.variants[0].label;
       const optionCount = firstVariantLabel.split(" / ").length;
-      
+
       // Determine headers/names of options
-      const optionNames = product.variantOptions && product.variantOptions.length === optionCount
-        ? product.variantOptions
-        : Array.from({ length: optionCount }, (_, idx) => `Option ${idx + 1}`);
+      const optionNames =
+        product.variantOptions && product.variantOptions.length === optionCount
+          ? product.variantOptions
+          : Array.from(
+              { length: optionCount },
+              (_, idx) => `Option ${idx + 1}`,
+            );
 
       // Extract unique option values for each option index
       const newOptions = optionNames.map((name, idx) => {
@@ -46,8 +98,8 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
           new Set(
             product.variants
               .map((v) => v.label.split(" / ")[idx]?.trim())
-              .filter(Boolean)
-          )
+              .filter(Boolean),
+          ),
         );
         return { name, values };
       });
@@ -55,10 +107,13 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
       setOptions(newOptions);
 
       // Initialize selected values with the first variant's combination
-      const firstVariantParts = firstVariantLabel.split(" / ").map((p) => p.trim());
+      const firstVariantParts = firstVariantLabel
+        .split(" / ")
+        .map((p) => p.trim());
       const initialSelected: Record<string, string> = {};
       newOptions.forEach((opt, idx) => {
-        initialSelected[opt.name] = firstVariantParts[idx] || opt.values[0] || "";
+        initialSelected[opt.name] =
+          firstVariantParts[idx] || opt.values[0] || "";
       });
       setSelectedValues(initialSelected);
     } else {
@@ -73,13 +128,15 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
     if (product.variants && product.variants.length > 0 && options.length > 0) {
       const match = product.variants.find((v) => {
         const parts = v.label.split(" / ").map((p) => p.trim());
-        return options.every((opt, idx) => parts[idx] === selectedValues[opt.name]);
+        return options.every(
+          (opt, idx) => parts[idx] === selectedValues[opt.name],
+        );
       });
       setMatchedVariant(match || null);
 
       // Auto-scroll to variant image if it exists
       if (match && match.image_url) {
-        const index = imageUrls.findIndex(url => url === match.image_url);
+        const index = imageUrls.findIndex((url) => url === match.image_url);
         if (index !== -1 && index !== currentImageIndex) {
           setCurrentImageIndex(index);
         }
@@ -87,7 +144,21 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
     } else {
       setMatchedVariant(product.variants?.[0] || null);
     }
-  }, [selectedValues, options, product, imageUrls]);
+  }, [selectedValues, options, product, imageUrls, currentImageIndex]);
+
+  useEffect(() => {
+    if (maxQty <= 0) {
+      setQty(1);
+      return;
+    }
+    setQty((currentQty) => Math.min(Math.max(1, currentQty), maxQty));
+  }, [maxQty]);
+
+  useEffect(() => {
+    if (currentImageIndex >= imageUrls.length) {
+      setCurrentImageIndex(0);
+    }
+  }, [currentImageIndex, imageUrls.length]);
 
   const handleOptionChange = (optionName: string, value: string) => {
     setSelectedValues((prev) => ({
@@ -107,7 +178,10 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
       name: product.name,
       variantLabel: matchedVariant.label,
       price: matchedVariant.price,
-      img: product.img,
+      img:
+        matchedVariant.image_url || imageUrls[currentImageIndex] || product.img,
+      stock_level: matchedVariant.stock_level,
+      stock_quantity: matchedVariant.stock_quantity,
     });
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
@@ -118,14 +192,16 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
   };
 
   const prevImage = () => {
-    setCurrentImageIndex((prev) => (prev - 1 + imageUrls.length) % imageUrls.length);
+    setCurrentImageIndex(
+      (prev) => (prev - 1 + imageUrls.length) % imageUrls.length,
+    );
   };
 
   const stats = [
     { label: "Average Size", value: product.avgSize || "N/A" },
-    { label: "Origin",       value: product.origin || "N/A" },
-    { label: "Care Level",   value: product.careLevel || "N/A" },
-    { label: "Light",        value: product.light || "N/A" },
+    { label: "Origin", value: product.origin || "N/A" },
+    { label: "Care Level", value: product.careLevel || "N/A" },
+    { label: "Light", value: product.light || "N/A" },
   ];
 
   return (
@@ -134,17 +210,18 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
         href="/products"
         className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mb-8 cursor-pointer group"
       >
-        <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" /> Back to Products
+        <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />{" "}
+        Back to Products
       </Link>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-10 lg:gap-16">
         {/* Image Carousel */}
         <div className="space-y-4">
           <div className="relative rounded-3xl overflow-hidden bg-muted aspect-square shadow-xl border border-border group">
-            <img 
-              src={imageUrls[currentImageIndex]} 
-              alt={product.name} 
-              className="w-full h-full object-cover" 
+            <img
+              src={imageUrls[currentImageIndex]}
+              alt={product.name}
+              className="w-full h-full object-cover"
             />
             {imageUrls.length > 1 && (
               <>
@@ -190,12 +267,17 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
           <h1 className="font-serif text-3xl sm:text-4xl font-medium mb-4 leading-snug">
             {product.name}
           </h1>
-          <p className="text-muted-foreground leading-relaxed mb-8 text-sm font-light">{product.description}</p>
+          <p className="text-muted-foreground leading-relaxed mb-8 text-sm font-light">
+            {product.description}
+          </p>
 
           {/* Stats Grid */}
           <div className="grid grid-cols-2 gap-3 mb-8">
             {stats.map((s) => (
-              <div key={s.label} className="bg-secondary/40 rounded-xl p-3.5 border border-border/40 hover:border-border transition-colors">
+              <div
+                key={s.label}
+                className="bg-secondary/40 rounded-xl p-3.5 border border-border/40 hover:border-border transition-colors"
+              >
                 <p className="text-[10px] text-muted-foreground mb-1 uppercase tracking-wider font-semibold">
                   {s.label}
                 </p>
@@ -225,7 +307,9 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
                       <div className="relative">
                         <select
                           value={selectedValues[opt.name] || ""}
-                          onChange={(e) => handleOptionChange(opt.name, e.target.value)}
+                          onChange={(e) =>
+                            handleOptionChange(opt.name, e.target.value)
+                          }
                           className="w-full bg-secondary text-secondary-foreground border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-primary cursor-pointer transition-colors appearance-none"
                         >
                           {opt.values.map((val) => (
@@ -246,18 +330,28 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
                 <div>
                   <div className="flex items-center justify-between px-4 py-3.5 rounded-xl border border-primary/20 bg-primary/5 text-primary text-sm mb-3">
                     <span className="font-medium">Selected Combination</span>
-                    <span className="font-bold text-base">${matchedVariant.price.toFixed(2)}</span>
+                    <span className="font-bold text-base">
+                      ${matchedVariant.price.toFixed(2)}
+                    </span>
                   </div>
                   {matchedVariant.stock_level && (
                     <div className="flex items-center justify-between px-4 py-2.5 rounded-xl border border-border/40 bg-muted/30 text-sm mb-6">
-                      <span className="text-muted-foreground font-light">Stock Level</span>
-                      <span className={`font-semibold text-xs uppercase tracking-wider px-2.5 py-1 rounded-full ${
-                        matchedVariant.stock_level === 'none' ? 'bg-destructive/10 text-destructive' :
-                        matchedVariant.stock_level === 'low' ? 'bg-orange-500/10 text-orange-600' :
-                        matchedVariant.stock_level === 'med' ? 'bg-amber-500/10 text-amber-600' :
-                        'bg-emerald-500/10 text-emerald-600'
-                      }`}>
-                        {matchedVariant.stock_level.charAt(0).toUpperCase() + matchedVariant.stock_level.slice(1)}
+                      <span className="text-muted-foreground font-light">
+                        Stock Level
+                      </span>
+                      <span
+                        className={`font-semibold text-xs uppercase tracking-wider px-2.5 py-1 rounded-full ${
+                          matchedVariant.stock_level === "none"
+                            ? "bg-destructive/10 text-destructive"
+                            : matchedVariant.stock_level === "low"
+                              ? "bg-orange-500/10 text-orange-600"
+                              : matchedVariant.stock_level === "med"
+                                ? "bg-amber-500/10 text-amber-600"
+                                : "bg-emerald-500/10 text-emerald-600"
+                        }`}
+                      >
+                        {matchedVariant.stock_level.charAt(0).toUpperCase() +
+                          matchedVariant.stock_level.slice(1)}
                       </span>
                     </div>
                   )}
@@ -280,14 +374,20 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
                       onClick={() => setQty((q) => Math.max(1, q - 1))}
                       className="w-10 h-10 flex items-center justify-center hover:bg-accent transition-colors cursor-pointer"
                       aria-label="Decrease quantity"
+                      disabled={maxQty <= 1}
                     >
                       <Minus className="w-3.5 h-3.5" />
                     </button>
-                    <span className="w-10 text-center font-semibold text-sm">{qty}</span>
+                    <span className="w-10 text-center font-semibold text-sm">
+                      {qty}
+                    </span>
                     <button
-                      onClick={() => setQty((q) => q + 1)}
+                      onClick={() => {
+                        setQty((q) => Math.min(maxQty, q + 1));
+                      }}
                       className="w-10 h-10 flex items-center justify-center hover:bg-accent transition-colors cursor-pointer"
                       aria-label="Increase quantity"
+                      disabled={maxQty <= 0 || qty >= maxQty}
                     >
                       <Plus className="w-3.5 h-3.5" />
                     </button>
@@ -295,27 +395,45 @@ export default function ProductDetailClient({ product }: ProductDetailClientProp
                   {matchedVariant && (
                     <span className="text-sm text-muted-foreground font-light">
                       {qty} × ${matchedVariant.price.toFixed(2)} = &nbsp;
-                      <span className="text-foreground font-semibold">${total.toFixed(2)}</span>
+                      <span className="text-foreground font-semibold">
+                        ${total.toFixed(2)}
+                      </span>
                     </span>
                   )}
                 </div>
+                {matchedVariant && maxQty > 0 && (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    {matchedVariant.stock_level === "low"
+                      ? "Low stock: only 1 can be purchased."
+                      : `Available quantity: ${maxQty}`}
+                  </p>
+                )}
               </div>
 
               {/* Add to Cart Trigger */}
               <button
                 onClick={handleAdd}
-                disabled={!matchedVariant}
+                disabled={
+                  !matchedVariant || matchedVariant.stock_level === "none"
+                }
                 className={`w-full py-4 rounded-full font-semibold text-sm tracking-wide transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer
-                  ${!matchedVariant
-                    ? "bg-muted text-muted-foreground cursor-not-allowed"
-                    : added
-                    ? "bg-emerald-600 text-white scale-[0.99] shadow-lg shadow-emerald-600/20"
-                    : "bg-primary text-primary-foreground hover:opacity-90 hover:shadow-xl hover:shadow-primary/30 hover:-translate-y-0.5"}`}
+                  ${
+                    !matchedVariant || matchedVariant.stock_level === "none"
+                      ? "bg-muted text-muted-foreground cursor-not-allowed"
+                      : added
+                        ? "bg-emerald-600 text-white scale-[0.99] shadow-lg shadow-emerald-600/20"
+                        : "bg-primary text-primary-foreground hover:opacity-90 hover:shadow-xl hover:shadow-primary/30 hover:-translate-y-0.5"
+                  }`}
               >
                 {added ? (
                   <>
                     <ShieldCheck className="w-4 h-4 animate-bounce" />
                     Added to Cart!
+                  </>
+                ) : matchedVariant?.stock_level === "none" ? (
+                  <>
+                    <ShoppingCart className="w-4 h-4" />
+                    Out of Stock
                   </>
                 ) : (
                   <>

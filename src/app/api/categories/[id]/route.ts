@@ -13,12 +13,12 @@ export async function PUT(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { name, slug, description, imageUrl, parentId, sortOrder, active } = body;
+    const { name, slug, description, imageUrl, iconName, parentId, sortOrder, active } = body;
 
     await sql`
       UPDATE categories
       SET name = ${name}, slug = ${slug}, description = ${description || null},
-          image_url = ${imageUrl || null}, parent_id = ${parentId || null},
+          image_url = ${imageUrl || null}, icon_name = ${iconName || 'package'}, parent_id = ${parentId || null},
           sort_order = ${sortOrder || 0}, active = ${active !== false}
       WHERE id = ${parseInt(id)}
     `;

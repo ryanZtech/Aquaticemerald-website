@@ -41,6 +41,8 @@ export interface CartItem {
   variantLabel: string;
   price: number;
   img?: string;
+  stock_level?: string;
+  stock_quantity?: number;
 }
 
 export interface PickupLocation {
