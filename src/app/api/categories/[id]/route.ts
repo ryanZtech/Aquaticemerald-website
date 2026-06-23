@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
+import { requireAdmin } from "@/lib/adminAuth";
 
-// PUT update category
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const authError = await requireAdmin();
+  if (authError) return authError;
+
   if (!sql) {
     return NextResponse.json({ error: "Database not configured" }, { status: 500 });
   }
@@ -30,11 +33,13 @@ export async function PUT(
   }
 }
 
-// DELETE category
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const authError = await requireAdmin();
+  if (authError) return authError;
+
   if (!sql) {
     return NextResponse.json({ error: "Database not configured" }, { status: 500 });
   }
@@ -42,7 +47,6 @@ export async function DELETE(
   try {
     const { id } = await params;
 
-    // Check if category has products
     const products = await sql`SELECT COUNT(*) as count FROM products WHERE category_id = ${parseInt(id)}`;
     if (products[0].count > 0) {
       return NextResponse.json(

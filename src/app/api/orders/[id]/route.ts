@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
+import { requireAdmin } from "@/lib/adminAuth";
 
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const authError = await requireAdmin();
+  if (authError) return authError;
   if (!sql) {
     return NextResponse.json({ error: "Database not configured" }, { status: 500 });
   }
@@ -20,7 +23,6 @@ export async function PUT(
       WHERE id = ${parseInt(id)}
     `;
 
-    // If order is finalised or picked_up, send notification emails
     const sendStatuses = ["finalised", "picked_up", "completed"];
     if (sendStatuses.includes((status || '').toString())) {
       try {
@@ -35,12 +37,12 @@ export async function PUT(
 
         if (orderRows.length > 0) {
           const o = orderRows[0];
-          // fetch seller email
+          
           let sellerEmail = process.env.SELLER_EMAIL || '';
           try {
             const s = await sql`SELECT value FROM store_settings WHERE key = 'seller_email' LIMIT 1`;
             if (s.length > 0) sellerEmail = s[0].value;
-          } catch (e) { /* ignore */ }
+          } catch (e) {  }
 
           const recipients = [];
           if (o.customer_email) recipients.push(o.customer_email);
@@ -92,6 +94,8 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const authError = await requireAdmin();
+  if (authError) return authError;
   if (!sql) {
     return NextResponse.json({ error: "Database not configured" }, { status: 500 });
   }

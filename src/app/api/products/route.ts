@@ -16,7 +16,6 @@ function getDefaultQuantityForLevel(level?: string) {
   }
 }
 
-// GET all products with optional search
 export async function GET(request: NextRequest) {
   if (!sql) {
     return NextResponse.json(
@@ -94,11 +93,8 @@ export async function GET(request: NextRequest) {
 
     query += ` GROUP BY p.id, p.slug, p.name, c.slug, c.name, p.short_description, p.full_description, i.image_url ORDER BY p.name`;
 
-    // Use the library's conventional query method when passing parameterized SQL
-    // (sql`...` is the tagged template form; for dynamic query strings use sql.query)
     const rows = await sql.query(query, params);
 
-    // Fetch attributes for all products in one query
     if (rows.length > 0) {
       const productIds = rows.map((r: any) => r.id);
       const attrRows = await sql`
@@ -108,14 +104,12 @@ export async function GET(request: NextRequest) {
         WHERE pav.product_id = ANY(${productIds})
       `;
 
-      // Build a map of product_id -> attributes
       const attrMap: Record<string, Record<string, string>> = {};
       for (const ar of attrRows) {
         if (!attrMap[ar.product_id]) attrMap[ar.product_id] = {};
         attrMap[ar.product_id][ar.name] = ar.value;
       }
 
-      // Attach attributes to each product row
       const enriched = rows.map((r: any) => ({
         ...r,
         attributes: attrMap[r.id] || {},
@@ -133,8 +127,11 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST create new product
 export async function POST(request: NextRequest) {
+  const { requireAdmin } = await import("@/lib/adminAuth");
+  const authError = await requireAdmin();
+  if (authError) return authError;
+
   if (!sql) {
     return NextResponse.json(
       { error: "Database not configured" },
@@ -158,10 +155,8 @@ export async function POST(request: NextRequest) {
     );
     const newImages = formData.getAll("newImages") as File[];
 
-    // Generate product ID
     const productId = `prod_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-    // Upload new images to Vercel Blob
     const uploadedProductImages: Array<{
       image_url: string;
       alt_text: string;
@@ -180,13 +175,11 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Insert product
     await sql`
       INSERT INTO products (id, name, slug, short_description, full_description, category_id, active)
       VALUES (${productId}, ${name}, ${slug}, ${shortDescription}, ${fullDescription}, ${parseInt(categoryId)}, TRUE)
     `;
 
-    // Insert variants
     for (const variant of variants) {
       const variantId = `${productId}-${variant.id}`;
       const stockLevel = (
@@ -209,7 +202,6 @@ export async function POST(request: NextRequest) {
         VALUES (${variantId}, ${productId}, ${variant.label}, ${variant.price}, ${stockQty}, ${stockLevel}, TRUE)
       `;
 
-      // Handle variant image
       const variantImageFile = formData.get(
         `variantImage_${variant.id}`,
       ) as File | null;
@@ -229,7 +221,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Insert images
     const allProductImages = [...productImages, ...uploadedProductImages];
     for (const img of allProductImages) {
       await sql`
@@ -238,7 +229,6 @@ export async function POST(request: NextRequest) {
       `;
     }
 
-    // Insert attributes
     for (const [attrName, attrValue] of Object.entries(attributes)) {
       if (attrValue) {
         let attrId;

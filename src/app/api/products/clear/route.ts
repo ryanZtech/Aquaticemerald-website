@@ -1,15 +1,18 @@
 import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { del } from "@vercel/blob";
+import { requireAdmin } from "@/lib/adminAuth";
 
-// DELETE all products
 export async function POST() {
+  const authError = await requireAdmin();
+  if (authError) return authError;
+
   if (!sql) {
     return NextResponse.json({ error: "Database not configured" }, { status: 500 });
   }
 
   try {
-    // Delete all images from blob storage first
+    
     try {
       const imgs = await sql`SELECT image_url FROM images`;
       for (const img of imgs) {
@@ -25,7 +28,6 @@ export async function POST() {
       console.error("Failed to fetch image URLs before clearing:", e);
     }
 
-    // Clear all products (cascades to variants, images, attributes)
     await sql`DELETE FROM products`;
     console.log("All products cleared successfully (images removed where possible)");
 

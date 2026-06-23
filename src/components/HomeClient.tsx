@@ -17,7 +17,7 @@ interface HomeClientProps {
 }
 
 export default function HomeClient({ products, settings }: HomeClientProps) {
-  // Filter out products that have variants (active items) and take first 4 for featured listing
+  
   const featured = products.filter((p) => p.variants.length > 0).slice(0, 4);
 
   const heroImg = settings.hero_image || "https://aquaticemerald.com/hero.png";
@@ -26,7 +26,7 @@ export default function HomeClient({ products, settings }: HomeClientProps) {
 
   return (
     <div className="pt-16">
-      {/* Hero Section */}
+      {}
       <section className="relative h-screen min-h-[560px] flex items-center justify-center overflow-hidden bg-black">
         {heroImg ? (
           <img
@@ -70,7 +70,7 @@ export default function HomeClient({ products, settings }: HomeClientProps) {
         </div>
       </section>
 
-      {/* Featured Collection Section */}
+      {}
       <section className="py-24 px-4 max-w-7xl mx-auto">
         <div className="text-center mb-14">
           <p className="text-xs font-semibold tracking-[0.35em] text-primary uppercase mb-3">
@@ -127,7 +127,7 @@ export default function HomeClient({ products, settings }: HomeClientProps) {
         </div>
       </section>
 
-      {/* Aquascape banner */}
+      {}
       <section className="relative h-60 sm:h-96 overflow-hidden bg-black">
         {sceneImg ? (
           <img
@@ -156,7 +156,7 @@ export default function HomeClient({ products, settings }: HomeClientProps) {
         </div>
       </section>
 
-      {/* Why Us Section */}
+      {}
       <section className="py-24 px-4 max-w-7xl mx-auto">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
           {[
@@ -196,7 +196,7 @@ export default function HomeClient({ products, settings }: HomeClientProps) {
         </div>
       </section>
 
-      {/* Footer */}
+      {}
       <footer className="border-t border-border py-8 px-4 text-center">
         <div className="flex items-center justify-center gap-2 mb-2">
           <img

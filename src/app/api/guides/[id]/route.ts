@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
+import { requireAdmin } from "@/lib/adminAuth";
 
 export async function GET(
   request: NextRequest,
@@ -32,6 +33,9 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const authError = await requireAdmin();
+  if (authError) return authError;
+
   if (!sql) {
     return NextResponse.json({ error: "Database not configured" }, { status: 500 });
   }
@@ -62,6 +66,9 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const authError = await requireAdmin();
+  if (authError) return authError;
+
   if (!sql) {
     return NextResponse.json({ error: "Database not configured" }, { status: 500 });
   }

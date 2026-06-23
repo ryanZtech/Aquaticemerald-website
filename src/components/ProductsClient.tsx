@@ -19,7 +19,6 @@ export default function ProductsClient({ products }: ProductsClientProps) {
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Dynamic categories from database
   const [categories, setCategories] = useState<
     { slug: string; name: string; icon_name?: string; image_url?: string }[]
   >([]);
@@ -65,7 +64,6 @@ export default function ProductsClient({ products }: ProductsClientProps) {
     }
   };
 
-  // Perform multi-dimensional filter: both category AND search query
   const filtered = products
     .filter((p) => activeCategory === "all" || p.category === activeCategory)
     .filter((p) => {
@@ -88,7 +86,7 @@ export default function ProductsClient({ products }: ProductsClientProps) {
           <h1 className="font-serif text-4xl sm:text-5xl font-medium">Shop</h1>
         </div>
 
-        {/* Dynamic Search Bar */}
+        {}
         <div className="relative w-full sm:max-w-xs group">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-muted-foreground group-focus-within:text-primary transition-colors" />
           <input
@@ -109,7 +107,7 @@ export default function ProductsClient({ products }: ProductsClientProps) {
         </div>
       </div>
 
-      {/* Category Tabs */}
+      {}
       <div className="flex gap-2 flex-wrap mb-10 items-center">
         <button
           onClick={() => handleCategoryChange("all")}
@@ -152,7 +150,7 @@ export default function ProductsClient({ products }: ProductsClientProps) {
         })}
       </div>
 
-      {/* Grid */}
+      {}
       <motion.div
         layout
         className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
@@ -167,7 +165,7 @@ export default function ProductsClient({ products }: ProductsClientProps) {
               exit={{ opacity: 0, scale: 0.96 }}
               transition={{
                 duration: 0.2,
-                ease: [0.23, 1, 0.32, 1], // Custom ease-out quint for a snappy feel
+                ease: [0.23, 1, 0.32, 1], 
               }}
               className="flex"
             >

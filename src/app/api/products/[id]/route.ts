@@ -16,7 +16,6 @@ function getDefaultQuantityForLevel(level?: string) {
   }
 }
 
-// GET single product
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -80,7 +79,6 @@ export async function GET(
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
 
-    // Get attributes
     const attributes = await sql`
       SELECT pa.name, pav.value
       FROM product_attribute_values pav
@@ -103,11 +101,14 @@ export async function GET(
   }
 }
 
-// PUT update product
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const { requireAdmin } = await import("@/lib/adminAuth");
+  const authError = await requireAdmin();
+  if (authError) return authError;
+
   if (!sql) {
     return NextResponse.json(
       { error: "Database not configured" },
@@ -132,7 +133,6 @@ export async function PUT(
     );
     const newImages = formData.getAll("newImages") as File[];
 
-    // Update product
     await sql`
       UPDATE products
       SET name = ${name}, slug = ${slug}, category_id = ${parseInt(categoryId)},
@@ -141,10 +141,8 @@ export async function PUT(
       WHERE id = ${id}
     `;
 
-    // Delete existing variants
     await sql`DELETE FROM product_variants WHERE product_id = ${id}`;
 
-    // Insert new variants
     for (const variant of variants) {
       const variantId = `${id}-${variant.id}`;
       const stockLevel = (
@@ -167,7 +165,6 @@ export async function PUT(
         VALUES (${variantId}, ${id}, ${variant.label}, ${variant.price}, ${stockQty}, ${stockLevel}, TRUE)
       `;
 
-      // Handle variant image
       const variantImageFile = formData.get(
         `variantImage_${variant.id}`,
       ) as File | null;
@@ -192,7 +189,6 @@ export async function PUT(
       }
     }
 
-    // Handle product images update
     if (newImages.length > 0 || productImages.length > 0) {
       const existingImages: any[] =
         await sql`SELECT id, image_url FROM images WHERE product_id = ${id}`;
@@ -204,7 +200,6 @@ export async function PUT(
         (img) => !productImageIdsToKeep.includes(img.id),
       );
 
-      // Delete old images
       for (const img of imagesToDelete) {
         if (img.image_url.includes("vercel-storage.com")) {
           try {
@@ -216,7 +211,6 @@ export async function PUT(
       }
       await sql`DELETE FROM images WHERE product_id = ${id} AND id != ALL(${productImageIdsToKeep.length > 0 ? productImageIdsToKeep : [null]})`;
 
-      // Upload new images
       const uploadedProductImages: Array<{
         image_url: string;
         alt_text: string;
@@ -235,7 +229,6 @@ export async function PUT(
         });
       }
 
-      // Insert all product images
       const allProductImages = [...productImages, ...uploadedProductImages];
       for (const img of allProductImages) {
         if (!img.id) {
@@ -253,7 +246,6 @@ export async function PUT(
       }
     }
 
-    // Update attributes
     await sql`DELETE FROM product_attribute_values WHERE product_id = ${id}`;
     for (const [attrName, attrValue] of Object.entries(attributes)) {
       if (attrValue) {
@@ -288,11 +280,14 @@ export async function PUT(
   }
 }
 
-// DELETE product
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const { requireAdmin } = await import("@/lib/adminAuth");
+  const authError = await requireAdmin();
+  if (authError) return authError;
+
   if (!sql) {
     return NextResponse.json(
       { error: "Database not configured" },
@@ -303,7 +298,6 @@ export async function DELETE(
   try {
     const { id } = await params;
 
-    // Delete image from blob storage
     const images =
       await sql`SELECT image_url FROM images WHERE product_id = ${id}`;
     for (const img of images) {
@@ -316,7 +310,6 @@ export async function DELETE(
       }
     }
 
-    // Delete product (cascades to variants, images, attributes)
     await sql`DELETE FROM products WHERE id = ${id}`;
 
     return NextResponse.json({ success: true });

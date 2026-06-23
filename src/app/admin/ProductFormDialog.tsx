@@ -54,23 +54,19 @@ export default function ProductFormDialog({
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(false);
   
-  // Form fields
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [shortDescription, setShortDescription] = useState("");
   const [fullDescription, setFullDescription] = useState("");
   
-  // Product images
   const [productImages, setProductImages] = useState<ProductImage[]>([]);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   
-  // Variant options and variants
   const [variantOptions, setVariantOptions] = useState<VariantOption[]>([]);
   const [variants, setVariants] = useState<Array<Variant & { imageFile?: File; imagePreview?: string }>>([]);
   
-  // Attributes
   const [careLevel, setCareLevel] = useState("");
   const [light, setLight] = useState("");
   const [avgSize, setAvgSize] = useState("");
@@ -108,14 +104,12 @@ export default function ProductFormDialog({
       setShortDescription(data.short_description || "");
       setFullDescription(data.full_description || "");
       
-      // Load images
       if (data.images && data.images.length > 0) {
         setProductImages(data.images);
       } else if (data.img) {
         setProductImages([{ image_url: data.img, is_primary: true, alt_text: data.name }]);
       }
       
-      // Load variants safely (supporting strings/arrays)
       const rawVariants = typeof data.variants === "string" ? JSON.parse(data.variants) : (data.variants || []);
       const numberToLevel = (qty: number) => {
         if (!qty || qty <= 0) return "none";
@@ -134,13 +128,11 @@ export default function ProductFormDialog({
       }));
       setVariants(loadedVariants);
       
-      // Load attributes
       setCareLevel(data.attributes?.["Care Level"] || "");
       setLight(data.attributes?.["Light"] || "");
       setAvgSize(data.attributes?.["Average Size"] || "");
       setOrigin(data.attributes?.["Origin"] || "");
 
-      // Reconstruct variant options from the 'Variant Options' attribute
       const loadedOptionNamesVal = data.attributes?.["Variant Options"];
       let loadedOptionNames = [];
       if (loadedOptionNamesVal) {
@@ -257,7 +249,6 @@ export default function ProductFormDialog({
       return;
     }
 
-    // Validate variant options and parse raw input if provided
     const parsedOptions = variantOptions.map((opt) => {
       const raw = typeof opt.valuesInput === "string" && opt.valuesInput.length > 0
         ? opt.valuesInput
@@ -280,7 +271,6 @@ export default function ProductFormDialog({
       }
     }
 
-    // Generate all combinations using parsed values
     const combinations: string[][] = [[]];
     for (const opt of parsedOptions) {
       const newCombinations: string[][] = [];
@@ -293,7 +283,6 @@ export default function ProductFormDialog({
       combinations.push(...newCombinations);
     }
 
-    // Create variants with default stock level
     const newVariants: Array<Variant & { imageFile?: File; imagePreview?: string }> = combinations.map((combo, index) => ({
       id: `var_${Date.now()}_${index}`,
       label: combo.join(" / "),
@@ -375,13 +364,11 @@ export default function ProductFormDialog({
       formData.append("shortDescription", shortDescription);
       formData.append("fullDescription", fullDescription);
       
-      // Append product images
       formData.append("productImages", JSON.stringify(productImages));
       for (let i = 0; i < imageFiles.length; i++) {
         formData.append("newImages", imageFiles[i]);
       }
       
-      // Append variants
       formData.append("variants", JSON.stringify(variants));
       for (const variant of variants) {
         if (variant.imageFile) {
@@ -389,7 +376,6 @@ export default function ProductFormDialog({
         }
       }
 
-      // Build attributes payload, including dynamic 'Variant Options' list
       const attributesPayload: Record<string, string> = {
         "Care Level": careLevel,
         Light: light,
@@ -444,7 +430,7 @@ export default function ProductFormDialog({
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Basic Info */}
+          {}
           <div className="space-y-4">
             <h3 className="font-medium">Basic Information</h3>
             
@@ -565,7 +551,7 @@ export default function ProductFormDialog({
             </div>
           </div>
 
-          {/* Variant Options */}
+          {}
           <div className="space-y-4 border-t pt-4">
             <div className="bg-primary/5 rounded-xl p-4 border border-primary/10 text-xs text-muted-foreground leading-relaxed">
               <span className="font-semibold text-primary flex items-center gap-1.5 mb-1.5">
@@ -618,7 +604,7 @@ export default function ProductFormDialog({
             )}
           </div>
 
-          {/* Variants */}
+          {}
           <div className="space-y-4 border-t pt-4">
             <div className="flex items-center justify-between">
               <h3 className="font-medium">Variants *</h3>
@@ -699,7 +685,7 @@ export default function ProductFormDialog({
             ))}
           </div>
 
-          {/* Attributes */}
+          {}
           <div className="space-y-4 border-t pt-4">
             <h3 className="font-medium">Product Attributes</h3>
             

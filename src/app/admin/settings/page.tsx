@@ -49,7 +49,7 @@ export default function AdminSettingsPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          seller_whatsapp: whatsapp.replace(/\D/g, ""), // strip non-numeric
+          seller_whatsapp: whatsapp.replace(/\D/g, ""), 
           seller_email: email.trim(),
         }),
       });
@@ -100,7 +100,7 @@ export default function AdminSettingsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* WhatsApp */}
+            {}
             <div className="space-y-2">
               <label className="text-sm font-medium flex items-center gap-1.5">
                 <MessageSquare className="w-4 h-4 text-muted-foreground" />
@@ -113,7 +113,7 @@ export default function AdminSettingsPage() {
                 <Input
                   value={whatsapp}
                   onChange={(e) => setWhatsapp(e.target.value)}
-                  placeholder="61468766892"
+                  placeholder="61400000000"
                   className="flex-1"
                   required
                 />
@@ -124,7 +124,7 @@ export default function AdminSettingsPage() {
               </p>
             </div>
 
-            {/* Email */}
+            {}
             <div className="space-y-2">
               <label className="text-sm font-medium flex items-center gap-1.5">
                 <Mail className="w-4 h-4 text-muted-foreground" />

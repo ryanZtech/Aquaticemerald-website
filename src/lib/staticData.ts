@@ -57,7 +57,6 @@ export interface PickupHour {
   timeRange: string;
 }
 
-// Configuration Constants
 export const MONTH_NAMES = [
   "January",
   "February",
@@ -83,7 +82,6 @@ export const DAY_NAMES_SHORT = [
   "Sat",
 ];
 
-// Utility Functions
 export function daysInMonth(year: number, month: number) {
   return new Date(year, month + 1, 0).getDate();
 }

@@ -28,7 +28,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isHydrated, setIsHydrated] = useState(false);
 
-  // Load cart from localStorage on mount (hydration-safe)
   useEffect(() => {
     const savedCart = localStorage.getItem("aquatic_emerald_cart");
     if (savedCart) {
@@ -41,7 +40,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     setIsHydrated(true);
   }, []);
 
-  // Save cart to localStorage whenever it changes, only after hydration is complete
   useEffect(() => {
     if (isHydrated) {
       localStorage.setItem("aquatic_emerald_cart", JSON.stringify(cart));

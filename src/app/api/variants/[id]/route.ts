@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
+import { requireAdmin } from "@/lib/adminAuth";
 
 function getStockLevelFromQuantity(quantity: number) {
   if (quantity <= 0) return "none";
@@ -12,6 +13,9 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const authError = await requireAdmin();
+  if (authError) return authError;
+
   if (!sql) {
     return NextResponse.json(
       { error: "Database not configured" },
@@ -43,7 +47,6 @@ export async function PUT(
       stock_level = getStockLevelFromQuantity(stock_quantity);
     }
 
-    // If both are provided, ensure they are somewhat consistent if quantity is 0 but level is positive
     if (stock_level && stock_quantity === 0) {
       if (stock_level === "low") stock_quantity = 1;
       if (stock_level === "med" || stock_level === "medium")

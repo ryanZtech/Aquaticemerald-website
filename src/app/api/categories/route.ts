@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 
-// GET all categories
 export async function GET() {
   if (!sql) {
     return NextResponse.json(
@@ -26,8 +25,11 @@ export async function GET() {
   }
 }
 
-// POST create new category
 export async function POST(request: NextRequest) {
+  const { requireAdmin } = await import("@/lib/adminAuth");
+  const authError = await requireAdmin();
+  if (authError) return authError;
+
   if (!sql) {
     return NextResponse.json(
       { error: "Database not configured" },
