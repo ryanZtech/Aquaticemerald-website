@@ -5,7 +5,6 @@ import { compareSync } from "bcrypt-ts";
 import { SignJWT } from "jose";
 import { sql } from "@/lib/db";
 
-// Helper to strip potential surrounding quotes from env variables
 const sanitizeEnv = (val: string | undefined) => {
   if (!val) return undefined;
   return val.replace(/^['"]|['"]$/g, "");
@@ -15,7 +14,6 @@ export async function loginAdmin(formData: FormData) {
   const password = formData.get("password") as string;
   const expectedHash = process.env.ADMIN_PASSWORD_HASH;
   const jwtSecret = process.env.JWT_SECRET;
-
 
   // 0. Check for Server Config Error
   if (!expectedHash || !jwtSecret) {

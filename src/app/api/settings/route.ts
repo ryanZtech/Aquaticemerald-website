@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
+import { requireAdmin } from "@/lib/adminAuth";
 
-// GET all store settings
 export async function GET() {
+  const authError = await requireAdmin();
+  if (authError) return authError;
+
   if (!sql) {
     return NextResponse.json({ error: "Database not configured" }, { status: 500 });
   }
@@ -17,16 +20,17 @@ export async function GET() {
   }
 }
 
-// POST update settings
 export async function POST(request: NextRequest) {
+  const authError = await requireAdmin();
+  if (authError) return authError;
+
   if (!sql) {
     return NextResponse.json({ error: "Database not configured" }, { status: 500 });
   }
 
   try {
     const body = await request.json();
-    
-    // Save each key-value pair to database using INSERT ON CONFLICT
+
     for (const [key, value] of Object.entries(body)) {
       if (typeof value === "string") {
         await sql`
@@ -44,3 +48,4 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Failed to save settings" }, { status: 500 });
   }
 }
+

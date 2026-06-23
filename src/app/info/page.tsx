@@ -1,17 +1,17 @@
 import { getLocations, getHours, getStoreSettings } from "@/lib/dataService";
 import { MapPin, Clock, ChevronDown } from "lucide-react";
 
-export const revalidate = 60; // Revalidate dynamic hours/locations every 60 seconds (ISR)
+export const revalidate = 60; 
 
 export default async function InfoPage() {
-  const [locations, hours, settings] = await Promise.all([
+  const [locations, hours, allSettings] = await Promise.all([
     getLocations(),
     getHours(),
     getStoreSettings(),
   ]);
 
   const sceneImg =
-    settings.scene_image || "https://aquaticemerald.com/front1.png";
+    allSettings.scene_image || "https://aquaticemerald.com/front1.png";
 
   const guides = [
     {
@@ -46,7 +46,7 @@ export default async function InfoPage() {
 
   return (
     <div className="pt-24 pb-20 px-4 max-w-4xl mx-auto min-h-screen">
-      {/* Header section */}
+      {}
       <div className="mb-12">
         <p className="text-xs font-semibold tracking-[0.35em] text-primary uppercase mb-3 animate-pulse">
           About Us
@@ -61,7 +61,7 @@ export default async function InfoPage() {
         </p>
       </div>
 
-      {/* Lush Scene Image */}
+      {}
       <div className="relative rounded-3xl overflow-hidden h-64 sm:h-80 mb-16 bg-muted shadow-lg border border-border/10">
         <img
           src={sceneImg}
@@ -70,7 +70,7 @@ export default async function InfoPage() {
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
       </div>
-      {/* Pickup Locations dynamic Grid */}
+      {}
       <h2 className="font-serif text-3xl font-medium mb-6">Pickup Locations</h2>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
         {locations.map((loc) => (
@@ -89,7 +89,7 @@ export default async function InfoPage() {
         ))}
       </div>
 
-      {/* Pickup Hours dynamic Card */}
+      {}
       <div className="bg-secondary rounded-2xl p-6 mb-16 border border-border/10">
         <div className="flex items-center gap-2 mb-4">
           <Clock className="w-4 h-4 text-primary" />
@@ -111,7 +111,7 @@ export default async function InfoPage() {
         </p>
       </div>
 
-      {/* Footer */}
+      {}
       <div className="mt-16 pt-8 border-t border-border text-center">
         <div className="flex items-center justify-center gap-2 mb-2">
           <img

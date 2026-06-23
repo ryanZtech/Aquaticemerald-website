@@ -1,9 +1,9 @@
 import { neon } from "@neondatabase/serverless";
 import { NextResponse } from "next/server";
+import { requireAdmin } from "@/lib/adminAuth";
 
 export const dynamic = "force-dynamic";
 
-// Seed Data (Initial Setup Only)
 const SELLER_WHATSAPP = process.env.SELLER_WHATSAPP || "61400000000";
 
 const LOCATIONS = [
@@ -244,6 +244,10 @@ const PRODUCTS = [
 ];
 
 export async function GET() {
+  
+  const authError = await requireAdmin();
+  if (authError) return authError;
+  
   const dbUrl = process.env.DATABASE_URL;
   if (!dbUrl) {
     return NextResponse.json(
@@ -256,52 +260,36 @@ export async function GET() {
     const sql = neon(dbUrl);
     console.log("Neon Seed API: Initializing full schema...");
 
-    // 1. Categories
     await sql`CREATE TABLE IF NOT EXISTS categories (id SERIAL PRIMARY KEY, name TEXT NOT NULL, slug TEXT UNIQUE NOT NULL, description TEXT, image_url TEXT, parent_id INTEGER REFERENCES categories(id), sort_order INTEGER DEFAULT 0, active BOOLEAN DEFAULT TRUE);`;
 
-    // 2. Products
     await sql`CREATE TABLE IF NOT EXISTS products (id TEXT PRIMARY KEY, name TEXT NOT NULL, slug TEXT UNIQUE NOT NULL, short_description TEXT, full_description TEXT, category_id INTEGER REFERENCES categories(id), featured BOOLEAN DEFAULT FALSE, active BOOLEAN DEFAULT TRUE, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP);`;
 
-    // 3. Product Variants
     await sql`CREATE TABLE IF NOT EXISTS product_variants (id TEXT PRIMARY KEY, product_id TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE, label TEXT NOT NULL, price NUMERIC(10, 2) NOT NULL, stock_quantity INTEGER DEFAULT 0, active BOOLEAN DEFAULT TRUE, sku TEXT, sort_order INTEGER DEFAULT 0);`;
 
-    // 4. Images
     await sql`CREATE TABLE IF NOT EXISTS images (id SERIAL PRIMARY KEY, product_id TEXT REFERENCES products(id) ON DELETE CASCADE, variant_id TEXT REFERENCES product_variants(id) ON DELETE CASCADE, image_url TEXT NOT NULL, alt_text TEXT, is_primary BOOLEAN DEFAULT FALSE, sort_order INTEGER DEFAULT 0, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP);`;
 
-    // 5. Tags
     await sql`CREATE TABLE IF NOT EXISTS tags (id SERIAL PRIMARY KEY, name TEXT NOT NULL, slug TEXT UNIQUE NOT NULL);`;
 
-    // 6. Product Tag Links
     await sql`CREATE TABLE IF NOT EXISTS product_tag_links (product_id TEXT REFERENCES products(id) ON DELETE CASCADE, tag_id INTEGER REFERENCES tags(id) ON DELETE CASCADE, PRIMARY KEY (product_id, tag_id));`;
 
-    // 7. Product Attributes
     await sql`CREATE TABLE IF NOT EXISTS product_attributes (id SERIAL PRIMARY KEY, name TEXT NOT NULL, data_type TEXT NOT NULL, unit TEXT);`;
 
-    // 8. Product Attribute Values
     await sql`CREATE TABLE IF NOT EXISTS product_attribute_values (product_id TEXT REFERENCES products(id) ON DELETE CASCADE, attribute_id INTEGER REFERENCES product_attributes(id) ON DELETE CASCADE, value TEXT NOT NULL, PRIMARY KEY (product_id, attribute_id));`;
 
-    // 9. Pickup Locations
     await sql`CREATE TABLE IF NOT EXISTS pickup_locations (id SERIAL PRIMARY KEY, name TEXT NOT NULL, address TEXT, instructions TEXT, active BOOLEAN DEFAULT TRUE, latitude NUMERIC(10, 8), longitude NUMERIC(11, 8), created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP);`;
 
-    // 10. Weekly Availability Rules
     await sql`CREATE TABLE IF NOT EXISTS weekly_availability_rules (id SERIAL PRIMARY KEY, pickup_location_id INTEGER REFERENCES pickup_locations(id) ON DELETE CASCADE, weekday INTEGER NOT NULL, start_time TIME NOT NULL, end_time TIME NOT NULL, slot_duration_minutes INTEGER DEFAULT 30, max_pickups_per_slot INTEGER DEFAULT 1, active BOOLEAN DEFAULT TRUE);`;
 
-    // 11. Availability Overrides
     await sql`CREATE TABLE IF NOT EXISTS availability_overrides (id SERIAL PRIMARY KEY, pickup_location_id INTEGER REFERENCES pickup_locations(id) ON DELETE CASCADE, start_at TIMESTAMP WITH TIME ZONE NOT NULL, end_at TIMESTAMP WITH TIME ZONE NOT NULL, override_type TEXT NOT NULL, custom_hours_json JSONB, reason TEXT, active BOOLEAN DEFAULT TRUE);`;
 
-    // 12. Orders
     await sql`CREATE TABLE IF NOT EXISTS orders (id SERIAL PRIMARY KEY, customer_name TEXT NOT NULL, customer_email TEXT NOT NULL, customer_phone TEXT, pickup_location_id INTEGER REFERENCES pickup_locations(id), pickup_slot_at TIMESTAMP WITH TIME ZONE NOT NULL, status TEXT DEFAULT 'pending', notes TEXT, subtotal NUMERIC(10, 2) NOT NULL, total NUMERIC(10, 2) NOT NULL, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP);`;
 
-    // 13. Order Items
     await sql`CREATE TABLE IF NOT EXISTS order_items (id SERIAL PRIMARY KEY, order_id INTEGER REFERENCES orders(id) ON DELETE CASCADE, product_id TEXT, variant_id TEXT, snapshot_product_name TEXT NOT NULL, snapshot_variant_label TEXT, snapshot_unit_price NUMERIC(10, 2) NOT NULL, quantity INTEGER NOT NULL);`;
 
-    // 14. Slot Reservations
     await sql`CREATE TABLE IF NOT EXISTS slot_reservations (id SERIAL PRIMARY KEY, pickup_location_id INTEGER REFERENCES pickup_locations(id) ON DELETE CASCADE, slot_at TIMESTAMP WITH TIME ZONE NOT NULL, current_count INTEGER DEFAULT 0, max_capacity INTEGER DEFAULT 1, is_blocked BOOLEAN DEFAULT FALSE, UNIQUE(pickup_location_id, slot_at));`;
 
-    // 15. Store Settings
     await sql`CREATE TABLE IF NOT EXISTS store_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);`;
 
-    // 16. Login Attempts (for rate limiting)
     await sql`
       CREATE TABLE IF NOT EXISTS login_attempts (
         id SERIAL PRIMARY KEY,
@@ -312,13 +300,11 @@ export async function GET() {
 
     console.log("Neon Seed API: Tables validated. Seeding records...");
 
-    // Seeding Categories
     const categories = Array.from(new Set(PRODUCTS.map((p) => p.category)));
     for (const cat of categories) {
       await sql`INSERT INTO categories (name, slug) VALUES (${cat.charAt(0).toUpperCase() + cat.slice(1)}, ${cat}) ON CONFLICT (slug) DO NOTHING;`;
     }
 
-    // Seeding Attributes
     const attributeNames = ["Care Level", "Light", "Average Size", "Origin"];
     for (const name of attributeNames) {
       await sql`INSERT INTO product_attributes (name, data_type) VALUES (${name}, 'string') ON CONFLICT DO NOTHING;`;
@@ -329,7 +315,6 @@ export async function GET() {
       attributesResult.map((r) => [r.name, r.id]),
     );
 
-    // Seeding Products
     const categoryResult = await sql`SELECT id, slug FROM categories;`;
     const catMap = Object.fromEntries(
       categoryResult.map((r) => [r.slug, r.id]),
@@ -355,12 +340,10 @@ export async function GET() {
       }
     }
 
-    // Seeding Locations
     for (const loc of LOCATIONS) {
       await sql`INSERT INTO pickup_locations (name, address, instructions) VALUES (${loc.name}, ${loc.detail}, 'Please arrive on time.') ON CONFLICT DO NOTHING;`;
     }
 
-    // Seeding Weekly Rules
     const locResult = await sql`SELECT id FROM pickup_locations;`;
     for (const loc of locResult) {
       await sql`INSERT INTO weekly_availability_rules (pickup_location_id, weekday, start_time, end_time) VALUES (${loc.id}, 6, '11:00:00', '18:00:00') ON CONFLICT DO NOTHING;`;
@@ -370,7 +353,6 @@ export async function GET() {
       }
     }
 
-    // Seeding Settings
     const sellerEmail = process.env.SELLER_EMAIL || "seller@example.com";
     await sql`INSERT INTO store_settings (key, value) VALUES ('seller_whatsapp', ${SELLER_WHATSAPP}), ('seller_email', ${sellerEmail}), ('hero_image', 'https://images.unsplash.com/photo-1779436853149-2e7d501f71cf?w=1600&h=900&fit=crop&auto=format'), ('scene_image', 'https://images.unsplash.com/photo-1779436853049-c19542e3c81c?w=1400&h=700&fit=crop&auto=format') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;`;
 

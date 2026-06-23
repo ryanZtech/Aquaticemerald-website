@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { buildCustomerHtml, buildSellerHtml } from "@/lib/emailTemplatesSimple";
+import { requireAdmin } from "@/lib/adminAuth";
 
-// GET all orders
 export async function GET() {
+  const authError = await requireAdmin();
+  if (authError) return authError;
+
   if (!sql) {
     return NextResponse.json(
       { error: "Database not configured" },
@@ -44,7 +47,6 @@ export async function GET() {
   }
 }
 
-// POST create new order (clean, parse-safe implementation)
 export async function POST(request: NextRequest) {
   if (!sql) return NextResponse.json({ error: "Database not configured" }, { status: 500 });
 
@@ -74,7 +76,6 @@ export async function POST(request: NextRequest) {
     const pickupLocationId = pickup_location_id ? Number(pickup_location_id) : null;
     const slotStart = pickup_slot_at || null;
 
-    // Validate stock for each cart item
     for (const it of cart) {
       const variantRows = await sql`SELECT stock_level, stock_quantity FROM product_variants WHERE id = ${it.variantId}`;
       if (variantRows.length > 0) {
@@ -88,7 +89,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Reserve slot if provided
     if (pickupLocationId && slotStart) {
       const dayOfWeek = new Date(slotStart).getDay();
       const ruleRows = await sql`
@@ -121,7 +121,6 @@ export async function POST(request: NextRequest) {
       reservedSlotAt = slotStart;
     }
 
-    // Create order
     const insert = await sql`
       INSERT INTO orders (customer_name, customer_email, customer_phone, pickup_location_id, pickup_slot_at, notes, subtotal, total)
       VALUES (${customer_name}, ${customer_email}, ${customer_phone}, ${pickupLocationId}, ${pickup_slot_at || null}, ${notes || orderRef || null}, ${subtotal}, ${total})
@@ -130,7 +129,6 @@ export async function POST(request: NextRequest) {
 
     const orderId = insert[0]?.id;
 
-    // Insert items and update stock
     for (const it of cart) {
       await sql`
         INSERT INTO order_items (order_id, product_id, variant_id, snapshot_product_name, snapshot_variant_label, snapshot_unit_price, quantity)
@@ -165,9 +163,9 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Load seller settings and compute wa links
     let sellerEmail: string | null = null;
-    let sellerWhatsApp: string = '61468766892';
+    
+    let sellerWhatsApp: string = process.env.SELLER_WHATSAPP || '';
     try {
       const settingsRows = await sql`SELECT key, value FROM store_settings WHERE key IN ('seller_email', 'seller_whatsapp')`;
       for (const row of settingsRows) {
@@ -184,11 +182,12 @@ export async function POST(request: NextRequest) {
     const customerWaLink = waCustomerPhone ? `https://wa.me/${waCustomerPhone}?text=${encodeURIComponent(`Hi ${customer_name}, this is Aquatic Emerald regarding your order #${orderRef || orderId}!`)}` : '';
     const sellerWaLink = sellerWhatsApp ? `https://wa.me/${sellerWhatsApp}` : '';
 
-    // compute pickup display values and year
     const currentYear = new Date().getFullYear();
+    const isCustomLocation = !pickupLocationId && notes && notes.includes('Custom location requested:');
+    const customLocationText = isCustomLocation ? notes.replace('Custom location requested:', '').trim() : '';
     const pickupDetails = pickupLocationId ? await sql`SELECT name, address AS detail FROM pickup_locations WHERE id = ${pickupLocationId}` : [];
-    const pickupName = pickupDetails[0]?.name || 'N/A';
-    const pickupDetail = pickupDetails[0]?.detail || '';
+    const pickupName = isCustomLocation ? `Custom Location` : (pickupDetails[0]?.name || 'N/A');
+    const pickupDetail = isCustomLocation ? customLocationText : (pickupDetails[0]?.detail || '');
     const pickupDateObj = pickup_slot_at ? new Date(pickup_slot_at) : null;
     const formattedPickupDate = pickupDateObj
       ? pickupDateObj.toLocaleDateString('en-AU', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
@@ -197,7 +196,6 @@ export async function POST(request: NextRequest) {
       ? pickupDateObj.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit', hour12: true })
       : 'N/A';
 
-    // Send emails using extracted templates if Resend key is present
     const RESEND_API_KEY = process.env.RESEND_API_KEY;
     if (RESEND_API_KEY) {
       const fromEmail = process.env.EMAIL_FROM || 'Aquatic Emerald <orders@aquaticemerald.com>';

@@ -20,7 +20,6 @@ export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const dropRef = useRef<HTMLDivElement>(null);
 
-  // Dynamic database-driven categories
   const [categories, setCategories] = useState<
     { slug: string; name: string; icon_name?: string; image_url?: string }[]
   >([
@@ -55,7 +54,6 @@ export default function Navbar() {
     loadCategories();
   }, []);
 
-  // Close dropdown on click outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (dropRef.current && !dropRef.current.contains(event.target as Node)) {
@@ -68,7 +66,6 @@ export default function Navbar() {
     };
   }, []);
 
-  // Close mobile menu on page transition
   useEffect(() => {
     setMobileMenuOpen(false);
   }, [pathname]);
@@ -81,7 +78,7 @@ export default function Navbar() {
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-background/90 backdrop-blur-lg border-b border-border transition-colors duration-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between h-16">
-        {/* Logo */}
+        {}
         <Link href="/" className="flex items-center gap-2.5 group">
           <img
             src="/logo.png"
@@ -94,7 +91,7 @@ export default function Navbar() {
           </span>
         </Link>
 
-        {/* Desktop Nav Links */}
+        {}
         <div className="hidden md:flex items-center gap-8">
           <Link
             href="/"
@@ -105,7 +102,7 @@ export default function Navbar() {
             Home
           </Link>
 
-          {/* Products Dropdown */}
+          {}
           <div
             ref={dropRef}
             className="relative"
@@ -190,9 +187,9 @@ export default function Navbar() {
           </Link>
         </div>
 
-        {/* Right Actions */}
+        {}
         <div className="flex items-center gap-2">
-          {/* Theme toggle */}
+          {}
           <button
             onClick={toggleDark}
             className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center hover:bg-accent transition-colors cursor-pointer"
@@ -205,7 +202,7 @@ export default function Navbar() {
             )}
           </button>
 
-          {/* Cart */}
+          {}
           <Link
             href="/cart"
             className="relative w-9 h-9 rounded-full bg-secondary flex items-center justify-center hover:bg-accent transition-colors"
@@ -219,7 +216,7 @@ export default function Navbar() {
             )}
           </Link>
 
-          {/* Mobile Menu Button */}
+          {}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             className="md:hidden w-9 h-9 rounded-full bg-secondary flex items-center justify-center hover:bg-accent transition-colors cursor-pointer"
@@ -234,7 +231,7 @@ export default function Navbar() {
         </div>
       </div>
 
-      {/* Mobile Menu drawer */}
+      {}
       <AnimatePresence>
         {mobileMenuOpen && (
           <motion.div

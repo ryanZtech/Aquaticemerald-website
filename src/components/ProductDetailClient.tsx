@@ -28,7 +28,6 @@ export default function ProductDetailClient({
   const [added, setAdded] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
-  // Dynamic multiple variant option dropdowns structure
   const [options, setOptions] = useState<{ name: string; values: string[] }[]>(
     [],
   );
@@ -82,11 +81,10 @@ export default function ProductDetailClient({
 
   useEffect(() => {
     if (product.variants && product.variants.length > 0) {
-      // Determine if the product has multiple options based on labels
+      
       const firstVariantLabel = product.variants[0].label;
       const optionCount = firstVariantLabel.split(" / ").length;
 
-      // Determine headers/names of options
       const optionNames =
         product.variantOptions && product.variantOptions.length === optionCount
           ? product.variantOptions
@@ -95,7 +93,6 @@ export default function ProductDetailClient({
               (_, idx) => `Option ${idx + 1}`,
             );
 
-      // Extract unique option values for each option index
       const newOptions = optionNames.map((name, idx) => {
         const values = Array.from(
           new Set(
@@ -109,7 +106,6 @@ export default function ProductDetailClient({
 
       setOptions(newOptions);
 
-      // Initialize selected values with the first variant's combination
       const firstVariantParts = firstVariantLabel
         .split(" / ")
         .map((p) => p.trim());
@@ -126,7 +122,6 @@ export default function ProductDetailClient({
     }
   }, [product]);
 
-  // Match the active variant whenever selected options change
   useEffect(() => {
     if (product.variants && product.variants.length > 0 && options.length > 0) {
       const match = product.variants.find((v) => {
@@ -137,7 +132,6 @@ export default function ProductDetailClient({
       });
       setMatchedVariant(match || null);
 
-      // Auto-scroll to variant image if it exists
       if (match && match.image_url) {
         const index = imageUrls.findIndex((url) => url === match.image_url);
         if (index !== -1 && index !== currentImageIndex) {
@@ -218,9 +212,9 @@ export default function ProductDetailClient({
       </Link>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-10 lg:gap-16">
-        {/* Image Carousel */}
+        {}
         <div className="space-y-3">
-          {/* Main image */}
+          {}
           <div className="relative rounded-3xl bg-muted aspect-square shadow-xl border border-border overflow-hidden">
             {imageUrls[currentImageIndex] ? (
               <img
@@ -234,7 +228,7 @@ export default function ProductDetailClient({
               </div>
             )}
 
-            {/* Nav buttons rendered OUTSIDE the overflow-hidden container via absolute positioning on a sibling overlay */}
+            {}
             {imageUrls.length > 1 && (
               <>
                 <button
@@ -260,7 +254,7 @@ export default function ProductDetailClient({
                   <ChevronRight className="w-5 h-5" />
                 </button>
 
-                {/* Dot indicators */}
+                {}
                 <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-20">
                   {imageUrls.map((_, i) => (
                     <button
@@ -280,7 +274,7 @@ export default function ProductDetailClient({
             )}
           </div>
 
-          {/* Thumbnail strip — horizontal scroll */}
+          {}
           {imageUrls.length > 1 && (
             <div
               className="flex gap-2 overflow-x-auto px-1 pb-1"
@@ -315,7 +309,7 @@ export default function ProductDetailClient({
           )}
         </div>
 
-        {/* Details Section */}
+        {}
         <div className="flex flex-col">
           <p className="text-xs text-primary tracking-widest mb-2.5 capitalize font-semibold">
             {product.category}
@@ -327,7 +321,7 @@ export default function ProductDetailClient({
             {product.description}
           </p>
 
-          {/* Stats Grid */}
+          {}
           <div className="grid grid-cols-2 gap-3 mb-8">
             {stats.map((s) => (
               <div
@@ -352,7 +346,7 @@ export default function ProductDetailClient({
             </div>
           ) : (
             <>
-              {/* Dynamic Multiple Option Dropdowns */}
+              {}
               {options.length > 0 && (
                 <div className="space-y-4 mb-6">
                   {options.map((opt) => (
@@ -381,7 +375,7 @@ export default function ProductDetailClient({
                 </div>
               )}
 
-              {/* Resolved Option Price Display */}
+              {}
               {matchedVariant ? (
                 <div>
                   <div className="flex items-center justify-between px-4 py-3.5 rounded-xl border border-primary/20 bg-primary/5 text-primary text-sm mb-3">
@@ -419,7 +413,7 @@ export default function ProductDetailClient({
                 </div>
               )}
 
-              {/* Quantity Selector */}
+              {}
               <div className="mb-8">
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2.5">
                   Quantity
@@ -466,7 +460,7 @@ export default function ProductDetailClient({
                 )}
               </div>
 
-              {/* Add to Cart Trigger */}
+              {}
               <button
                 onClick={handleAdd}
                 disabled={

@@ -105,6 +105,7 @@ export default function CheckoutClient({
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [location, setLocation] = useState("");
+  const [customLocation, setCustomLocation] = useState("");
   const [saving, setSaving] = useState(false);
   const [year, setYear] = useState(todayY);
   const [month, setMonth] = useState(todayM);
@@ -171,12 +172,13 @@ export default function CheckoutClient({
   const isDayDisabled = (d: number) => {
     if (year < todayY) return true;
     if (year === todayY && month < todayM) return true;
-    if (year === todayY && month === todayM && d < todayD) return true;
+    if (year === todayY && month === todayM && d <= todayD) return true;
     return false;
   };
 
   const selectedDow = day !== null ? new Date(year, month, day).getDay() : -1;
-  const selectedLocationId = location ? parseInt(location, 10) : NaN;
+  const isCustomLocation = location === "custom";
+  const selectedLocationId = !isCustomLocation && location ? parseInt(location, 10) : NaN;
   const selectedRules = Number.isNaN(selectedLocationId)
     ? []
     : timeRules.filter(
@@ -281,6 +283,7 @@ export default function CheckoutClient({
     phone.trim().length >= 8 &&
     email.trim().includes("@") &&
     location &&
+    (location !== "custom" || customLocation.trim().length >= 3) &&
     day !== null &&
     timeWindow;
 
@@ -311,12 +314,12 @@ export default function CheckoutClient({
         customer_name: name || "",
         customer_email: email,
         customer_phone: phone,
-        pickup_location_id: parseInt(location) || null,
+        pickup_location_id: isCustomLocation ? null : parseInt(location) || null,
         pickup_slot_at,
         cart,
         subtotal: cart.reduce((s, it) => s + it.price * it.qty, 0),
         total: cartTotal,
-        notes: "",
+        notes: isCustomLocation ? `Custom location requested: ${customLocation}` : "",
       };
 
       const res = await fetch("/api/orders", {
@@ -332,13 +335,11 @@ export default function CheckoutClient({
         return;
       }
 
-      const msg = `my order number is ${orderId}, please confirm my order`;
+      const msg = `my order number is ${orderId}, please confirm my order${isCustomLocation ? ` (I have requested a custom location: ${customLocation})` : ""}`;
       const whatsappUrl = `https://wa.me/${whatsapp}?text=${encodeURIComponent(msg)}`;
 
-      // Open WhatsApp
       window.open(whatsappUrl, "_blank");
 
-      // Small delay before redirecting to allow the window to open
       setTimeout(() => {
         clearCart();
         router.push("/");
@@ -511,6 +512,42 @@ export default function CheckoutClient({
                 </div>
               </button>
             ))}
+            <button
+              onClick={() => {
+                setLocation("custom");
+                setTimeWindow("");
+              }}
+              className={`w-full flex items-center gap-3 px-4 py-4 rounded-xl border text-sm transition-all text-left cursor-pointer ${location === "custom" ? "border-primary bg-primary/5 text-primary" : "border-border hover:border-primary/40"}`}
+            >
+              <div
+                className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition ${location === "custom" ? "border-primary bg-primary" : "border-muted-foreground/40"}`}
+              >
+                {location === "custom" && (
+                  <Check className="w-3 h-3 text-primary-foreground" />
+                )}
+              </div>
+              <div className="flex-1">
+                <p className="font-medium">Custom Location</p>
+                <p className="text-xs text-muted-foreground font-light mt-0.5">
+                  Request a different pickup location
+                </p>
+              </div>
+            </button>
+            {location === "custom" && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                className="pt-2"
+              >
+                <input
+                  type="text"
+                  value={customLocation}
+                  onChange={(e) => setCustomLocation(e.target.value)}
+                  placeholder="Enter your preferred location..."
+                  className="w-full px-4 py-3 rounded-xl bg-secondary border border-border focus:border-primary text-sm outline-none focus:ring-2 focus:ring-ring transition"
+                />
+              </motion.div>
+            )}
           </div>
         </div>
 

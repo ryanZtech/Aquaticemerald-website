@@ -29,7 +29,7 @@ export default async function AdminLayout({
 
   return (
     <div className="min-h-screen bg-muted/20 flex flex-col sm:flex-row">
-      {/* Sidebar */}
+      {}
       <aside className="w-full sm:w-64 bg-card border-r border-border p-6 flex flex-col h-screen sticky top-0">
         <Link href="/" className="flex items-center gap-2 group mb-8">
           <img
@@ -99,7 +99,7 @@ export default async function AdminLayout({
         </div>
       </aside>
 
-      {/* Main Content */}
+      {}
       <main className="flex-1 p-6 sm:p-10">{children}</main>
     </div>
   );

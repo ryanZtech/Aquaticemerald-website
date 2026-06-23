@@ -20,6 +20,10 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  const { requireAdmin } = await import("@/lib/adminAuth");
+  const authError = await requireAdmin();
+  if (authError) return authError;
+
   if (!sql) {
     return NextResponse.json({ error: "DB not configured" }, { status: 500 });
   }

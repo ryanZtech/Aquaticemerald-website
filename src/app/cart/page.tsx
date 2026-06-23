@@ -37,7 +37,7 @@ export default function CartPage() {
         </div>
       ) : (
         <>
-          {/* Cart Items List */}
+          {}
           <div className="space-y-3 mb-8">
             {cart.map((item) => {
               const maxQty =
@@ -70,7 +70,7 @@ export default function CartPage() {
                     </p>
                   </div>
                   
-                  {/* Quantity and Remove Controllers */}
+                  {}
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <div className="flex items-center border border-border rounded-full overflow-hidden bg-secondary">
                       <button
@@ -104,7 +104,7 @@ export default function CartPage() {
             })}
           </div>
 
-          {/* Cart Pricing Summary */}
+          {}
           <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
             <div className="flex justify-between text-sm text-muted-foreground mb-3 font-light">
               <span>Subtotal ({itemCount} item{itemCount !== 1 ? "s" : ""})</span>
@@ -115,7 +115,7 @@ export default function CartPage() {
               <span className="text-primary">${cartTotal.toFixed(2)}</span>
             </div>
 
-            {/* Minimum Cart value rule feedback */}
+            {}
             <p 
               className={`text-xs text-center mb-3 font-medium transition-all duration-200 ${
                 cartTotal < 5 

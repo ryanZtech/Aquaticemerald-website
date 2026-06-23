@@ -12,8 +12,6 @@ export interface Guide {
   updated_at: string;
 }
 
-
-// Helper mapper to normalize database rows to Product interface
 function mapDbProduct(row: any): Product {
   let dbVariants = [];
   if (Array.isArray(row.variants)) {
@@ -327,7 +325,7 @@ export async function getSellerWhatsApp(): Promise<string> {
 
     if (rows.length === 0) return "";
     let val = String(rows[0].value || "").replace(/\D/g, "");
-    // If value starts with 0, assume AU country code +61
+    
     if (val.startsWith("0")) {
       val = "61" + val.substring(1);
     }
