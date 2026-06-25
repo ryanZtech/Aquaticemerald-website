@@ -40,7 +40,6 @@ interface Product {
     id: string;
     label: string;
     price: number;
-    stock_quantity: number;
     stock_level?: string;
   }>;
 }
@@ -60,7 +59,6 @@ export default function ProductsPageClient() {
     string | null
   >(null);
   const [tempStockLevel, setTempStockLevel] = useState("");
-  const [tempStockQuantity, setTempStockQuantity] = useState("0");
 
   const [selectedCategory, setSelectedCategory] = useState("all");
 
@@ -199,7 +197,6 @@ export default function ProductsPageClient() {
   const handleUpdateStockLevel = async (
     variantId: string,
     newStockLevel: string,
-    newStockQuantity?: number,
   ) => {
     try {
       const response = await fetch(`/api/variants/${variantId}`, {
@@ -207,7 +204,6 @@ export default function ProductsPageClient() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           stock_level: newStockLevel,
-          stock_quantity: newStockQuantity,
         }),
       });
 
@@ -495,54 +491,28 @@ export default function ProductsPageClient() {
                           </div>
                         ) : (
                           <div className="border border-border/60 rounded-xl overflow-hidden bg-card text-xs">
-                            <div className="grid grid-cols-4 bg-muted/50 py-2.5 px-4 font-semibold text-muted-foreground border-b border-border/60">
+                            <div className="grid grid-cols-3 bg-muted/50 py-2.5 px-4 font-semibold text-muted-foreground border-b border-border/60">
                               <div>Label</div>
                               <div className="text-center">Price</div>
-                              <div className="text-center">Qty</div>
                               <div className="text-right">Stock Level</div>
                             </div>
                             <div className="divide-y divide-border/40">
                               {detailProduct.variants.map((v, idx) => {
                                 const currentStockLevel =
-                                  v.stock_level ||
-                                  (v.stock_quantity && v.stock_quantity > 20
-                                    ? "high"
-                                    : v.stock_quantity && v.stock_quantity > 10
-                                      ? "med"
-                                      : v.stock_quantity && v.stock_quantity > 0
-                                        ? "low"
-                                        : "none");
-                                const currentStockQuantity = Number(
-                                  v.stock_quantity || 0,
-                                );
+                                  v.stock_level || "none";
                                 const isEditing =
                                   editingStockVariantId === v.id;
 
                                 return (
                                   <div
                                     key={`${idx}-${v.id}`}
-                                    className="grid grid-cols-4 py-2.5 px-4 items-center"
+                                    className="grid grid-cols-3 py-2.5 px-4 items-center"
                                   >
                                     <div className="font-medium text-foreground">
                                       {v.label}
                                     </div>
                                     <div className="text-center font-semibold text-primary">
                                       ${Number(v.price).toFixed(2)}
-                                    </div>
-                                    <div className="text-center text-xs text-muted-foreground">
-                                      {isEditing ? (
-                                        <Input
-                                          type="number"
-                                          min="0"
-                                          value={tempStockQuantity}
-                                          onChange={(e) =>
-                                            setTempStockQuantity(e.target.value)
-                                          }
-                                          className="mx-auto h-8 w-20 text-center"
-                                        />
-                                      ) : (
-                                        currentStockQuantity
-                                      )}
                                     </div>
                                     <div className="text-right">
                                       {isEditing ? (
@@ -579,13 +549,6 @@ export default function ProductsPageClient() {
                                               handleUpdateStockLevel(
                                                 v.id,
                                                 tempStockLevel,
-                                                Math.max(
-                                                  0,
-                                                  parseInt(
-                                                    tempStockQuantity,
-                                                    10,
-                                                  ) || 0,
-                                                ),
                                               )
                                             }
                                           >
@@ -608,9 +571,6 @@ export default function ProductsPageClient() {
                                             setEditingStockVariantId(v.id);
                                             setTempStockLevel(
                                               currentStockLevel,
-                                            );
-                                            setTempStockQuantity(
-                                              String(currentStockQuantity),
                                             );
                                           }}
                                           className="text-muted-foreground hover:text-foreground flex items-center gap-1 ml-auto cursor-pointer"
@@ -746,15 +706,7 @@ export default function ProductsPageClient() {
 
                     const CatIcon = getCategoryIcon(p.category || "") as any;
                     const stockLevels = p.variants.map(
-                      (v) =>
-                        v.stock_level ||
-                        (v.stock_quantity && v.stock_quantity > 20
-                          ? "high"
-                          : v.stock_quantity && v.stock_quantity > 10
-                            ? "med"
-                            : v.stock_quantity && v.stock_quantity > 0
-                              ? "low"
-                              : "none"),
+                      (v) => v.stock_level || "none",
                     );
                     const allSame = stockLevels.every(
                       (s) => s === stockLevels[0],

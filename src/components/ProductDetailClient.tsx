@@ -15,6 +15,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
+import { maxQtyForLevel } from "@/lib/stockLimits";
 
 interface ProductDetailClientProps {
   product: Product;
@@ -23,7 +24,7 @@ interface ProductDetailClientProps {
 export default function ProductDetailClient({
   product,
 }: ProductDetailClientProps) {
-  const { addToCart } = useCart();
+  const { addToCart, stockLimits } = useCart();
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -72,12 +73,7 @@ export default function ProductDetailClient({
   })();
 
   const imageUrls = allImages.map((img) => img.image_url);
-  const maxQty =
-    matchedVariant?.stock_level === "none"
-      ? 0
-      : matchedVariant?.stock_level === "low"
-        ? 1
-        : Math.max(1, Number(matchedVariant?.stock_quantity || 999));
+  const maxQty = maxQtyForLevel(matchedVariant?.stock_level, stockLimits);
 
   useEffect(() => {
     if (product.variants && product.variants.length > 0) {
@@ -178,7 +174,6 @@ export default function ProductDetailClient({
       img:
         matchedVariant.image_url || imageUrls[currentImageIndex] || product.img,
       stock_level: matchedVariant.stock_level,
-      stock_quantity: matchedVariant.stock_quantity,
     });
     setAdded(true);
     setTimeout(() => setAdded(false), 2000);
@@ -454,8 +449,8 @@ export default function ProductDetailClient({
                 {matchedVariant && maxQty > 0 && (
                   <p className="mt-2 text-xs text-muted-foreground">
                     {matchedVariant.stock_level === "low"
-                      ? "Low stock: only 1 can be purchased."
-                      : `Available quantity: ${maxQty}`}
+                      ? `Low stock: up to ${maxQty} can be purchased.`
+                      : `You can order up to ${maxQty}.`}
                   </p>
                 )}
               </div>

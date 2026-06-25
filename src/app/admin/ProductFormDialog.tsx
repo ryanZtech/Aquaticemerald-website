@@ -111,19 +111,13 @@ export default function ProductFormDialog({
       }
       
       const rawVariants = typeof data.variants === "string" ? JSON.parse(data.variants) : (data.variants || []);
-      const numberToLevel = (qty: number) => {
-        if (!qty || qty <= 0) return "none";
-        if (qty <= 10) return "low";
-        if (qty <= 20) return "med";
-        return "high";
-      };
+
 
       const loadedVariants = rawVariants.map((v: any) => ({
         id: v.id ? v.id.toString().split("-").pop() : Math.random().toString(),
         label: v.label,
         price: parseFloat(v.price),
-        stock_quantity: Number(v.stock_quantity || 0),
-        stock_level: v.stock_level || numberToLevel(Number(v.stock_quantity || 0)),
+        stock_level: v.stock_level || "none",
         image_url: v.image_url,
       }));
       setVariants(loadedVariants);
@@ -287,7 +281,6 @@ export default function ProductFormDialog({
       id: `var_${Date.now()}_${index}`,
       label: combo.join(" / "),
       price: 0,
-      stock_quantity: 0,
       stock_level: "none",
     }));
 
@@ -302,7 +295,6 @@ export default function ProductFormDialog({
         id: `var_${Date.now()}`,
         label: "",
         price: 0,
-        stock_quantity: 0,
         stock_level: "none",
       },
     ]);
@@ -629,15 +621,6 @@ export default function ProductFormDialog({
                     value={variant.price || ""}
                     onChange={(e) =>
                       updateVariant(variant.id, "price", parseFloat(e.target.value) || 0)
-                    }
-                  />
-                  <Input
-                    type="number"
-                    min="0"
-                    placeholder="Stock Qty"
-                    value={variant.stock_quantity ?? 0}
-                    onChange={(e) =>
-                      updateVariant(variant.id, "stock_quantity", Math.max(0, parseInt(e.target.value, 10) || 0))
                     }
                   />
                   <select

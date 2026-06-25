@@ -76,19 +76,6 @@ export async function POST(request: NextRequest) {
     const pickupLocationId = pickup_location_id ? Number(pickup_location_id) : null;
     const slotStart = pickup_slot_at || null;
 
-    for (const it of cart) {
-      const variantRows = await sql`SELECT stock_level, stock_quantity FROM product_variants WHERE id = ${it.variantId}`;
-      if (variantRows.length > 0) {
-        const variant = variantRows[0];
-        if (variant.stock_level === "none" || (variant.stock_quantity || 0) <= 0) {
-          return NextResponse.json({ error: `${it.name} is out of stock` }, { status: 400 });
-        }
-        if (variant.stock_level === "low" && (it.qty || 0) > 1) {
-          return NextResponse.json({ error: `${it.name} has low stock - only 1 can be purchased` }, { status: 400 });
-        }
-      }
-    }
-
     if (pickupLocationId && slotStart) {
       const dayOfWeek = new Date(slotStart).getDay();
       const ruleRows = await sql`
@@ -134,33 +121,6 @@ export async function POST(request: NextRequest) {
         INSERT INTO order_items (order_id, product_id, variant_id, snapshot_product_name, snapshot_variant_label, snapshot_unit_price, quantity)
         VALUES (${orderId}, ${it.productId || null}, ${it.variantId || null}, ${it.name}, ${it.variantLabel}, ${it.price}, ${it.qty})
       `;
-
-      const variantRows = await sql`SELECT stock_level, stock_quantity FROM product_variants WHERE id = ${it.variantId}`;
-      if (variantRows.length > 0) {
-        const variant = variantRows[0];
-        let newStockQuantity = (variant.stock_quantity || 0) - (it.qty || 0);
-        let newStockLevel = variant.stock_level;
-
-        if (variant.stock_level === "low") {
-          newStockLevel = "none";
-          newStockQuantity = 0;
-        } else if (newStockQuantity <= 0) {
-          newStockLevel = "none";
-          newStockQuantity = 0;
-        } else if (newStockQuantity > 0 && newStockQuantity <= 10) {
-          newStockLevel = "low";
-        } else if (newStockQuantity > 10 && newStockQuantity <= 20) {
-          newStockLevel = "med";
-        } else {
-          newStockLevel = "high";
-        }
-
-        await sql`
-          UPDATE product_variants
-          SET stock_level = ${newStockLevel}, stock_quantity = ${newStockQuantity}, updated_at = CURRENT_TIMESTAMP
-          WHERE id = ${it.variantId}
-        `;
-      }
     }
 
     let sellerEmail: string | null = null;
@@ -183,18 +143,17 @@ export async function POST(request: NextRequest) {
     const sellerWaLink = sellerWhatsApp ? `https://wa.me/${sellerWhatsApp}` : '';
 
     const currentYear = new Date().getFullYear();
-    const isCustomLocation = !pickupLocationId && notes && notes.includes('Custom location requested:');
-    const customLocationText = isCustomLocation ? notes.replace('Custom location requested:', '').trim() : '';
+    const isCustomLocation = !pickupLocationId && notes && notes.includes('Custom location');
     const pickupDetails = pickupLocationId ? await sql`SELECT name, address AS detail FROM pickup_locations WHERE id = ${pickupLocationId}` : [];
-    const pickupName = isCustomLocation ? `Custom Location` : (pickupDetails[0]?.name || 'N/A');
-    const pickupDetail = isCustomLocation ? customLocationText : (pickupDetails[0]?.detail || '');
+    const pickupName = isCustomLocation ? `Custom Location (to be arranged)` : (pickupDetails[0]?.name || 'N/A');
+    const pickupDetail = isCustomLocation ? 'Location and time will be negotiated via WhatsApp' : (pickupDetails[0]?.detail || '');
     const pickupDateObj = pickup_slot_at ? new Date(pickup_slot_at) : null;
-    const formattedPickupDate = pickupDateObj
+    const formattedPickupDate = isCustomLocation ? 'To be arranged via WhatsApp' : (pickupDateObj
       ? pickupDateObj.toLocaleDateString('en-AU', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
-      : 'N/A';
-    const formattedPickupTime = pickupDateObj
+      : 'N/A');
+    const formattedPickupTime = isCustomLocation ? '' : (pickupDateObj
       ? pickupDateObj.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit', hour12: true })
-      : 'N/A';
+      : 'N/A');
 
     const RESEND_API_KEY = process.env.RESEND_API_KEY;
     if (RESEND_API_KEY) {

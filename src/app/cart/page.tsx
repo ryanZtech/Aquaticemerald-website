@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useCart } from "@/context/CartContext";
+import { maxQtyForLevel } from "@/lib/stockLimits";
 import { ShoppingCart, Minus, Plus, X, ArrowLeft } from "lucide-react";
 
 export default function CartPage() {
-  const { cart, updateQty, removeItem, cartTotal } = useCart();
+  const { cart, updateQty, removeItem, cartTotal, stockLimits } = useCart();
   const itemCount = cart.reduce((sum, item) => sum + item.qty, 0);
 
   return (
@@ -40,12 +41,7 @@ export default function CartPage() {
           {}
           <div className="space-y-3 mb-8">
             {cart.map((item) => {
-              const maxQty =
-                item.stock_level === "none"
-                  ? 0
-                  : item.stock_level === "low"
-                    ? 1
-                    : Math.max(1, Number(item.stock_quantity || 999));
+              const maxQty = maxQtyForLevel(item.stock_level, stockLimits);
                           return (
                             <div
                               key={`${item.productId}-${item.variantId}`}

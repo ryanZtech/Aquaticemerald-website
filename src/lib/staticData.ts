@@ -2,7 +2,6 @@ export interface Variant {
   id: string;
   label: string;
   price: number;
-  stock_quantity?: number;
   stock_level?: string;
   image_url?: string;
 }
@@ -42,7 +41,6 @@ export interface CartItem {
   price: number;
   img?: string;
   stock_level?: string;
-  stock_quantity?: number;
 }
 
 export interface PickupLocation {
