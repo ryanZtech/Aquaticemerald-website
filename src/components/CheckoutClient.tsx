@@ -105,7 +105,6 @@ export default function CheckoutClient({
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [location, setLocation] = useState("");
-  const [customLocation, setCustomLocation] = useState("");
   const [saving, setSaving] = useState(false);
   const [year, setYear] = useState(todayY);
   const [month, setMonth] = useState(todayM);
@@ -283,9 +282,25 @@ export default function CheckoutClient({
     phone.trim().length >= 8 &&
     email.trim().includes("@") &&
     location &&
-    (location !== "custom" || customLocation.trim().length >= 3) &&
-    day !== null &&
-    timeWindow;
+    (isCustomLocation || (day !== null && timeWindow));
+
+  const getMissingFields = () => {
+    const missing: string[] = [];
+    if (name.trim().length < 2) missing.push("name");
+    if (phone.trim().length < 8) missing.push("phone number");
+    if (!email.trim().includes("@")) missing.push("email");
+    if (!location) missing.push("location");
+    if (!isCustomLocation) {
+      if (day === null) missing.push("date");
+      if (!timeWindow) missing.push("time");
+    }
+    return missing;
+  };
+
+  const missingFields = getMissingFields();
+  const missingFieldsText = missingFields.length > 0
+    ? `Enter ${missingFields.join(", ")} to confirm order`
+    : "";
 
   const handleConfirm = async () => {
     let hasError = false;
@@ -307,7 +322,7 @@ export default function CheckoutClient({
 
     setSaving(true);
     try {
-      const pickup_slot_at = timeWindow;
+      const pickup_slot_at = isCustomLocation ? null : timeWindow;
 
       const payload = {
         orderRef: orderId,
@@ -319,7 +334,7 @@ export default function CheckoutClient({
         cart,
         subtotal: cart.reduce((s, it) => s + it.price * it.qty, 0),
         total: cartTotal,
-        notes: isCustomLocation ? `Custom location requested: ${customLocation}` : "",
+        notes: isCustomLocation ? `Custom location - to be negotiated via WhatsApp` : "",
       };
 
       const res = await fetch("/api/orders", {
@@ -335,7 +350,9 @@ export default function CheckoutClient({
         return;
       }
 
-      const msg = `my order number is ${orderId}, please confirm my order${isCustomLocation ? ` (I have requested a custom location: ${customLocation})` : ""}`;
+      const msg = isCustomLocation 
+        ? `my order number is ${orderId}, please confirm my order. I would like to arrange a custom pickup location and time with you.`
+        : `my order number is ${orderId}, please confirm my order`;
       const whatsappUrl = `https://wa.me/${whatsapp}?text=${encodeURIComponent(msg)}`;
 
       window.open(whatsappUrl, "_blank");
@@ -516,6 +533,7 @@ export default function CheckoutClient({
               onClick={() => {
                 setLocation("custom");
                 setTimeWindow("");
+                setDay(null);
               }}
               className={`w-full flex items-center gap-3 px-4 py-4 rounded-xl border text-sm transition-all text-left cursor-pointer ${location === "custom" ? "border-primary bg-primary/5 text-primary" : "border-border hover:border-primary/40"}`}
             >
@@ -529,28 +547,15 @@ export default function CheckoutClient({
               <div className="flex-1">
                 <p className="font-medium">Custom Location</p>
                 <p className="text-xs text-muted-foreground font-light mt-0.5">
-                  Request a different pickup location
+                  Negotiate pickup location via WhatsApp
                 </p>
               </div>
             </button>
-            {location === "custom" && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                className="pt-2"
-              >
-                <input
-                  type="text"
-                  value={customLocation}
-                  onChange={(e) => setCustomLocation(e.target.value)}
-                  placeholder="Enter your preferred location..."
-                  className="w-full px-4 py-3 rounded-xl bg-secondary border border-border focus:border-primary text-sm outline-none focus:ring-2 focus:ring-ring transition"
-                />
-              </motion.div>
-            )}
           </div>
         </div>
 
+        {!isCustomLocation && (
+          <>
         <div className="bg-card border border-border rounded-2xl p-5 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-4 flex items-center gap-2">
             <Calendar className="w-3.5 h-3.5" /> Pickup Date
@@ -656,36 +661,43 @@ export default function CheckoutClient({
             )}
           </motion.div>
         )}
+        </>
+        )}
 
-        {canConfirm && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.97 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.97 }}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.97 }}
+          animate={{ opacity: 1, scale: 1 }}
+        >
+          <button
+            onClick={handleConfirm}
+            disabled={!canConfirm || saving}
+            className={`w-full py-5 rounded-full font-semibold text-sm tracking-wide transition-all duration-300 flex items-center justify-center gap-3 ${
+              canConfirm && !saving
+                ? "bg-emerald-600 hover:bg-emerald-500 text-white hover:shadow-xl hover:shadow-emerald-600/30 hover:-translate-y-0.5 cursor-pointer"
+                : "bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed"
+            } ${saving ? "opacity-75" : ""}`}
           >
-            <button
-              onClick={handleConfirm}
-              disabled={saving}
-              className={`w-full py-5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-full font-semibold text-sm tracking-wide transition-all duration-300 flex items-center justify-center gap-3 hover:shadow-xl hover:shadow-emerald-600/30 hover:-translate-y-0.5 cursor-pointer ${saving ? "opacity-75 cursor-not-allowed" : ""}`}
-            >
-              {saving ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  <span>Processing Order...</span>
-                </>
-              ) : (
-                <>
-                  <MessageCircle className="w-5 h-5" />
-                  <span>Confirm & Message on WhatsApp</span>
-                </>
-              )}
-            </button>
+            {saving ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                <span>Processing Order...</span>
+              </>
+            ) : canConfirm ? (
+              <>
+                <MessageCircle className="w-5 h-5" />
+                <span>Confirm & Message on WhatsApp</span>
+              </>
+            ) : (
+              <span className="capitalize">{missingFieldsText}</span>
+            )}
+          </button>
+          {canConfirm && (
             <p className="text-center text-xs text-muted-foreground mt-3 leading-relaxed font-light">
               This opens WhatsApp with your order reference number pre-filled.
               Your order is confirmed once the seller responds.
             </p>
-          </motion.div>
-        )}
+          )}
+        </motion.div>
       </div>
     </div>
   );

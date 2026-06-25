@@ -2,12 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { requireAdmin } from "@/lib/adminAuth";
 
-function getStockLevelFromQuantity(quantity: number) {
-  if (quantity <= 0) return "none";
-  if (quantity <= 1) return "low";
-  if (quantity <= 10) return "med";
-  return "high";
-}
+const ALLOWED_LEVELS = ["none", "low", "med", "high"];
 
 export async function PUT(
   request: NextRequest,
@@ -26,52 +21,22 @@ export async function PUT(
   try {
     const { id } = await params;
     const body = await request.json();
-    let { stock_level, stock_quantity } = body;
+    const { stock_level } = body;
 
-    if (!stock_level && stock_quantity === undefined) {
+    const level = String(stock_level || "").toLowerCase();
+    if (!ALLOWED_LEVELS.includes(level)) {
       return NextResponse.json(
-        { error: "No stock data provided" },
+        { error: "Invalid stock level" },
         { status: 400 },
       );
     }
 
-    if (stock_level && stock_quantity === undefined) {
-      if (stock_level === "none") stock_quantity = 0;
-      if (stock_level === "low") stock_quantity = 1;
-      if (stock_level === "med" || stock_level === "medium")
-        stock_quantity = 10;
-      if (stock_level === "high") stock_quantity = 25;
-    }
-
-    if (stock_quantity !== undefined && !stock_level) {
-      stock_level = getStockLevelFromQuantity(stock_quantity);
-    }
-
-    if (stock_level && stock_quantity === 0) {
-      if (stock_level === "low") stock_quantity = 1;
-      if (stock_level === "med" || stock_level === "medium")
-        stock_quantity = 10;
-      if (stock_level === "high") stock_quantity = 25;
-    }
-
-    const updates: string[] = [];
-    const values: any[] = [];
-
-    if (stock_level) {
-      updates.push(`stock_level = $${values.length + 1}`);
-      values.push(stock_level);
-    }
-
-    if (stock_quantity !== undefined) {
-      updates.push(`stock_quantity = $${values.length + 1}`);
-      values.push(stock_quantity);
-    }
-
-    values.push(id);
-
-    const query = `UPDATE product_variants SET ${updates.join(", ")}, updated_at = CURRENT_TIMESTAMP WHERE id = $${values.length} RETURNING *`;
-
-    const result = await sql.query(query, values);
+    const result = await sql`
+      UPDATE product_variants
+      SET stock_level = ${level}, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ${id}
+      RETURNING *
+    `;
 
     if (result.length === 0) {
       return NextResponse.json({ error: "Variant not found" }, { status: 404 });

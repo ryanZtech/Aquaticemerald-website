@@ -199,15 +199,7 @@ export default function ProductsClient({ products }: ProductsClientProps) {
                     <div className="absolute top-3 right-3 bg-black/50 backdrop-blur-sm text-white text-[9px] px-2 py-0.5 rounded-full font-light">
                       {(() => {
                         const stockLevels = p.variants.map(
-                          (v) =>
-                            v.stock_level ||
-                            (v.stock_quantity && v.stock_quantity > 20
-                              ? "high"
-                              : v.stock_quantity && v.stock_quantity > 10
-                                ? "med"
-                                : v.stock_quantity && v.stock_quantity > 0
-                                  ? "low"
-                                  : "none"),
+                          (v) => v.stock_level || "none",
                         );
                         const allSame = stockLevels.every(
                           (s) => s === stockLevels[0],

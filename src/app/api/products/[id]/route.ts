@@ -2,20 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { put, del } from "@vercel/blob";
 
-function getDefaultQuantityForLevel(level?: string) {
-  switch ((level || "").toLowerCase()) {
-    case "low":
-      return 1;
-    case "med":
-    case "medium":
-      return 10;
-    case "high":
-      return 25;
-    default:
-      return 0;
-  }
-}
-
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -41,7 +27,6 @@ export async function GET(
               'id', v.id,
               'label', v.label,
               'price', v.price,
-              'stock_quantity', v.stock_quantity,
               'stock_level', v.stock_level,
               'image_url', (
                 SELECT vi.image_url
@@ -150,19 +135,10 @@ export async function PUT(
         variant.stockLevel ||
         "none"
       ).toLowerCase();
-      const stockQty = Math.max(
-        0,
-        Number(
-          variant.stock_quantity ??
-            variant.stockQuantity ??
-            variant.stock ??
-            getDefaultQuantityForLevel(stockLevel),
-        ) || 0,
-      );
 
       await sql`
-        INSERT INTO product_variants (id, product_id, label, price, stock_quantity, stock_level, active)
-        VALUES (${variantId}, ${id}, ${variant.label}, ${variant.price}, ${stockQty}, ${stockLevel}, TRUE)
+        INSERT INTO product_variants (id, product_id, label, price, stock_level, active)
+        VALUES (${variantId}, ${id}, ${variant.label}, ${variant.price}, ${stockLevel}, TRUE)
       `;
 
       const variantImageFile = formData.get(

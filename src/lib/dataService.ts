@@ -65,7 +65,6 @@ function mapDbProduct(row: any): Product {
           ? parseFloat(v.price)
           : Number(v.price || 0),
       stock_level: v.stock_level,
-      stock_quantity: v.stock_quantity,
       image_url: v.image_url,
     })),
   };
@@ -94,7 +93,6 @@ export async function getProducts(category?: string): Promise<Product[]> {
               'label', v.label,
               'price', v.price,
               'stock_level', v.stock_level,
-              'stock_quantity', v.stock_quantity,
               'image_url', (
                 SELECT vi.image_url
                 FROM variant_images vi
@@ -161,7 +159,6 @@ export async function getProductBySlug(slug: string): Promise<Product | null> {
               'label', v.label,
               'price', v.price,
               'stock_level', v.stock_level,
-              'stock_quantity', v.stock_quantity,
               'image_url', (
                 SELECT vi.image_url
                 FROM variant_images vi

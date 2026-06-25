@@ -264,7 +264,7 @@ export async function GET() {
 
     await sql`CREATE TABLE IF NOT EXISTS products (id TEXT PRIMARY KEY, name TEXT NOT NULL, slug TEXT UNIQUE NOT NULL, short_description TEXT, full_description TEXT, category_id INTEGER REFERENCES categories(id), featured BOOLEAN DEFAULT FALSE, active BOOLEAN DEFAULT TRUE, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP);`;
 
-    await sql`CREATE TABLE IF NOT EXISTS product_variants (id TEXT PRIMARY KEY, product_id TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE, label TEXT NOT NULL, price NUMERIC(10, 2) NOT NULL, stock_quantity INTEGER DEFAULT 0, active BOOLEAN DEFAULT TRUE, sku TEXT, sort_order INTEGER DEFAULT 0);`;
+    await sql`CREATE TABLE IF NOT EXISTS product_variants (id TEXT PRIMARY KEY, product_id TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE, label TEXT NOT NULL, price NUMERIC(10, 2) NOT NULL, active BOOLEAN DEFAULT TRUE, sku TEXT, sort_order INTEGER DEFAULT 0);`;
 
     await sql`CREATE TABLE IF NOT EXISTS images (id SERIAL PRIMARY KEY, product_id TEXT REFERENCES products(id) ON DELETE CASCADE, variant_id TEXT REFERENCES product_variants(id) ON DELETE CASCADE, image_url TEXT NOT NULL, alt_text TEXT, is_primary BOOLEAN DEFAULT FALSE, sort_order INTEGER DEFAULT 0, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP);`;
 
@@ -324,7 +324,7 @@ export async function GET() {
       await sql`INSERT INTO products (id, name, slug, short_description, full_description, category_id) VALUES (${p.id}, ${p.name}, ${p.slug}, ${p.description.substring(0, 100) + "..."}, ${p.description}, ${catMap[p.category]}) ON CONFLICT (id) DO NOTHING;`;
       for (const v of p.variants) {
         const varId = `${p.id}-${v.id}`;
-        await sql`INSERT INTO product_variants (id, product_id, label, price, stock_quantity) VALUES (${varId}, ${p.id}, ${v.label}, ${v.price}, 10) ON CONFLICT (id) DO NOTHING;`;
+        await sql`INSERT INTO product_variants (id, product_id, label, price) VALUES (${varId}, ${p.id}, ${v.label}, ${v.price}) ON CONFLICT (id) DO NOTHING;`;
       }
       await sql`INSERT INTO images (product_id, image_url, alt_text, is_primary) VALUES (${p.id}, ${p.img}, ${p.name}, TRUE) ON CONFLICT DO NOTHING;`;
       const attrs = [
