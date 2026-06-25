@@ -1,6 +1,17 @@
 import { sql } from "./db";
 import { Product, PickupLocation, PickupHour } from "./staticData";
 
+export interface Faq {
+  id: number;
+  title: string;
+  slug: string;
+  body: string;
+  display_order: number;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Guide {
   id: number;
   title: string;
@@ -303,6 +314,36 @@ export async function getGuides(): Promise<Guide[]> {
     }));
   } catch (error) {
     console.error("Neon Database query failed for guides:", error);
+    return [];
+  }
+}
+
+export async function getFaqs(): Promise<Faq[]> {
+  if (!sql) {
+    console.error("Neon Database: DATABASE_URL is missing. No data available.");
+    return [];
+  }
+
+  try {
+    const rows = await sql`
+      SELECT id, title, slug, body, display_order, active, created_at, updated_at
+      FROM faqs
+      WHERE active = TRUE
+      ORDER BY display_order ASC, created_at DESC
+    `;
+
+    return rows.map((row: any) => ({
+      id: Number(row.id),
+      title: row.title,
+      slug: row.slug,
+      body: row.body,
+      display_order: Number(row.display_order),
+      active: Boolean(row.active),
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+    }));
+  } catch (error) {
+    console.error("Neon Database query failed for FAQs:", error);
     return [];
   }
 }

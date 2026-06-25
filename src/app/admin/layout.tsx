@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
 import { redirect } from "next/navigation";
 import { Button } from "@/app/components/ui/button";
-import { LogOut, Package, MapPin, Settings, FolderTree, ShoppingCart, BookOpen, Clock } from "lucide-react";
+import { LogOut, Package, MapPin, Settings, FolderTree, ShoppingCart, BookOpen, Clock, CircleHelp } from "lucide-react";
 import Link from "next/link";
 import { logoutAdmin } from "@/app/actions/auth";
 
@@ -84,6 +84,12 @@ export default async function AdminLayout({
             className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-accent text-sm font-medium transition-colors"
           >
             <BookOpen className="w-4 h-4 text-foreground" /> Care Guides
+          </Link>
+          <Link
+            href="/admin/faq"
+            className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-accent text-sm font-medium transition-colors"
+          >
+            <CircleHelp className="w-4 h-4 text-foreground" /> FAQ
           </Link>
         </nav>
         <div className="pt-4 border-t border-border">
