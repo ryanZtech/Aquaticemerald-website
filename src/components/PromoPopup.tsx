@@ -20,7 +20,7 @@ interface PopupData {
 export default function PromoPopup() {
   const [popup, setPopup] = useState<PopupData | null>(null);
   const [showPopup, setShowPopup] = useState(false);
-  const [dismissed, setDismissed] = useState(false);
+  const [showCornerButton, setShowCornerButton] = useState(false);
 
   useEffect(() => {
     // Check if already viewed in localStorage
@@ -34,8 +34,11 @@ export default function PromoPopup() {
           setPopup(data);
           
           // Check if this popup was already viewed
-          if (!viewedPopups.includes(data.id)) {
-            // Show after delay
+          if (viewedPopups.includes(data.id)) {
+            // Already viewed - show corner button immediately
+            setShowCornerButton(true);
+          } else {
+            // Not viewed yet - show after delay
             setTimeout(() => {
               setShowPopup(true);
             }, data.delay_seconds * 1000);
@@ -55,7 +58,7 @@ export default function PromoPopup() {
       }
     }
     setShowPopup(false);
-    setDismissed(true);
+    setShowCornerButton(true);
   };
 
   const handleReopen = () => {
@@ -67,7 +70,7 @@ export default function PromoPopup() {
   return (
     <>
       {/* Floating re-open button */}
-      {dismissed && !showPopup && (
+      {showCornerButton && !showPopup && (
         <motion.button
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}

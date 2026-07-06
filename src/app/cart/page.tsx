@@ -6,8 +6,13 @@ import { maxQtyForLevel } from "@/lib/stockLimits";
 import { ShoppingCart, Minus, Plus, X, ArrowLeft } from "lucide-react";
 
 export default function CartPage() {
-  const { cart, updateQty, removeItem, cartTotal, stockLimits } = useCart();
+  const { cart, updateQty, removeItem, cartTotal, stockLimits, autoDiscount } = useCart();
   const itemCount = cart.reduce((sum, item) => sum + item.qty, 0);
+
+  // Calculate final total with auto-discount
+  const discountedTotal = autoDiscount 
+    ? Math.max(0, cartTotal - (autoDiscount.discount_amount || 0))
+    : cartTotal;
 
   return (
     <div className="pt-24 pb-20 px-4 max-w-3xl mx-auto min-h-screen">
@@ -102,37 +107,75 @@ export default function CartPage() {
 
           {}
           <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
+            {/* Auto-discount banner */}
+            {autoDiscount && (
+              <div className="mb-6 p-4 bg-emerald-50 dark:bg-emerald-950/30 border-2 border-emerald-200 dark:border-emerald-800 rounded-xl">
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <span className="text-white text-lg">🎉</span>
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-semibold text-emerald-900 dark:text-emerald-100 mb-1">
+                      {autoDiscount.name}
+                    </p>
+                    {autoDiscount.description && (
+                      <p className="text-sm text-emerald-700 dark:text-emerald-300 mb-2">
+                        {autoDiscount.description}
+                      </p>
+                    )}
+                    {autoDiscount.free_item ? (
+                      <p className="text-sm font-medium text-emerald-800 dark:text-emerald-200">
+                        🎁 Free: {autoDiscount.free_item.productName} ({autoDiscount.free_item.variantLabel})
+                      </p>
+                    ) : (
+                      <p className="text-sm font-medium text-emerald-800 dark:text-emerald-200">
+                        💰 ${autoDiscount.discount_amount.toFixed(2)} off your order
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="flex justify-between text-sm text-muted-foreground mb-3 font-light">
               <span>Subtotal ({itemCount} item{itemCount !== 1 ? "s" : ""})</span>
               <span>${cartTotal.toFixed(2)}</span>
             </div>
+            
+            {autoDiscount && autoDiscount.discount_amount > 0 && (
+              <div className="flex justify-between text-sm text-emerald-600 dark:text-emerald-400 mb-3 font-medium">
+                <span>Auto Discount</span>
+                <span>-${autoDiscount.discount_amount.toFixed(2)}</span>
+              </div>
+            )}
+            
             <div className="flex justify-between font-semibold text-base mb-6 pt-4 border-t border-border transition-colors">
               <span>Total</span>
-              <span className="text-primary">${cartTotal.toFixed(2)}</span>
+              <span className="text-primary">${discountedTotal.toFixed(2)}</span>
             </div>
 
             {}
             <p 
               className={`text-xs text-center mb-3 font-medium transition-all duration-200 ${
-                cartTotal < 5 
+                discountedTotal < 5 
                   ? "text-destructive" 
                   : "text-emerald-600 dark:text-emerald-400"
               }`}
             >
-              {cartTotal < 5 
+              {discountedTotal < 5 
                 ? "Minimum order is $5.00. Please add more items to proceed."
                 : "✓ Minimum order of $5.00 met!"}
             </p>
 
             <Link
-              href={cartTotal < 5 ? "/cart" : "/checkout"}
+              href={discountedTotal < 5 ? "/cart" : "/checkout"}
               onClick={(e) => {
-                if (cartTotal < 5) {
+                if (discountedTotal < 5) {
                   e.preventDefault();
                 }
               }}
               className={`block w-full py-4 text-center rounded-full font-semibold text-sm tracking-wide transition-all duration-200 ${
-                cartTotal < 5
+                discountedTotal < 5
                   ? "bg-muted text-muted-foreground cursor-not-allowed opacity-60 pointer-events-none"
                   : "bg-primary text-primary-foreground hover:opacity-90 hover:shadow-xl hover:shadow-primary/30 cursor-pointer"
               }`}
