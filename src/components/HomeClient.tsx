@@ -10,6 +10,7 @@ import {
   MessageCircle,
 } from "lucide-react";
 import { motion } from "motion/react";
+import PromoPopup from "./PromoPopup";
 
 interface HomeClientProps {
   products: Product[];
@@ -26,6 +27,9 @@ export default function HomeClient({ products, settings }: HomeClientProps) {
 
   return (
     <div className="pt-16">
+      {/* Promo Popup */}
+      <PromoPopup />
+      
       {}
       <section className="relative h-screen min-h-[560px] flex items-center justify-center overflow-hidden bg-black">
         {heroImg ? (

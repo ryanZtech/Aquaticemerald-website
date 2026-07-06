@@ -119,6 +119,17 @@ export default function CheckoutClient({
   >({});
   const [loadingSlots, setLoadingSlots] = useState(false);
 
+  // Promo code state
+  const [promoCode, setPromoCode] = useState("");
+  const [appliedPromo, setAppliedPromo] = useState<{
+    code: string;
+    discount_type: string;
+    discount_amount: number;
+    description?: string;
+  } | null>(null);
+  const [promoLoading, setPromoLoading] = useState(false);
+  const [promoError, setPromoError] = useState("");
+
   useEffect(() => {
     const generate22CharId = () => {
       const chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -132,6 +143,65 @@ export default function CheckoutClient({
       return `AE-${segment(4)}-${segment(4)}-${segment(4)}-${segment(4)}`;
     };
     setOrderId(generate22CharId());
+
+    // Auto-apply promo from URL
+    const params = new URLSearchParams(window.location.search);
+    const promoParam = params.get("promo");
+    if (promoParam) {
+      setPromoCode(promoParam);
+      setTimeout(() => handleApplyPromo(promoParam), 500);
+    }
+  }, []);
+
+  const handleApplyPromo = async (code?: string) => {
+    const codeToApply = code || promoCode;
+    if (!codeToApply.trim()) {
+      setPromoError("Enter a promo code");
+      return;
+    }
+
+    setPromoLoading(true);
+    setPromoError("");
+
+    try {
+      const res = await fetch("/api/discount-codes/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: codeToApply, cartTotal }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setAppliedPromo({
+          code: data.code,
+          discount_type: data.discount_type,
+          discount_amount: data.discount_amount || 0,
+          description: data.description,
+        });
+        setPromoError("");
+      } else {
+        const error = await res.json();
+        setPromoError(error.error || "Invalid code");
+        setAppliedPromo(null);
+      }
+    } catch (error) {
+      console.error("Error applying promo:", error);
+      setPromoError("Failed to apply code");
+      setAppliedPromo(null);
+    } finally {
+      setPromoLoading(false);
+    }
+  };
+
+  const handleRemovePromo = () => {
+    setAppliedPromo(null);
+    setPromoCode("");
+    setPromoError("");
+  };
+
+  const subtotal = cart.reduce((s, it) => s + it.price * it.qty, 0);
+  const discountAmount = appliedPromo?.discount_amount || 0;
+  const finalTotal = Math.max(0, subtotal - discountAmount);
   }, []);
 
   const availableMonths = Array.from({ length: 6 }, (_, i) => {
@@ -169,9 +239,24 @@ export default function CheckoutClient({
   const firstDay = firstDayOfMonth(year, month);
 
   const isDayDisabled = (d: number) => {
+    // Block past dates
     if (year < todayY) return true;
     if (year === todayY && month < todayM) return true;
     if (year === todayY && month === todayM && d <= todayD) return true;
+    
+    // Block dates with no time rules for selected location
+    if (!isCustomLocation && location && !Number.isNaN(selectedLocationId)) {
+      const testDate = new Date(year, month, d);
+      const dow = testDate.getDay();
+      const hasRules = timeRules.some(
+        (rule) =>
+          rule.active &&
+          rule.pickup_location_id === selectedLocationId &&
+          rule.weekday === dow
+      );
+      if (!hasRules) return true;
+    }
+    
     return false;
   };
 
@@ -332,8 +417,10 @@ export default function CheckoutClient({
         pickup_location_id: isCustomLocation ? null : parseInt(location) || null,
         pickup_slot_at,
         cart,
-        subtotal: cart.reduce((s, it) => s + it.price * it.qty, 0),
-        total: cartTotal,
+        subtotal,
+        total: finalTotal,
+        promo_code: appliedPromo?.code || null,
+        discount_amount: discountAmount,
         notes: isCustomLocation ? `Custom location - to be negotiated via WhatsApp` : "",
       };
 
@@ -432,9 +519,73 @@ export default function CheckoutClient({
               </div>
             ))}
           </div>
-          <div className="border-t border-border pt-3 flex justify-between font-semibold">
+
+          {/* Promo Code Input */}
+          {!appliedPromo ? (
+            <div className="mb-4 pb-4 border-b border-border">
+              <label className="text-xs font-medium mb-2 block">Promo Code</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={promoCode}
+                  onChange={(e) => {
+                    setPromoCode(e.target.value.toUpperCase());
+                    setPromoError("");
+                  }}
+                  placeholder="Enter code"
+                  className="flex-1 px-3 py-2 rounded-lg bg-secondary border border-border text-sm outline-none focus:border-primary"
+                  onKeyPress={(e) => e.key === "Enter" && handleApplyPromo()}
+                />
+                <button
+                  onClick={() => handleApplyPromo()}
+                  disabled={promoLoading || !promoCode.trim()}
+                  className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  {promoLoading ? "..." : "Apply"}
+                </button>
+              </div>
+              {promoError && (
+                <p className="text-xs text-red-500 mt-1">{promoError}</p>
+              )}
+            </div>
+          ) : (
+            <div className="mb-4 pb-4 border-b border-border">
+              <div className="flex items-center justify-between bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg px-3 py-2">
+                <div>
+                  <p className="text-xs font-semibold text-green-700 dark:text-green-400">
+                    {appliedPromo.code} applied
+                  </p>
+                  {appliedPromo.description && (
+                    <p className="text-xs text-green-600 dark:text-green-500 mt-0.5">
+                      {appliedPromo.description}
+                    </p>
+                  )}
+                </div>
+                <button
+                  onClick={handleRemovePromo}
+                  className="text-xs text-red-600 dark:text-red-400 hover:underline cursor-pointer"
+                >
+                  Remove
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <div className="flex justify-between text-sm text-muted-foreground">
+              <span>Subtotal</span>
+              <span>${subtotal.toFixed(2)}</span>
+            </div>
+            {discountAmount > 0 && (
+              <div className="flex justify-between text-sm text-green-600 dark:text-green-400">
+                <span>Discount</span>
+                <span>-${discountAmount.toFixed(2)}</span>
+              </div>
+            )}
+          </div>
+          <div className="border-t border-border pt-3 mt-3 flex justify-between font-semibold">
             <span>Total</span>
-            <span className="text-primary">${cartTotal.toFixed(2)}</span>
+            <span className="text-primary">${finalTotal.toFixed(2)}</span>
           </div>
         </div>
 
