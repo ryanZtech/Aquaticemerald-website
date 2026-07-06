@@ -202,7 +202,6 @@ export default function CheckoutClient({
   const subtotal = cart.reduce((s, it) => s + it.price * it.qty, 0);
   const discountAmount = appliedPromo?.discount_amount || 0;
   const finalTotal = Math.max(0, subtotal - discountAmount);
-  }, []);
 
   const availableMonths = Array.from({ length: 6 }, (_, i) => {
     const d = new Date(todayY, todayM + i, 1);
@@ -244,8 +243,14 @@ export default function CheckoutClient({
     if (year === todayY && month < todayM) return true;
     if (year === todayY && month === todayM && d <= todayD) return true;
     
+    // If no location selected, allow all future dates
+    if (!location || isCustomLocation) return false;
+    
+    // If location selected but rules not loaded yet, allow all future dates temporarily
+    if (timeRules.length === 0) return false;
+    
     // Block dates with no time rules for selected location
-    if (!isCustomLocation && location && !Number.isNaN(selectedLocationId)) {
+    if (!Number.isNaN(selectedLocationId)) {
       const testDate = new Date(year, month, d);
       const dow = testDate.getDay();
       const hasRules = timeRules.some(
