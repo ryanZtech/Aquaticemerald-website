@@ -126,6 +126,7 @@ export default function CheckoutClient({
     discount_type: string;
     discount_amount: number;
     description?: string;
+    free_item?: { productName: string } | null;
   } | null>(null);
   const [promoLoading, setPromoLoading] = useState(false);
   const [promoError, setPromoError] = useState("");
@@ -177,6 +178,7 @@ export default function CheckoutClient({
           discount_type: data.discount_type,
           discount_amount: data.discount_amount || 0,
           description: data.description,
+          free_item: data.free_item || null,
         });
         setPromoError("");
       } else {
@@ -563,6 +565,11 @@ export default function CheckoutClient({
                   {appliedPromo.description && (
                     <p className="text-xs text-green-600 dark:text-green-500 mt-0.5">
                       {appliedPromo.description}
+                    </p>
+                  )}
+                  {appliedPromo.free_item && (
+                    <p className="text-xs text-green-600 dark:text-green-500 mt-1 font-medium">
+                      🎁 Includes free: {appliedPromo.free_item.productName}
                     </p>
                   )}
                 </div>
