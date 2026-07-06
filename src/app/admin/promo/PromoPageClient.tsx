@@ -22,6 +22,7 @@ interface DiscountCode {
   free_product_name: string | null;
   valid_from: string;
   valid_until: string | null;
+  max_uses: number | null;
   active: boolean;
   usage_count: number;
 }
@@ -57,7 +58,7 @@ interface PromoPopup {
 }
 
 interface Product {
-  id: number;
+  id: string | number;
   name: string;
   slug: string;
 }
@@ -78,6 +79,7 @@ export default function PromoPageClient() {
     free_variant_id: "",
     valid_from: new Date().toISOString().slice(0, 16),
     valid_until: "",
+    max_uses: "",
     active: true,
   });
 
@@ -181,6 +183,7 @@ export default function PromoPageClient() {
       free_variant_id: "",
       valid_from: new Date().toISOString().slice(0, 16),
       valid_until: "",
+      max_uses: "",
       active: true,
     });
     setCodeDialogOpen(true);
@@ -197,6 +200,7 @@ export default function PromoPageClient() {
       free_variant_id: code.free_variant_id?.toString() || "",
       valid_from: new Date(code.valid_from).toISOString().slice(0, 16),
       valid_until: code.valid_until ? new Date(code.valid_until).toISOString().slice(0, 16) : "",
+      max_uses: code.max_uses?.toString() || "",
       active: code.active,
     });
     setCodeDialogOpen(true);
@@ -210,8 +214,9 @@ export default function PromoPageClient() {
       const payload = {
         ...codeForm,
         discount_value: codeForm.discount_value ? parseFloat(codeForm.discount_value) : null,
-        free_product_id: codeForm.free_product_id ? parseInt(codeForm.free_product_id) : null,
+        free_product_id: codeForm.free_product_id || null,
         free_variant_id: codeForm.free_variant_id ? parseInt(codeForm.free_variant_id) : null,
+        max_uses: codeForm.max_uses ? parseInt(codeForm.max_uses) : null,
       };
 
       const res = await fetch(url, {
@@ -304,10 +309,10 @@ export default function PromoPageClient() {
       const payload = {
         ...autoForm,
         trigger_spend_amount: autoForm.trigger_spend_amount ? parseFloat(autoForm.trigger_spend_amount) : null,
-        trigger_product_id: autoForm.trigger_product_id ? parseInt(autoForm.trigger_product_id) : null,
+        trigger_product_id: autoForm.trigger_product_id || null,
         trigger_variant_id: autoForm.trigger_variant_id ? parseInt(autoForm.trigger_variant_id) : null,
         effect_value: autoForm.effect_value ? parseFloat(autoForm.effect_value) : null,
-        effect_free_product_id: autoForm.effect_free_product_id ? parseInt(autoForm.effect_free_product_id) : null,
+        effect_free_product_id: autoForm.effect_free_product_id || null,
         effect_free_variant_id: autoForm.effect_free_variant_id ? parseInt(autoForm.effect_free_variant_id) : null,
         priority: parseInt(autoForm.priority) || 0,
       };
@@ -825,6 +830,19 @@ export default function PromoPageClient() {
                   onChange={(e) => setCodeForm((prev) => ({ ...prev, valid_until: e.target.value }))}
                 />
               </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Max Uses</label>
+              <Input
+                type="number"
+                value={codeForm.max_uses}
+                onChange={(e) => setCodeForm((prev) => ({ ...prev, max_uses: e.target.value }))}
+                placeholder="Leave empty for unlimited"
+                min="1"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Leave empty for unlimited uses
+              </p>
             </div>
             <div className="flex items-center gap-2">
               <input

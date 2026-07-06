@@ -25,6 +25,7 @@ export async function PUT(
       free_variant_id,
       valid_from,
       valid_until,
+      max_uses,
       active
     } = body;
 
@@ -39,6 +40,7 @@ export async function PUT(
         free_variant_id = ${free_variant_id || null},
         valid_from = ${valid_from},
         valid_until = ${valid_until || null},
+        max_uses = ${max_uses || null},
         active = ${active},
         updated_at = CURRENT_TIMESTAMP
       WHERE id = ${parseInt(id)}

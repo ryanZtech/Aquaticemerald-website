@@ -47,18 +47,19 @@ export async function POST(request: NextRequest) {
       free_variant_id,
       valid_from,
       valid_until,
+      max_uses,
       active
     } = body;
 
     const result = await sql`
       INSERT INTO discount_codes (
         code, description, discount_type, discount_value,
-        free_product_id, free_variant_id, valid_from, valid_until, active
+        free_product_id, free_variant_id, valid_from, valid_until, max_uses, active
       )
       VALUES (
         ${code}, ${description || null}, ${discount_type}, ${discount_value || null},
         ${free_product_id || null}, ${free_variant_id || null},
-        ${valid_from}, ${valid_until || null}, ${active ?? true}
+        ${valid_from}, ${valid_until || null}, ${max_uses || null}, ${active ?? true}
       )
       RETURNING *
     `;
