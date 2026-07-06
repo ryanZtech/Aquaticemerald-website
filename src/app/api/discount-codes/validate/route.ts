@@ -17,7 +17,8 @@ export async function POST(request: NextRequest) {
       SELECT 
         dc.*,
         p.name as free_product_name,
-        p.slug as free_product_slug
+        p.slug as free_product_slug,
+        (SELECT COUNT(*) FROM orders WHERE promo_code = dc.code) as current_uses
       FROM discount_codes dc
       LEFT JOIN products p ON dc.free_product_id = p.id
       WHERE UPPER(dc.code) = UPPER(${code})
@@ -32,6 +33,11 @@ export async function POST(request: NextRequest) {
     }
 
     const discount = rows[0];
+
+    // Check max uses
+    if (discount.max_uses && discount.current_uses >= discount.max_uses) {
+      return NextResponse.json({ error: "Code usage limit reached" }, { status: 400 });
+    }
     let discountAmount = 0;
     let freeItem = null;
 
