@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
+import { rateLimit } from "@/lib/rateLimit";
 
 export async function POST(request: NextRequest) {
   if (!sql) {
@@ -7,6 +8,31 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    // Rate limiting: 10 requests per minute per IP
+    const ip = request.headers.get("x-forwarded-for") || 
+               request.headers.get("x-real-ip") || 
+               "anonymous";
+    
+    const rateLimitResult = rateLimit(`promo-validate:${ip}`, 10, 60 * 1000);
+    
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        { 
+          error: "Too many requests. Please try again later.",
+          retryAfter: Math.ceil((rateLimitResult.reset - Date.now()) / 1000)
+        }, 
+        { 
+          status: 429,
+          headers: {
+            "X-RateLimit-Limit": rateLimitResult.limit.toString(),
+            "X-RateLimit-Remaining": rateLimitResult.remaining.toString(),
+            "X-RateLimit-Reset": rateLimitResult.reset.toString(),
+            "Retry-After": Math.ceil((rateLimitResult.reset - Date.now()) / 1000).toString()
+          }
+        }
+      );
+    }
+
     const { code, cartTotal } = await request.json();
 
     if (!code || !code.trim()) {
@@ -60,6 +86,12 @@ export async function POST(request: NextRequest) {
       discount_amount: discountAmount,
       free_item: freeItem,
       description: discount.description,
+    }, {
+      headers: {
+        "X-RateLimit-Limit": rateLimitResult.limit.toString(),
+        "X-RateLimit-Remaining": rateLimitResult.remaining.toString(),
+        "X-RateLimit-Reset": rateLimitResult.reset.toString()
+      }
     });
   } catch (error) {
     console.error("Error validating discount code:", error);

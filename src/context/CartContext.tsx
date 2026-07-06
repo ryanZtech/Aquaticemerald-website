@@ -30,6 +30,18 @@ interface CartContextType {
   cartCount: number;
   cartTotal: number;
   stockLimits: StockLimits;
+  autoDiscount: {
+    name: string;
+    description: string | null;
+    discount_amount: number;
+    free_item: {
+      productId: string;
+      productName: string;
+      productSlug: string;
+      variantId: string;
+      variantLabel: string;
+    } | null;
+  } | null;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -40,6 +52,18 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [stockLimits, setStockLimits] = useState<StockLimits>(
     DEFAULT_STOCK_LIMITS,
   );
+  const [autoDiscount, setAutoDiscount] = useState<{
+    name: string;
+    description: string | null;
+    discount_amount: number;
+    free_item: {
+      productId: string;
+      productName: string;
+      productSlug: string;
+      variantId: string;
+      variantLabel: string;
+    } | null;
+  } | null>(null);
 
   useEffect(() => {
     const savedCart = localStorage.getItem("aquatic_emerald_cart");
@@ -75,6 +99,47 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     if (isHydrated) {
       localStorage.setItem("aquatic_emerald_cart", JSON.stringify(cart));
     }
+  }, [cart, isHydrated]);
+
+  // Evaluate auto-discounts whenever cart changes
+  useEffect(() => {
+    if (!isHydrated || cart.length === 0) {
+      setAutoDiscount(null);
+      return;
+    }
+
+    let cancelled = false;
+    async function evaluateAutoDiscounts() {
+      try {
+        const cartTotal = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
+        const res = await fetch("/api/auto-discounts/evaluate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ cart, cartTotal }),
+        });
+        
+        if (!res.ok || cancelled) return;
+        
+        const data = await res.json();
+        if (data.applicable && !cancelled) {
+          setAutoDiscount({
+            name: data.discount.name,
+            description: data.discount.description,
+            discount_amount: data.discount.discount_amount || 0,
+            free_item: data.discount.free_item || null,
+          });
+        } else if (!cancelled) {
+          setAutoDiscount(null);
+        }
+      } catch (error) {
+        console.error("Failed to evaluate auto discounts:", error);
+      }
+    }
+
+    evaluateAutoDiscounts();
+    return () => {
+      cancelled = true;
+    };
   }, [cart, isHydrated]);
 
   const addToCart = useCallback(
@@ -159,6 +224,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         cartCount,
         cartTotal,
         stockLimits,
+        autoDiscount,
       }}
     >
       {children}
