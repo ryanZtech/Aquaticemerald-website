@@ -446,20 +446,18 @@ export default function CheckoutClient({
 
       const result = await res.json();
       console.log("✅ Order created successfully:", result);
-      
-      alert(`Order #${result.orderId} created! Check the console logs for email details. You should receive a confirmation email at ${email}`);
 
-      // TEMPORARILY DISABLED FOR DEBUGGING
-      // const msg = isCustomLocation 
-      //   ? `my order number is ${orderId}, please confirm my order. I would like to arrange a custom pickup location and time with you.`
-      //   : `my order number is ${orderId}, please confirm my order`;
-      // const whatsappUrl = `https://wa.me/${whatsapp}?text=${encodeURIComponent(msg)}`;
-      // window.open(whatsappUrl, "_blank");
+      const msg = isCustomLocation 
+        ? `my order number is ${orderId}, please confirm my order. I would like to arrange a custom pickup location and time with you.`
+        : `my order number is ${orderId}, please confirm my order`;
+      const whatsappUrl = `https://wa.me/${whatsapp}?text=${encodeURIComponent(msg)}`;
+
+      window.open(whatsappUrl, "_blank");
 
       setTimeout(() => {
         clearCart();
         router.push("/");
-      }, 3000);
+      }, 500);
     } catch (e) {
       console.error(e);
       alert("Failed to submit order");
