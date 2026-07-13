@@ -3,8 +3,7 @@
 import { useEffect, useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/app/components/ui/table";
 import { Button } from "@/app/components/ui/button";
-import { Copy, Check, Trash2 } from "lucide-react";
-import { useRef } from "react";
+import { Copy, Check, Trash2, ChevronDown, ChevronRight, Phone, Mail } from "lucide-react";
 import { toast } from "sonner";
 
 interface OrderItem {
@@ -32,11 +31,51 @@ interface Order {
   items: OrderItem[];
 }
 
+function OrderItemsDetail({ items, total }: { items: OrderItem[]; total: number }) {
+  return (
+    <div className="px-4 pb-4 pt-1">
+      <div className="bg-muted/40 rounded-xl border border-border/60 overflow-hidden">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-border/60 bg-muted/60">
+              <th className="text-left px-4 py-2 font-medium text-muted-foreground">Product</th>
+              <th className="text-left px-4 py-2 font-medium text-muted-foreground">Variant</th>
+              <th className="text-right px-4 py-2 font-medium text-muted-foreground">Unit Price</th>
+              <th className="text-right px-4 py-2 font-medium text-muted-foreground">Qty</th>
+              <th className="text-right px-4 py-2 font-medium text-muted-foreground">Subtotal</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((item) => (
+              <tr key={item.id} className="border-b border-border/40 last:border-0">
+                <td className="px-4 py-2 font-medium">{item.snapshot_product_name}</td>
+                <td className="px-4 py-2 text-muted-foreground">{item.snapshot_variant_label || "—"}</td>
+                <td className="px-4 py-2 text-right">${Number(item.snapshot_unit_price).toFixed(2)}</td>
+                <td className="px-4 py-2 text-right">{item.quantity}</td>
+                <td className="px-4 py-2 text-right font-medium">
+                  ${(Number(item.snapshot_unit_price) * item.quantity).toFixed(2)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr className="bg-muted/60">
+              <td colSpan={4} className="px-4 py-2 text-right font-semibold text-sm">Total</td>
+              <td className="px-4 py-2 text-right font-semibold text-primary">${Number(total).toFixed(2)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 export default function OrdersPageClient() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [showPickedUp, setShowPickedUp] = useState(false);
   const [copyState, setCopyState] = useState<Record<number, boolean>>({});
+  const [expandedOrders, setExpandedOrders] = useState<Set<number>>(new Set());
 
   const fetchOrders = async () => {
     try {
@@ -54,6 +93,15 @@ export default function OrdersPageClient() {
   useEffect(() => {
     fetchOrders();
   }, []);
+
+  const toggleExpand = (orderId: number) => {
+    setExpandedOrders((prev) => {
+      const next = new Set(prev);
+      if (next.has(orderId)) next.delete(orderId);
+      else next.add(orderId);
+      return next;
+    });
+  };
 
   const handleTogglePicked = async (order: Order) => {
     const newStatus = order.status === "picked_up" ? "pending" : "picked_up";
@@ -176,7 +224,7 @@ export default function OrdersPageClient() {
         .checkbox-wrapper-30 .checkbox input:checked + svg {
           --dashArray: 16 93;
           --dashOffset: 109;
-          stroke: #16a34a; /* green tick */
+          stroke: #16a34a;
         }
         .checkbox-wrapper-30 .checkbox svg {
           fill: none;
@@ -198,6 +246,7 @@ export default function OrdersPageClient() {
           width: 100%;
         }
       `}</style>
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-serif text-3xl font-medium">Orders</h1>
@@ -206,7 +255,7 @@ export default function OrdersPageClient() {
       </div>
 
       <div className="bg-card rounded-2xl border border-border overflow-hidden">
-        <svg xmlns="http://www.w3.org/2000/svg" style={{display: 'none'}}>
+        <svg xmlns="http://www.w3.org/2000/svg" style={{ display: "none" }}>
           <symbol id="checkbox-30" viewBox="0 0 22 22">
             <path fill="none" stroke="currentColor" d="M5.5,11.3L9,14.8L20.2,3.3l0,0c-0.5-1-1.5-1.8-2.7-1.8h-13c-1.7,0-3,1.3-3,3v13c0,1.7,1.3,3,3,3h13 c1.7,0,3-1.3,3-3v-13c0-0.4-0.1-0.8-0.3-1.2" />
           </symbol>
@@ -214,10 +263,10 @@ export default function OrdersPageClient() {
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/50">
-              <TableHead className="w-[48px]"> </TableHead>
-              <TableHead>Order #</TableHead>
+              <TableHead className="w-[40px]" />
+              <TableHead className="w-[40px]" />
+              <TableHead>Order</TableHead>
               <TableHead>Customer</TableHead>
-              <TableHead>Email</TableHead>
               <TableHead>Items</TableHead>
               <TableHead>Total</TableHead>
               <TableHead>Pickup</TableHead>
@@ -228,29 +277,62 @@ export default function OrdersPageClient() {
           <TableBody>
             {pending.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-12 text-muted-foreground font-light">No orders</TableCell>
+                <TableCell colSpan={9} className="text-center py-12 text-muted-foreground font-light">No orders</TableCell>
               </TableRow>
             ) : (
               pending.map((o) => (
-                <TableRow key={o.id}>
-                    <TableCell>
+                <>
+                  <TableRow
+                    key={o.id}
+                    className="cursor-pointer hover:bg-muted/30 transition-colors"
+                    onClick={() => toggleExpand(o.id)}
+                  >
+                    <TableCell onClick={(e) => e.stopPropagation()}>
                       <div className="checkbox-wrapper-30">
                         <label className="checkbox">
-                          <input type="checkbox" checked={o.status === 'picked_up'} onChange={() => handleTogglePicked(o)} />
+                          <input type="checkbox" checked={o.status === "picked_up"} onChange={() => handleTogglePicked(o)} />
                           <svg viewBox="0 0 22 22">
                             <use xlinkHref="#checkbox-30" />
                           </svg>
                         </label>
                       </div>
                     </TableCell>
+                    <TableCell>
+                      {expandedOrders.has(o.id)
+                        ? <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                        : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
+                    </TableCell>
                     <TableCell className="font-medium">#{o.id}</TableCell>
-                  <TableCell>{o.customer_name}</TableCell>
-                  <TableCell>{o.customer_email}</TableCell>
-                  <TableCell>{o.items.length} item{o.items.length !== 1 ? "s" : ""}</TableCell>
-                  <TableCell>${Number(o.total).toFixed(2)}</TableCell>
-                  <TableCell>{o.pickup_location_name || "-"}<br/><span className="text-xs text-muted-foreground">{o.pickup_slot_at ? formatPickupTime(o.pickup_slot_at) : "-"}</span></TableCell>
-                  <TableCell>{o.status}</TableCell>
-                  <TableCell className="text-right">
+                    <TableCell>
+                      <div className="font-medium">{o.customer_name}</div>
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
+                        <Mail className="w-3 h-3" />{o.customer_email}
+                      </div>
+                      {o.customer_phone && (
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                          <Phone className="w-3 h-3" />{o.customer_phone}
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="font-medium">{o.items.length} item{o.items.length !== 1 ? "s" : ""}</div>
+                      <div className="text-xs text-muted-foreground mt-0.5 max-w-[200px] truncate">
+                        {o.items.map(i => `${i.quantity}× ${i.snapshot_product_name}`).join(", ")}
+                      </div>
+                    </TableCell>
+                    <TableCell className="font-medium">${Number(o.total).toFixed(2)}</TableCell>
+                    <TableCell>
+                      <div>{o.pickup_location_name || "—"}</div>
+                      <span className="text-xs text-muted-foreground">
+                        {o.pickup_slot_at ? formatPickupTime(o.pickup_slot_at) : "—"}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
+                        {o.status}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                       <div className="flex justify-end gap-2">
                         <Button variant="ghost" size="icon" onClick={() => toggleCopy(o.id, () => copyMessage(o))} className="cursor-pointer">
                           {copyState[o.id] ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
@@ -259,8 +341,16 @@ export default function OrdersPageClient() {
                           <Trash2 className="w-4 h-4" />
                         </Button>
                       </div>
-                  </TableCell>
-                </TableRow>
+                    </TableCell>
+                  </TableRow>
+                  {expandedOrders.has(o.id) && (
+                    <TableRow key={`${o.id}-detail`} className="bg-muted/10 hover:bg-muted/10">
+                      <TableCell colSpan={9} className="p-0">
+                        <OrderItemsDetail items={o.items} total={o.total} />
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </>
               ))
             )}
           </TableBody>
@@ -276,38 +366,65 @@ export default function OrdersPageClient() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/50">
+                  <TableHead className="w-[32px]" />
                   <TableHead>Order #</TableHead>
                   <TableHead>Customer</TableHead>
                   <TableHead>Items</TableHead>
                   <TableHead>Total</TableHead>
-                  <TableHead>Picked Up At</TableHead>
+                  <TableHead>Pickup Time</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {picked.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-12 text-muted-foreground font-light">No picked up orders</TableCell>
+                    <TableCell colSpan={7} className="text-center py-12 text-muted-foreground font-light">No picked up orders</TableCell>
                   </TableRow>
                 ) : (
                   picked.map((o) => (
-                    <TableRow key={o.id}>
-                      <TableCell className="font-medium">#{o.id}</TableCell>
-                      <TableCell>{o.customer_name}<br/><span className="text-xs text-muted-foreground">{o.customer_email}</span></TableCell>
-                      <TableCell>{o.items.length} item{o.items.length !== 1 ? "s" : ""}</TableCell>
-                      <TableCell>${Number(o.total).toFixed(2)}</TableCell>
-                      <TableCell>{o.pickup_slot_at ? new Date(o.pickup_slot_at).toLocaleString() : "-"}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button variant="ghost" size="icon" onClick={() => copyMessage(o)}>
-                            <Copy className="w-4 h-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => handleTogglePicked(o)}>
-                            <Check className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
+                    <>
+                      <TableRow
+                        key={o.id}
+                        className="cursor-pointer hover:bg-muted/30 transition-colors"
+                        onClick={() => toggleExpand(o.id)}
+                      >
+                        <TableCell>
+                          {expandedOrders.has(o.id)
+                            ? <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                            : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
+                        </TableCell>
+                        <TableCell className="font-medium">#{o.id}</TableCell>
+                        <TableCell>
+                          <div>{o.customer_name}</div>
+                          <div className="text-xs text-muted-foreground">{o.customer_email}</div>
+                        </TableCell>
+                        <TableCell>
+                          <div>{o.items.length} item{o.items.length !== 1 ? "s" : ""}</div>
+                          <div className="text-xs text-muted-foreground max-w-[180px] truncate">
+                            {o.items.map(i => `${i.quantity}× ${i.snapshot_product_name}`).join(", ")}
+                          </div>
+                        </TableCell>
+                        <TableCell>${Number(o.total).toFixed(2)}</TableCell>
+                        <TableCell>{o.pickup_slot_at ? formatPickupTime(o.pickup_slot_at) : "—"}</TableCell>
+                        <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex justify-end gap-2">
+                            <Button variant="ghost" size="icon" onClick={() => toggleCopy(o.id, () => copyMessage(o))}>
+                              {copyState[o.id] ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => handleTogglePicked(o)}>
+                              <Check className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                      {expandedOrders.has(o.id) && (
+                        <TableRow key={`${o.id}-detail`} className="bg-muted/10 hover:bg-muted/10">
+                          <TableCell colSpan={7} className="p-0">
+                            <OrderItemsDetail items={o.items} total={o.total} />
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </>
                   ))
                 )}
               </TableBody>
