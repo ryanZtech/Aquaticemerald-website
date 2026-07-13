@@ -156,10 +156,19 @@ export async function POST(request: NextRequest) {
       : 'N/A');
 
     const RESEND_API_KEY = process.env.RESEND_API_KEY;
+    console.log('🔍 EMAIL DEBUG - Starting email process for order:', orderId);
+    console.log('📧 RESEND_API_KEY exists:', !!RESEND_API_KEY);
+    console.log('📧 RESEND_API_KEY length:', RESEND_API_KEY?.length || 0);
+    console.log('📧 RESEND_API_KEY first 10 chars:', RESEND_API_KEY?.substring(0, 10) || 'NONE');
+    console.log('📧 Customer email:', customer_email);
+    console.log('📧 Seller email:', sellerEmail);
+    
     if (RESEND_API_KEY) {
       const fromEmail = process.env.EMAIL_FROM || 'Aquatic Emerald <orders@aquaticemerald.com>';
+      console.log('📧 From email:', fromEmail);
 
       if (customer_email) {
+        console.log('📧 Building customer email HTML...');
         const customerHtml = buildCustomerHtml({
           customer_name,
           customer_email,
@@ -176,9 +185,11 @@ export async function POST(request: NextRequest) {
           sellerWaLink,
           currentYear,
         });
+        console.log('📧 Customer HTML length:', customerHtml.length);
 
         try {
-          await fetch('https://api.resend.com/emails', {
+          console.log('📧 Sending customer email to:', customer_email);
+          const response = await fetch('https://api.resend.com/emails', {
             method: 'POST',
             headers: {
               Authorization: `Bearer ${RESEND_API_KEY}`,
@@ -191,12 +202,25 @@ export async function POST(request: NextRequest) {
               html: customerHtml,
             }),
           });
+          
+          const responseData = await response.json();
+          console.log('✅ Customer email response status:', response.status);
+          console.log('✅ Customer email response:', JSON.stringify(responseData));
+          
+          if (!response.ok) {
+            console.error('❌ Customer email failed with status:', response.status);
+            console.error('❌ Error details:', responseData);
+          }
         } catch (e) {
-          console.error('Failed to send email to customer:', customer_email, e);
+          console.error('❌ Exception sending customer email:', e);
+          console.error('❌ Full error:', JSON.stringify(e, Object.getOwnPropertyNames(e)));
         }
+      } else {
+        console.log('⚠️ No customer email provided, skipping customer email');
       }
 
       if (sellerEmail) {
+        console.log('📧 Building seller email HTML...');
         const sellerHtml = buildSellerHtml({
           customer_name,
           customer_email,
@@ -213,9 +237,11 @@ export async function POST(request: NextRequest) {
           customerWaLink,
           currentYear,
         });
+        console.log('📧 Seller HTML length:', sellerHtml.length);
 
         try {
-          await fetch('https://api.resend.com/emails', {
+          console.log('📧 Sending seller email to:', sellerEmail);
+          const response = await fetch('https://api.resend.com/emails', {
             method: 'POST',
             headers: {
               Authorization: `Bearer ${RESEND_API_KEY}`,
@@ -228,11 +254,28 @@ export async function POST(request: NextRequest) {
               html: sellerHtml,
             }),
           });
+          
+          const responseData = await response.json();
+          console.log('✅ Seller email response status:', response.status);
+          console.log('✅ Seller email response:', JSON.stringify(responseData));
+          
+          if (!response.ok) {
+            console.error('❌ Seller email failed with status:', response.status);
+            console.error('❌ Error details:', responseData);
+          }
         } catch (e) {
-          console.error('Failed to send email to seller:', sellerEmail, e);
+          console.error('❌ Exception sending seller email:', e);
+          console.error('❌ Full error:', JSON.stringify(e, Object.getOwnPropertyNames(e)));
         }
+      } else {
+        console.log('⚠️ No seller email configured, skipping seller email');
       }
+    } else {
+      console.error('❌ RESEND_API_KEY not found in environment variables!');
+      console.log('Available env vars:', Object.keys(process.env).filter(k => k.includes('RESEND') || k.includes('EMAIL')));
     }
+    
+    console.log('✅ Email process completed for order:', orderId);
 
     return NextResponse.json({ success: true, orderId });
   } catch (error) {
