@@ -75,12 +75,24 @@ export async function POST(request: NextRequest) {
 
     const pickupLocationId = pickup_location_id ? Number(pickup_location_id) : null;
     const slotStart = pickup_slot_at || null;
+    const isCustomLocation = !pickupLocationId || (notes && String(notes).includes('Custom location'));
 
-    if (pickupLocationId && slotStart) {
+    // If custom location, resolve it to the 'Custom' pickup_location entry in DB
+    let resolvedLocationId: number | null = pickupLocationId;
+    if (isCustomLocation && !pickupLocationId) {
+      try {
+        const customLoc = await sql`SELECT id FROM pickup_locations WHERE name = 'Custom' LIMIT 1`;
+        resolvedLocationId = customLoc[0]?.id ?? null;
+      } catch (e) {
+        console.error('Failed to resolve custom location id:', e);
+      }
+    }
+
+    if (resolvedLocationId && slotStart) {
       const dayOfWeek = new Date(slotStart).getDay();
       const ruleRows = await sql`
         SELECT max_pickups_per_slot FROM weekly_availability_rules
-        WHERE pickup_location_id = ${pickupLocationId}
+        WHERE pickup_location_id = ${resolvedLocationId}
           AND weekday = ${dayOfWeek}
           AND active = TRUE
         LIMIT 1
@@ -89,7 +101,7 @@ export async function POST(request: NextRequest) {
 
       const reservationRows = await sql`
         INSERT INTO slot_reservations (pickup_location_id, slot_at, current_count, max_capacity, is_blocked)
-        VALUES (${pickupLocationId}, ${slotStart}, 1, ${maxPickups}, FALSE)
+        VALUES (${resolvedLocationId}, ${slotStart}, 1, ${maxPickups}, FALSE)
         ON CONFLICT (pickup_location_id, slot_at)
         DO UPDATE
         SET current_count = slot_reservations.current_count + 1,
@@ -104,13 +116,13 @@ export async function POST(request: NextRequest) {
       }
 
       reservedSlot = true;
-      reservedLocationId = pickupLocationId;
+      reservedLocationId = resolvedLocationId;
       reservedSlotAt = slotStart;
     }
 
     const insert = await sql`
       INSERT INTO orders (customer_name, customer_email, customer_phone, pickup_location_id, pickup_slot_at, notes, subtotal, total)
-      VALUES (${customer_name}, ${customer_email}, ${customer_phone}, ${pickupLocationId}, ${pickup_slot_at || null}, ${notes || orderRef || null}, ${subtotal}, ${total})
+      VALUES (${customer_name}, ${customer_email}, ${customer_phone}, ${resolvedLocationId}, ${pickup_slot_at || null}, ${notes || orderRef || null}, ${subtotal}, ${total})
       RETURNING id, created_at
     `;
 
@@ -143,9 +155,8 @@ export async function POST(request: NextRequest) {
     const sellerWaLink = sellerWhatsApp ? `https://wa.me/${sellerWhatsApp}` : '';
 
     const currentYear = new Date().getFullYear();
-    const isCustomLocation = !pickupLocationId && notes && notes.includes('Custom location');
-    const pickupDetails = pickupLocationId ? await sql`SELECT name, address AS detail FROM pickup_locations WHERE id = ${pickupLocationId}` : [];
-    const pickupName = isCustomLocation ? `Custom Location (to be arranged)` : (pickupDetails[0]?.name || 'N/A');
+    const pickupDetails = resolvedLocationId ? await sql`SELECT name, address AS detail FROM pickup_locations WHERE id = ${resolvedLocationId}` : [];
+    const pickupName = isCustomLocation ? 'Custom Location (to be arranged)' : (pickupDetails[0]?.name || 'N/A');
     const pickupDetail = isCustomLocation ? 'Location and time will be negotiated via WhatsApp' : (pickupDetails[0]?.detail || '');
     const pickupDateObj = pickup_slot_at ? new Date(pickup_slot_at) : null;
     const formattedPickupDate = isCustomLocation ? 'To be arranged via WhatsApp' : (pickupDateObj
