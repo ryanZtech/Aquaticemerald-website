@@ -1,5 +1,19 @@
 type CartItem = { qty?: number; name?: string; variantLabel?: string; price?: number };
 
+// Customer-supplied fields (name, email, phone, order reference, notes, etc.)
+// are attacker-controlled and must never be interpolated into HTML emails
+// without escaping — otherwise a crafted checkout name/notes field could
+// inject markup or break out of an href/tel/mailto attribute.
+export function escapeHtml(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 export function buildCustomerHtml(opts: {
   customer_name: string;
   customer_email?: string | null;
@@ -17,10 +31,10 @@ export function buildCustomerHtml(opts: {
   currentYear?: number;
 }) {
   const {
-    customer_name,
-    customer_email = 'N/A',
-    customer_phone = 'N/A',
-    orderRef,
+    customer_name: rawCustomerName,
+    customer_email: rawCustomerEmail = 'N/A',
+    customer_phone: rawCustomerPhone = 'N/A',
+    orderRef: rawOrderRef,
     orderId,
     cart = [],
     subtotal = 0,
@@ -33,13 +47,20 @@ export function buildCustomerHtml(opts: {
     currentYear = new Date().getFullYear(),
   } = opts;
 
+  // Escape everything the customer typed at checkout before it ever touches
+  // the HTML string, since these values are attacker-controlled.
+  const customer_name = escapeHtml(rawCustomerName);
+  const customer_email = escapeHtml(rawCustomerEmail);
+  const customer_phone = escapeHtml(rawCustomerPhone);
+  const orderRef = escapeHtml(rawOrderRef);
+
   const itemsHtml = (cart || []).map(i => `
     <tr>
       <td style="padding: 16px 0; border-bottom: 1px solid #e2ede4;">
         <table border="0" cellpadding="0" cellspacing="0" width="100%">
           <tr>
             <td align="left" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 15px; color: #0d1f10; line-height: 1.4;">
-              <strong style="color: #1a6b40;">${i.qty || 0}&times;</strong> ${i.name || ''} <span style="color: #5a7a60; font-size: 14px;">(${i.variantLabel || ''})</span>
+              <strong style="color: #1a6b40;">${i.qty || 0}&times;</strong> ${escapeHtml(i.name)} <span style="color: #5a7a60; font-size: 14px;">(${escapeHtml(i.variantLabel)})</span>
             </td>
             <td align="right" valign="top" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 15px; font-weight: bold; color: #0d1f10; padding-left: 10px;">
               $${Number((i.price || 0) * (i.qty || 0)).toFixed(2)}
@@ -302,10 +323,10 @@ export function buildSellerHtml(opts: {
   currentYear?: number;
 }) {
   const {
-    customer_name,
-    customer_email = 'N/A',
-    customer_phone = 'N/A',
-    orderRef,
+    customer_name: rawCustomerName,
+    customer_email: rawCustomerEmail = 'N/A',
+    customer_phone: rawCustomerPhone = 'N/A',
+    orderRef: rawOrderRef,
     orderId,
     cart = [],
     subtotal = 0,
@@ -318,13 +339,18 @@ export function buildSellerHtml(opts: {
     currentYear = new Date().getFullYear(),
   } = opts;
 
+  const customer_name = escapeHtml(rawCustomerName);
+  const customer_email = escapeHtml(rawCustomerEmail);
+  const customer_phone = escapeHtml(rawCustomerPhone);
+  const orderRef = escapeHtml(rawOrderRef);
+
   const itemsHtml = (cart || []).map(i => `
     <tr>
       <td style="padding: 14px 0; border-bottom: 1px solid #e2ede4;">
         <table border="0" cellpadding="0" cellspacing="0" width="100%">
           <tr>
             <td align="left" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #0d1f10;">
-              <strong style="color: #1a6b40;">${i.qty || 0}&times;</strong> ${i.name || ''} <span style="color: #5a7a60; font-size: 13px;">(${i.variantLabel || ''})</span>
+              <strong style="color: #1a6b40;">${i.qty || 0}&times;</strong> ${escapeHtml(i.name)} <span style="color: #5a7a60; font-size: 13px;">(${escapeHtml(i.variantLabel)})</span>
             </td>
             <td align="right" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; font-weight: bold; color: #0d1f10;">
               $${Number((i.price || 0) * (i.qty || 0)).toFixed(2)}

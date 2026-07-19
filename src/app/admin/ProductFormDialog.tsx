@@ -12,6 +12,7 @@ import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 import { Label } from "@/app/components/ui/label";
 import { Textarea } from "@/app/components/ui/textarea";
+import { STOCK_LEVELS, STOCK_LEVEL_LABELS } from "@/lib/stockLimits";
 import {
   Select,
   SelectContent,
@@ -629,10 +630,11 @@ export default function ProductFormDialog({
                     onChange={(e) => updateVariant(variant.id, "stock_level", e.target.value)}
                     className="h-9 rounded-md border px-3"
                   >
-                    <option value="none">None</option>
-                    <option value="low">Low</option>
-                    <option value="med">Medium</option>
-                    <option value="high">High</option>
+                    {STOCK_LEVELS.map((level) => (
+                      <option key={level} value={level}>
+                        {STOCK_LEVEL_LABELS[level]}
+                      </option>
+                    ))}
                   </select>
                   <div className="flex items-center gap-2">
                     {(variant.imagePreview || variant.image_url) && (

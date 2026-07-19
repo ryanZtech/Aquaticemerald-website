@@ -13,35 +13,23 @@ import {
 } from "@/app/components/ui/card";
 import { MessageSquare, Mail, Save, ShieldCheck, Loader2, Boxes } from "lucide-react";
 import { toast } from "sonner";
+import {
+  STOCK_LEVELS,
+  STOCK_LEVEL_LABELS,
+  STOCK_LEVEL_SETTINGS_KEYS,
+  DEFAULT_STOCK_LIMITS,
+  type StockLevel,
+} from "@/lib/stockLimits";
 
-interface LevelField {
-  key: "max_qty_none" | "max_qty_low" | "max_qty_med" | "max_qty_high";
-  label: string;
-  description: string;
-}
-
-const LEVEL_FIELDS: LevelField[] = [
-  {
-    key: "max_qty_none",
-    label: "None (Out of Stock)",
-    description: "Forced to 0 — customers cannot order.",
-  },
-  {
-    key: "max_qty_low",
-    label: "Low",
-    description: "Max quantity a customer can order for a low-stock variant.",
-  },
-  {
-    key: "max_qty_med",
-    label: "Medium",
-    description: "Max quantity a customer can order for a medium-stock variant.",
-  },
-  {
-    key: "max_qty_high",
-    label: "High",
-    description: "Max quantity a customer can order for a high-stock variant.",
-  },
-];
+const LEVEL_DESCRIPTIONS: Record<StockLevel, string> = {
+  none: "Forced to 0 — customers cannot order.",
+  single: "Max quantity a customer can order when only a single unit remains.",
+  very_low: "Max quantity a customer can order for a very-low-stock variant.",
+  low: "Max quantity a customer can order for a low-stock variant.",
+  medium: "Max quantity a customer can order for a medium-stock variant.",
+  high: "Max quantity a customer can order for a high-stock variant.",
+  very_high: "Max quantity a customer can order for a very-high-stock variant.",
+};
 
 export default function AdminSettingsPage() {
   const [loading, setLoading] = useState(true);
@@ -50,10 +38,16 @@ export default function AdminSettingsPage() {
   const [whatsapp, setWhatsapp] = useState("");
   const [email, setEmail] = useState("");
 
-  const [maxQtyNone, setMaxQtyNone] = useState("0");
-  const [maxQtyLow, setMaxQtyLow] = useState("1");
-  const [maxQtyMed, setMaxQtyMed] = useState("10");
-  const [maxQtyHigh, setMaxQtyHigh] = useState("25");
+  // One quantity field per stock level, keyed by the level itself.
+  const [maxQtyByLevel, setMaxQtyByLevel] = useState<Record<StockLevel, string>>(
+    () => {
+      const initial = {} as Record<StockLevel, string>;
+      STOCK_LEVELS.forEach((level) => {
+        initial[level] = String(DEFAULT_STOCK_LIMITS[level]);
+      });
+      return initial;
+    },
+  );
 
   useEffect(() => {
     async function loadSettings() {
@@ -63,10 +57,17 @@ export default function AdminSettingsPage() {
           const data = await response.json();
           if (data.seller_whatsapp) setWhatsapp(data.seller_whatsapp);
           if (data.seller_email) setEmail(data.seller_email);
-          if (data.max_qty_none !== undefined) setMaxQtyNone(String(data.max_qty_none));
-          if (data.max_qty_low !== undefined) setMaxQtyLow(String(data.max_qty_low));
-          if (data.max_qty_med !== undefined) setMaxQtyMed(String(data.max_qty_med));
-          if (data.max_qty_high !== undefined) setMaxQtyHigh(String(data.max_qty_high));
+
+          setMaxQtyByLevel((prev) => {
+            const next = { ...prev };
+            STOCK_LEVELS.forEach((level) => {
+              const settingsKey = STOCK_LEVEL_SETTINGS_KEYS[level];
+              if (data[settingsKey] !== undefined) {
+                next[level] = String(data[settingsKey]);
+              }
+            });
+            return next;
+          });
         }
       } catch (error) {
         console.error("Failed to load settings:", error);
@@ -83,16 +84,22 @@ export default function AdminSettingsPage() {
     setSaving(true);
 
     try {
+      const stockLimitPayload: Record<string, string> = {};
+      STOCK_LEVELS.forEach((level) => {
+        const settingsKey = STOCK_LEVEL_SETTINGS_KEYS[level];
+        stockLimitPayload[settingsKey] =
+          level === "none"
+            ? "0"
+            : String(Math.max(0, parseInt(maxQtyByLevel[level], 10) || 0));
+      });
+
       const response = await fetch("/api/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           seller_whatsapp: whatsapp.replace(/\D/g, ""),
           seller_email: email.trim(),
-          max_qty_none: "0",
-          max_qty_low: String(Math.max(0, parseInt(maxQtyLow, 10) || 0)),
-          max_qty_med: String(Math.max(0, parseInt(maxQtyMed, 10) || 0)),
-          max_qty_high: String(Math.max(0, parseInt(maxQtyHigh, 10) || 0)),
+          ...stockLimitPayload,
         }),
       });
 
@@ -198,40 +205,29 @@ export default function AdminSettingsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
-            {LEVEL_FIELDS.map((field) => {
-              const value =
-                field.key === "max_qty_none"
-                  ? maxQtyNone
-                  : field.key === "max_qty_low"
-                    ? maxQtyLow
-                    : field.key === "max_qty_med"
-                      ? maxQtyMed
-                      : maxQtyHigh;
-              const setter =
-                field.key === "max_qty_none"
-                  ? setMaxQtyNone
-                  : field.key === "max_qty_low"
-                    ? setMaxQtyLow
-                    : field.key === "max_qty_med"
-                      ? setMaxQtyMed
-                      : setMaxQtyHigh;
-              return (
-                <div key={field.key} className="space-y-2">
-                  <label className="text-sm font-medium">{field.label}</label>
-                  <Input
-                    type="number"
-                    min="0"
-                    value={value}
-                    onChange={(e) => setter(e.target.value)}
-                    disabled={field.key === "max_qty_none"}
-                    className="max-w-[160px]"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    {field.description}
-                  </p>
-                </div>
-              );
-            })}
+            {STOCK_LEVELS.map((level) => (
+              <div key={level} className="space-y-2">
+                <label className="text-sm font-medium">
+                  {STOCK_LEVEL_LABELS[level]}
+                </label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={maxQtyByLevel[level]}
+                  onChange={(e) =>
+                    setMaxQtyByLevel((prev) => ({
+                      ...prev,
+                      [level]: e.target.value,
+                    }))
+                  }
+                  disabled={level === "none"}
+                  className="max-w-[160px]"
+                />
+                <p className="text-xs text-muted-foreground">
+                  {LEVEL_DESCRIPTIONS[level]}
+                </p>
+              </div>
+            ))}
           </CardContent>
           <CardFooter className="bg-muted/30 border-t flex justify-end p-4">
             <Button type="submit" disabled={saving} className="gap-2">

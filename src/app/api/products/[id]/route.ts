@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { put, del } from "@vercel/blob";
+import { validateImageFile, safeImageKey } from "@/lib/fileValidation";
+import { normalizeStockLevel } from "@/lib/stockLimits";
 
 export async function GET(
   request: NextRequest,
@@ -130,11 +132,9 @@ export async function PUT(
 
     for (const variant of variants) {
       const variantId = `${id}-${variant.id}`;
-      const stockLevel = (
-        variant.stock_level ||
-        variant.stockLevel ||
-        "none"
-      ).toLowerCase();
+      const stockLevel = normalizeStockLevel(
+        variant.stock_level || variant.stockLevel,
+      );
 
       await sql`
         INSERT INTO product_variants (id, product_id, label, price, stock_level, active)
@@ -145,8 +145,12 @@ export async function PUT(
         `variantImage_${variant.id}`,
       ) as File | null;
       if (variantImageFile) {
+        const validation = validateImageFile(variantImageFile);
+        if (!validation.valid) {
+          return NextResponse.json({ error: validation.error }, { status: 400 });
+        }
         const blob = await put(
-          `products/${id}/variants/${variantId}/${variantImageFile.name}`,
+          safeImageKey(`products/${id}/variants/${variantId}`, variantImageFile),
           variantImageFile,
           {
             access: "public",
@@ -194,7 +198,11 @@ export async function PUT(
       }> = [];
       for (let i = 0; i < newImages.length; i++) {
         const file = newImages[i];
-        const blob = await put(`products/${id}/${file.name}`, file, {
+        const validation = validateImageFile(file);
+        if (!validation.valid) {
+          return NextResponse.json({ error: validation.error }, { status: 400 });
+        }
+        const blob = await put(safeImageKey(`products/${id}`, file), file, {
           access: "public",
           addRandomSuffix: true,
         });

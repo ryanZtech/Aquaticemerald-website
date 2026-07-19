@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
-import { rateLimit } from "@/lib/rateLimit";
+import { rateLimit, getClientIp } from "@/lib/rateLimit";
 
 export async function POST(request: NextRequest) {
   if (!sql) {
@@ -9,9 +9,7 @@ export async function POST(request: NextRequest) {
 
   try {
     // Rate limiting: 10 requests per minute per IP
-    const ip = request.headers.get("x-forwarded-for") || 
-               request.headers.get("x-real-ip") || 
-               "anonymous";
+    const ip = getClientIp(request.headers);
     
     const rateLimitResult = rateLimit(`promo-validate:${ip}`, 10, 60 * 1000);
     

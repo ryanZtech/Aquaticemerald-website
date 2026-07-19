@@ -1,0 +1,1831 @@
+diff --git a/next.config.mjs b/next.config.mjs
+index d5456a1..7bebba7 100644
+--- a/next.config.mjs
++++ b/next.config.mjs
+@@ -1,6 +1,27 @@
+ /** @type {import('next').NextConfig} */
+ const nextConfig = {
+   reactStrictMode: true,
++  async headers() {
++    return [
++      {
++        // Apply to every route, including the admin panel.
++        source: "/:path*",
++        headers: [
++          // Prevent the admin login/dashboard from being framed by another
++          // site (clickjacking protection).
++          { key: "X-Frame-Options", value: "SAMEORIGIN" },
++          // Stop browsers from MIME-sniffing responses into an unintended
++          // content type.
++          { key: "X-Content-Type-Options", value: "nosniff" },
++          // Don't leak the full referring URL (which may contain order refs
++          // or emails in query strings) to third-party destinations.
++          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
++          // Disable browser features this site doesn't use.
++          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
++        ],
++      },
++    ];
++  },
+ };
+ 
+ export default nextConfig;
+diff --git a/package-lock.json b/package-lock.json
+index 931961f..cb9e12d 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -526,9 +526,6 @@
+       "cpu": [
+         "arm"
+       ],
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "LGPL-3.0-or-later",
+       "optional": true,
+       "os": [
+@@ -545,9 +542,6 @@
+       "cpu": [
+         "arm64"
+       ],
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "LGPL-3.0-or-later",
+       "optional": true,
+       "os": [
+@@ -564,9 +558,6 @@
+       "cpu": [
+         "ppc64"
+       ],
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "LGPL-3.0-or-later",
+       "optional": true,
+       "os": [
+@@ -583,9 +574,6 @@
+       "cpu": [
+         "riscv64"
+       ],
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "LGPL-3.0-or-later",
+       "optional": true,
+       "os": [
+@@ -602,9 +590,6 @@
+       "cpu": [
+         "s390x"
+       ],
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "LGPL-3.0-or-later",
+       "optional": true,
+       "os": [
+@@ -621,9 +606,6 @@
+       "cpu": [
+         "x64"
+       ],
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "LGPL-3.0-or-later",
+       "optional": true,
+       "os": [
+@@ -640,9 +622,6 @@
+       "cpu": [
+         "arm64"
+       ],
+-      "libc": [
+-        "musl"
+-      ],
+       "license": "LGPL-3.0-or-later",
+       "optional": true,
+       "os": [
+@@ -659,9 +638,6 @@
+       "cpu": [
+         "x64"
+       ],
+-      "libc": [
+-        "musl"
+-      ],
+       "license": "LGPL-3.0-or-later",
+       "optional": true,
+       "os": [
+@@ -678,9 +654,6 @@
+       "cpu": [
+         "arm"
+       ],
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "Apache-2.0",
+       "optional": true,
+       "os": [
+@@ -703,9 +676,6 @@
+       "cpu": [
+         "arm64"
+       ],
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "Apache-2.0",
+       "optional": true,
+       "os": [
+@@ -728,9 +698,6 @@
+       "cpu": [
+         "ppc64"
+       ],
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "Apache-2.0",
+       "optional": true,
+       "os": [
+@@ -753,9 +720,6 @@
+       "cpu": [
+         "riscv64"
+       ],
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "Apache-2.0",
+       "optional": true,
+       "os": [
+@@ -778,9 +742,6 @@
+       "cpu": [
+         "s390x"
+       ],
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "Apache-2.0",
+       "optional": true,
+       "os": [
+@@ -803,9 +764,6 @@
+       "cpu": [
+         "x64"
+       ],
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "Apache-2.0",
+       "optional": true,
+       "os": [
+@@ -828,9 +786,6 @@
+       "cpu": [
+         "arm64"
+       ],
+-      "libc": [
+-        "musl"
+-      ],
+       "license": "Apache-2.0",
+       "optional": true,
+       "os": [
+@@ -853,9 +808,6 @@
+       "cpu": [
+         "x64"
+       ],
+-      "libc": [
+-        "musl"
+-      ],
+       "license": "Apache-2.0",
+       "optional": true,
+       "os": [
+@@ -1249,15 +1201,15 @@
+       }
+     },
+     "node_modules/@next/env": {
+-      "version": "16.2.6",
+-      "resolved": "https://registry.npmjs.org/@next/env/-/env-16.2.6.tgz",
+-      "integrity": "sha512-gd8HoHN4ufj73WmR3JmVolrpJR47ILK6LouP5xElPglaVxir6e1a7VzvTvDWkOoPXT9rkkTzyCxBu4yeZfZwcw==",
++      "version": "16.2.10",
++      "resolved": "https://registry.npmjs.org/@next/env/-/env-16.2.10.tgz",
++      "integrity": "sha512-zLPxg9M0MEHmygpj5OuxjQ+vHMiy/K7cSp74G8ecYolmgUWw0RwN02tF56npup/+qaI8JB97hQgS/r2Hb6QwVA==",
+       "license": "MIT"
+     },
+     "node_modules/@next/swc-darwin-arm64": {
+-      "version": "16.2.6",
+-      "resolved": "https://registry.npmjs.org/@next/swc-darwin-arm64/-/swc-darwin-arm64-16.2.6.tgz",
+-      "integrity": "sha512-ZJGkkcNfYgrrMkqOdZ7zoLa1TOy0qpcMfk/z4Mh/FKUz40gVO+HNQWqmLxf67Z5WB64DRp0dhEbyHfel+6sJUg==",
++      "version": "16.2.10",
++      "resolved": "https://registry.npmjs.org/@next/swc-darwin-arm64/-/swc-darwin-arm64-16.2.10.tgz",
++      "integrity": "sha512-v9IdJCa0H0mbo+8z5zwUpOk1Vj7RjkcI5uNYf5Ws1y6szf/p3Mzl9hLaST8SCt6L9h8NGnruZcd2+o0NTNwDhA==",
+       "cpu": [
+         "arm64"
+       ],
+@@ -1271,9 +1223,9 @@
+       }
+     },
+     "node_modules/@next/swc-darwin-x64": {
+-      "version": "16.2.6",
+-      "resolved": "https://registry.npmjs.org/@next/swc-darwin-x64/-/swc-darwin-x64-16.2.6.tgz",
+-      "integrity": "sha512-v/YLBHIY132Ced3puBJ7YJKw1lqsCrgcNo2aRJlCEyQrrCeRJlvGlnmxhPxNQI3KE3N1DN5r9TPNPvka3nq5RQ==",
++      "version": "16.2.10",
++      "resolved": "https://registry.npmjs.org/@next/swc-darwin-x64/-/swc-darwin-x64-16.2.10.tgz",
++      "integrity": "sha512-17IS0jJRViROGmA9uGdNR8VPJpfbnaVG7E9qhso5jDLkmyd0lSDORWxbcKINzcFqzZqGwGtMSnrFRxBpuUYjLQ==",
+       "cpu": [
+         "x64"
+       ],
+@@ -1287,15 +1239,12 @@
+       }
+     },
+     "node_modules/@next/swc-linux-arm64-gnu": {
+-      "version": "16.2.6",
+-      "resolved": "https://registry.npmjs.org/@next/swc-linux-arm64-gnu/-/swc-linux-arm64-gnu-16.2.6.tgz",
+-      "integrity": "sha512-RPOvqlYBbcQjkz9VQQDZ2T2bARIjXZV1KFlt+V2Mr6SW/e4I9fcKsaA0hdyf2FHoTlsV2xnBd5Y912rP/1Ce6w==",
++      "version": "16.2.10",
++      "resolved": "https://registry.npmjs.org/@next/swc-linux-arm64-gnu/-/swc-linux-arm64-gnu-16.2.10.tgz",
++      "integrity": "sha512-GRQRsRtuciNJvB54AvvuQTiq0oZtFwa1owQqtZD8wwnGpM2L39MV22kpI72YSXLKIyY40LC66EiLFv4PiicXxg==",
+       "cpu": [
+         "arm64"
+       ],
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1306,15 +1255,12 @@
+       }
+     },
+     "node_modules/@next/swc-linux-arm64-musl": {
+-      "version": "16.2.6",
+-      "resolved": "https://registry.npmjs.org/@next/swc-linux-arm64-musl/-/swc-linux-arm64-musl-16.2.6.tgz",
+-      "integrity": "sha512-URUTu1+dMkxJsPFgm+OeEvq9wf5sujw0EvgYy80TDGHTSLTnIHeqb0Eu8A3sC95IRgjejQL+kC4mw+4yPxiAXA==",
++      "version": "16.2.10",
++      "resolved": "https://registry.npmjs.org/@next/swc-linux-arm64-musl/-/swc-linux-arm64-musl-16.2.10.tgz",
++      "integrity": "sha512-zkN9MQYS7UQBro+FnISUq1itaQjXI9xqISzuQ+2bc921NcJ1x4yPCqrn77tVN6/dOOXaaWVX3k6/bR07pPwK+A==",
+       "cpu": [
+         "arm64"
+       ],
+-      "libc": [
+-        "musl"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1325,15 +1271,12 @@
+       }
+     },
+     "node_modules/@next/swc-linux-x64-gnu": {
+-      "version": "16.2.6",
+-      "resolved": "https://registry.npmjs.org/@next/swc-linux-x64-gnu/-/swc-linux-x64-gnu-16.2.6.tgz",
+-      "integrity": "sha512-DOj182mPV8G3UkrayLoREM5YEYI+Dk5wv7Ox9xl1fFibAELEsFD0lDPfHIeILlutMMfdyhlzYPELG3peuKaurw==",
++      "version": "16.2.10",
++      "resolved": "https://registry.npmjs.org/@next/swc-linux-x64-gnu/-/swc-linux-x64-gnu-16.2.10.tgz",
++      "integrity": "sha512-iCVJnwvrPYECvA6WM/7+oo+OiTvedIKLxtCLAZP4xZR3nXa1zmzZyLPbYCmWvpd4CvMYF1EMTafd0ii3DygLvA==",
+       "cpu": [
+         "x64"
+       ],
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1344,15 +1287,12 @@
+       }
+     },
+     "node_modules/@next/swc-linux-x64-musl": {
+-      "version": "16.2.6",
+-      "resolved": "https://registry.npmjs.org/@next/swc-linux-x64-musl/-/swc-linux-x64-musl-16.2.6.tgz",
+-      "integrity": "sha512-HKQ5SP/V/ub73UvF7n/zeJlxk2kLmtL7Wzrg4WfmkjmNos5onJ2tKu7yZOPdL18A6Svfn3max29ym+ry7NkK4g==",
++      "version": "16.2.10",
++      "resolved": "https://registry.npmjs.org/@next/swc-linux-x64-musl/-/swc-linux-x64-musl-16.2.10.tgz",
++      "integrity": "sha512-ov2g4H0dHY9bPoOU83m91hWT7Iq5qy13bUnyyshLU3HGR1Ownn0X9QpmDPc5iIUaahTp7f7LeGAhV4DSFtackw==",
+       "cpu": [
+         "x64"
+       ],
+-      "libc": [
+-        "musl"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -1363,9 +1303,9 @@
+       }
+     },
+     "node_modules/@next/swc-win32-arm64-msvc": {
+-      "version": "16.2.6",
+-      "resolved": "https://registry.npmjs.org/@next/swc-win32-arm64-msvc/-/swc-win32-arm64-msvc-16.2.6.tgz",
+-      "integrity": "sha512-LZXpTlPyS5v7HhSmnvsLGP3iIYgYOBnc8r8ArlT55sGHV89bR2HlDdBjWQ+PY6SJMmk8TuVGFuxalnP3k/0Dwg==",
++      "version": "16.2.10",
++      "resolved": "https://registry.npmjs.org/@next/swc-win32-arm64-msvc/-/swc-win32-arm64-msvc-16.2.10.tgz",
++      "integrity": "sha512-DwAnhLX76HQiFFQNgWlcK+JzlnD1rZ+UK/WY0ZMI/deXpvgnesjNYrqcfo1JzBuz4Kf7o3brIBL0glI1junatA==",
+       "cpu": [
+         "arm64"
+       ],
+@@ -1379,9 +1319,9 @@
+       }
+     },
+     "node_modules/@next/swc-win32-x64-msvc": {
+-      "version": "16.2.6",
+-      "resolved": "https://registry.npmjs.org/@next/swc-win32-x64-msvc/-/swc-win32-x64-msvc-16.2.6.tgz",
+-      "integrity": "sha512-F0+4i0h9J6C4eE3EAPWsoCk7UW/dbzOjyzxY0qnDUOYFu6FFmdZ6l97/XdV3/Nz3VYyO7UWjyEJUXkGqcoXfMA==",
++      "version": "16.2.10",
++      "resolved": "https://registry.npmjs.org/@next/swc-win32-x64-msvc/-/swc-win32-x64-msvc-16.2.10.tgz",
++      "integrity": "sha512-0JXq3b85Jk9Jg4ntLUbXSPvoDw3gpZou7twuKdoFG2jOw635v7+IiXfTaa0TxVMyx78pUjnrVYwLgjKfX4e6/A==",
+       "cpu": [
+         "x64"
+       ],
+@@ -2851,9 +2791,6 @@
+         "arm64"
+       ],
+       "dev": true,
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -2871,9 +2808,6 @@
+         "arm64"
+       ],
+       "dev": true,
+-      "libc": [
+-        "musl"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -2891,9 +2825,6 @@
+         "x64"
+       ],
+       "dev": true,
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -2911,9 +2842,6 @@
+         "x64"
+       ],
+       "dev": true,
+-      "libc": [
+-        "musl"
+-      ],
+       "license": "MIT",
+       "optional": true,
+       "os": [
+@@ -4171,9 +4099,6 @@
+         "arm64"
+       ],
+       "dev": true,
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "MPL-2.0",
+       "optional": true,
+       "os": [
+@@ -4195,9 +4120,6 @@
+         "arm64"
+       ],
+       "dev": true,
+-      "libc": [
+-        "musl"
+-      ],
+       "license": "MPL-2.0",
+       "optional": true,
+       "os": [
+@@ -4219,9 +4141,6 @@
+         "x64"
+       ],
+       "dev": true,
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "MPL-2.0",
+       "optional": true,
+       "os": [
+@@ -4243,9 +4162,6 @@
+         "x64"
+       ],
+       "dev": true,
+-      "libc": [
+-        "musl"
+-      ],
+       "license": "MPL-2.0",
+       "optional": true,
+       "os": [
+@@ -4454,12 +4370,12 @@
+       }
+     },
+     "node_modules/next": {
+-      "version": "16.2.6",
+-      "resolved": "https://registry.npmjs.org/next/-/next-16.2.6.tgz",
+-      "integrity": "sha512-qOVgKJg1+At15NpeUP+eJgCHvTCgXsogweq87Ri/Ix7PkqQHg4sdaXmSFqKlgaIXE4kW0g25LE68W87UANlHtw==",
++      "version": "16.2.10",
++      "resolved": "https://registry.npmjs.org/next/-/next-16.2.10.tgz",
++      "integrity": "sha512-2som5AVXb3kE6Yjine3/mNbBayYF58eguBWIVVUdr1y/L426xyVEgYxgBG+1QC34P2x5E+tcDup6XkuOAX3dCA==",
+       "license": "MIT",
+       "dependencies": {
+-        "@next/env": "16.2.6",
++        "@next/env": "16.2.10",
+         "@swc/helpers": "0.5.15",
+         "baseline-browser-mapping": "^2.9.19",
+         "caniuse-lite": "^1.0.30001579",
+@@ -4473,14 +4389,14 @@
+         "node": ">=20.9.0"
+       },
+       "optionalDependencies": {
+-        "@next/swc-darwin-arm64": "16.2.6",
+-        "@next/swc-darwin-x64": "16.2.6",
+-        "@next/swc-linux-arm64-gnu": "16.2.6",
+-        "@next/swc-linux-arm64-musl": "16.2.6",
+-        "@next/swc-linux-x64-gnu": "16.2.6",
+-        "@next/swc-linux-x64-musl": "16.2.6",
+-        "@next/swc-win32-arm64-msvc": "16.2.6",
+-        "@next/swc-win32-x64-msvc": "16.2.6",
++        "@next/swc-darwin-arm64": "16.2.10",
++        "@next/swc-darwin-x64": "16.2.10",
++        "@next/swc-linux-arm64-gnu": "16.2.10",
++        "@next/swc-linux-arm64-musl": "16.2.10",
++        "@next/swc-linux-x64-gnu": "16.2.10",
++        "@next/swc-linux-x64-musl": "16.2.10",
++        "@next/swc-win32-arm64-msvc": "16.2.10",
++        "@next/swc-win32-x64-msvc": "16.2.10",
+         "sharp": "^0.34.5"
+       },
+       "peerDependencies": {
+@@ -5278,9 +5194,9 @@
+       }
+     },
+     "node_modules/tar": {
+-      "version": "7.5.15",
+-      "resolved": "https://registry.npmjs.org/tar/-/tar-7.5.15.tgz",
+-      "integrity": "sha512-dzGK0boVlC4W5QFuQN1EFSl3bIDYsk7Tj40U6eIBnK2k/8ml7TZ5agbI5j5+qnoVcAA+rNtBml8SEiLxZpNqRQ==",
++      "version": "7.5.20",
++      "resolved": "https://registry.npmjs.org/tar/-/tar-7.5.20.tgz",
++      "integrity": "sha512-9FcyK4PA6+WbzlTM9WhQm6vB5W7cP7dUiPsv1g7YDwEQnQ1CGpK3MGlKk/ITVWMk05kHZuBhmVhiv8LZoy/PFQ==",
+       "dev": true,
+       "license": "BlueOak-1.0.0",
+       "dependencies": {
+@@ -5342,9 +5258,9 @@
+       }
+     },
+     "node_modules/undici": {
+-      "version": "6.26.0",
+-      "resolved": "https://registry.npmjs.org/undici/-/undici-6.26.0.tgz",
+-      "integrity": "sha512-4yqz8a3n5HmGTlsbADNtr/dJlhkh/55Rq798G6ibiULcXbDtaLpTl1pvdqcbFfeoj3iSi52lePFM7h9H21cw/A==",
++      "version": "6.27.0",
++      "resolved": "https://registry.npmjs.org/undici/-/undici-6.27.0.tgz",
++      "integrity": "sha512-YmfV3YnEDzXRC5lZ2jWtWWHKGUm1zIt8AhesR1tens+HTNv+YZlN/dp6G727LOvMJ8xjP9Be7Y2Sdr96LDm+pg==",
+       "license": "MIT",
+       "engines": {
+         "node": ">=18.17"
+diff --git a/package.json b/package.json
+index 772a124..af3ea2d 100644
+--- a/package.json
++++ b/package.json
+@@ -6,7 +6,8 @@
+   "scripts": {
+     "dev": "next dev",
+     "build": "next build",
+-    "start": "next start"
++    "start": "next start",
++    "migrate:stock-levels": "node scripts/migrate-stock-levels.mjs"
+   },
+   "dependencies": {
+     "@emotion/react": "11.14.0",
+diff --git a/scripts/migrate-stock-levels.mjs b/scripts/migrate-stock-levels.mjs
+new file mode 100644
+index 0000000..dcaf14d
+--- /dev/null
++++ b/scripts/migrate-stock-levels.mjs
+@@ -0,0 +1,215 @@
++#!/usr/bin/env node
++/**
++ * migrate-stock-levels.mjs
++ * ------------------------
++ * One-off migration for the "stock_level" scale change:
++ *   none, low, med, high  →  none, single, very_low, low, medium, high, very_high
++ *
++ * What it does, in order:
++ *   1. Reads DATABASE_URL out of .env.local (or the real environment, if
++ *      already set — e.g. on Vercel).
++ *   2. Finds any CHECK constraint on product_variants.stock_level and drops it,
++ *      so old values don't block the update.
++ *   3. Normalizes existing rows: 'med' -> 'medium', anything unrecognized -> 'none'.
++ *      Recognized values ('none','single','very_low','low','medium','high','very_high')
++ *      are left untouched.
++ *   4. Re-adds a CHECK constraint restricted to the new 7-value set.
++ *   5. Seeds any missing max_qty_* store_settings rows with sensible defaults
++ *      (without overwriting any values you've already configured in Admin > Settings).
++ *
++ * Usage:
++ *   node scripts/migrate-stock-levels.mjs           # apply the migration
++ *   node scripts/migrate-stock-levels.mjs --dry-run # show what would happen, change nothing
++ *
++ * Requires: Node 18+ (for global fetch, used by @neondatabase/serverless),
++ * and `npm install` already run in this folder (so @neondatabase/serverless exists).
++ */
++
++import { readFileSync, existsSync } from "node:fs";
++import { neon } from "@neondatabase/serverless";
++
++const DRY_RUN = process.argv.includes("--dry-run");
++
++const NEW_LEVELS = [
++  "none",
++  "single",
++  "very_low",
++  "low",
++  "medium",
++  "high",
++  "very_high",
++];
++
++const DEFAULT_MAX_QTY = {
++  none: "0",
++  single: "1",
++  very_low: "2",
++  low: "5",
++  medium: "10",
++  high: "25",
++  very_high: "50",
++};
++
++const SETTINGS_KEY_BY_LEVEL = {
++  none: "max_qty_none",
++  single: "max_qty_single",
++  very_low: "max_qty_very_low",
++  low: "max_qty_low",
++  medium: "max_qty_medium",
++  high: "max_qty_high",
++  very_high: "max_qty_very_high",
++};
++
++function loadDatabaseUrl() {
++  if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
++
++  const envPath = ".env.local";
++  if (!existsSync(envPath)) {
++    throw new Error(
++      `DATABASE_URL is not set and ${envPath} was not found in the current directory.\n` +
++        `Run this script from the folder that contains .env.local (your project root).`,
++    );
++  }
++
++  const contents = readFileSync(envPath, "utf8");
++  for (const rawLine of contents.split("\n")) {
++    const line = rawLine.trim();
++    if (!line || line.startsWith("#")) continue;
++    const eq = line.indexOf("=");
++    if (eq === -1) continue;
++    const key = line.slice(0, eq).trim();
++    if (key !== "DATABASE_URL") continue;
++    let value = line.slice(eq + 1).trim();
++    // Strip surrounding quotes if present.
++    if (
++      (value.startsWith('"') && value.endsWith('"')) ||
++      (value.startsWith("'") && value.endsWith("'"))
++    ) {
++      value = value.slice(1, -1);
++    }
++    return value;
++  }
++
++  throw new Error(`Could not find DATABASE_URL in ${envPath}.`);
++}
++
++function normalizeLegacyLevel(level) {
++  const l = String(level || "").toLowerCase().trim();
++  if (l === "med") return "medium";
++  if (l === "verylow" || l === "very-low") return "very_low";
++  if (l === "veryhigh" || l === "very-high") return "very_high";
++  if (NEW_LEVELS.includes(l)) return l;
++  return "none";
++}
++
++async function main() {
++  console.log(DRY_RUN ? "Running in --dry-run mode (no changes will be made).\n" : "");
++
++  const databaseUrl = loadDatabaseUrl();
++  const sql = neon(databaseUrl);
++
++  // --- Step 1: find & drop any existing CHECK constraint on stock_level ---
++  console.log("Step 1: Looking for existing CHECK constraints on product_variants.stock_level...");
++  const constraints = await sql`
++    SELECT conname, pg_get_constraintdef(oid) AS definition
++    FROM pg_constraint
++    WHERE conrelid = 'product_variants'::regclass
++      AND contype = 'c'
++      AND pg_get_constraintdef(oid) ILIKE '%stock_level%'
++  `;
++
++  if (constraints.length === 0) {
++    console.log("  No existing CHECK constraint found on stock_level (nothing to drop).");
++  } else {
++    for (const c of constraints) {
++      console.log(`  Found constraint "${c.conname}": ${c.definition}`);
++      if (!DRY_RUN) {
++        await sql.query(`ALTER TABLE product_variants DROP CONSTRAINT ${c.conname}`);
++        console.log(`  Dropped "${c.conname}".`);
++      } else {
++        console.log(`  (dry-run) Would drop "${c.conname}".`);
++      }
++    }
++  }
++
++  // --- Step 2: inspect current distinct values so you know what's being changed ---
++  console.log("\nStep 2: Checking current distinct stock_level values in product_variants...");
++  const distinctRows = await sql`
++    SELECT stock_level, COUNT(*) AS count
++    FROM product_variants
++    GROUP BY stock_level
++    ORDER BY count DESC
++  `;
++
++  if (distinctRows.length === 0) {
++    console.log("  No product_variants rows found.");
++  } else {
++    for (const row of distinctRows) {
++      const current = row.stock_level;
++      const normalized = normalizeLegacyLevel(current);
++      const changeNote = normalized !== current ? `  ->  will become "${normalized}"` : "  (already valid, unchanged)";
++      console.log(`  "${current ?? "(null)"}": ${row.count} row(s)${changeNote}`);
++    }
++  }
++
++  // --- Step 3: migrate any legacy/unrecognized values ---
++  console.log("\nStep 3: Normalizing legacy values...");
++  const toMigrate = distinctRows.filter((row) => normalizeLegacyLevel(row.stock_level) !== row.stock_level);
++
++  if (toMigrate.length === 0) {
++    console.log("  Nothing to migrate — all existing values are already valid.");
++  } else {
++    for (const row of toMigrate) {
++      const target = normalizeLegacyLevel(row.stock_level);
++      console.log(`  Updating ${row.count} row(s) from "${row.stock_level ?? "(null)"}" to "${target}"...`);
++      if (!DRY_RUN) {
++        if (row.stock_level === null) {
++          await sql`UPDATE product_variants SET stock_level = ${target} WHERE stock_level IS NULL`;
++        } else {
++          await sql`UPDATE product_variants SET stock_level = ${target} WHERE stock_level = ${row.stock_level}`;
++        }
++      } else {
++        console.log("  (dry-run) Would run the above update.");
++      }
++    }
++  }
++
++  // --- Step 4: add the new CHECK constraint ---
++  console.log("\nStep 4: Adding new CHECK constraint for the 7-level scale...");
++  const constraintName = "product_variants_stock_level_check";
++  const valuesList = NEW_LEVELS.map((l) => `'${l}'`).join(", ");
++  if (!DRY_RUN) {
++    await sql.query(
++      `ALTER TABLE product_variants ADD CONSTRAINT ${constraintName} CHECK (stock_level IN (${valuesList}))`,
++    );
++    console.log(`  Added constraint "${constraintName}".`);
++  } else {
++    console.log(`  (dry-run) Would add: CHECK (stock_level IN (${valuesList}))`);
++  }
++
++  // --- Step 5: seed any missing store_settings rows with sensible defaults ---
++  console.log("\nStep 5: Seeding missing max_qty_* store_settings (won't overwrite existing values)...");
++  for (const level of NEW_LEVELS) {
++    const key = SETTINGS_KEY_BY_LEVEL[level];
++    const defaultValue = DEFAULT_MAX_QTY[level];
++    if (!DRY_RUN) {
++      await sql`
++        INSERT INTO store_settings (key, value)
++        VALUES (${key}, ${defaultValue})
++        ON CONFLICT (key) DO NOTHING
++      `;
++    }
++    console.log(`  ${key} -> default "${defaultValue}" (only inserted if not already present)`);
++  }
++
++  console.log(
++    DRY_RUN
++      ? "\nDry run complete. Re-run without --dry-run to apply these changes."
++      : "\nMigration complete.",
++  );
++}
++
++main().catch((err) => {
++  console.error("\nMigration failed:", err);
++  process.exit(1);
++});
+diff --git a/src/app/actions/auth.ts b/src/app/actions/auth.ts
+index ae29639..e4c2274 100644
+--- a/src/app/actions/auth.ts
++++ b/src/app/actions/auth.ts
+@@ -4,6 +4,7 @@ import { cookies, headers } from "next/headers";
+ import { compareSync } from "bcrypt-ts";
+ import { SignJWT } from "jose";
+ import { sql } from "@/lib/db";
++import { getClientIp } from "@/lib/rateLimit";
+ 
+ const sanitizeEnv = (val: string | undefined) => {
+   if (!val) return undefined;
+@@ -31,7 +32,7 @@ export async function loginAdmin(formData: FormData) {
+   } else {
+     try {
+       const headerList = await headers();
+-      const ip = headerList.get("x-forwarded-for") || "unknown";
++      const ip = getClientIp(headerList);
+ 
+       // Clean up old attempts (> 5 mins)
+       await sql`DELETE FROM login_attempts WHERE attempted_at < NOW() - INTERVAL '5 minutes'`;
+diff --git a/src/app/admin/ProductFormDialog.tsx b/src/app/admin/ProductFormDialog.tsx
+index f0da053..12f6fec 100644
+--- a/src/app/admin/ProductFormDialog.tsx
++++ b/src/app/admin/ProductFormDialog.tsx
+@@ -12,6 +12,7 @@ import { Button } from "@/app/components/ui/button";
+ import { Input } from "@/app/components/ui/input";
+ import { Label } from "@/app/components/ui/label";
+ import { Textarea } from "@/app/components/ui/textarea";
++import { STOCK_LEVELS, STOCK_LEVEL_LABELS } from "@/lib/stockLimits";
+ import {
+   Select,
+   SelectContent,
+@@ -629,10 +630,11 @@ export default function ProductFormDialog({
+                     onChange={(e) => updateVariant(variant.id, "stock_level", e.target.value)}
+                     className="h-9 rounded-md border px-3"
+                   >
+-                    <option value="none">None</option>
+-                    <option value="low">Low</option>
+-                    <option value="med">Medium</option>
+-                    <option value="high">High</option>
++                    {STOCK_LEVELS.map((level) => (
++                      <option key={level} value={level}>
++                        {STOCK_LEVEL_LABELS[level]}
++                      </option>
++                    ))}
+                   </select>
+                   <div className="flex items-center gap-2">
+                     {(variant.imagePreview || variant.image_url) && (
+diff --git a/src/app/admin/ProductsPageClient.tsx b/src/app/admin/ProductsPageClient.tsx
+index c92a020..71e9810 100644
+--- a/src/app/admin/ProductsPageClient.tsx
++++ b/src/app/admin/ProductsPageClient.tsx
+@@ -3,6 +3,11 @@
+ import { useState, useEffect } from "react";
+ import { Button } from "@/app/components/ui/button";
+ import { Input } from "@/app/components/ui/input";
++import {
++  STOCK_LEVELS,
++  STOCK_LEVEL_LABELS,
++  normalizeStockLevel,
++} from "@/lib/stockLimits";
+ import {
+   Select,
+   SelectContent,
+@@ -523,22 +528,15 @@ export default function ProductsPageClient() {
+                                               setTempStockLevel(value)
+                                             }
+                                           >
+-                                            <SelectTrigger className="w-28 h-7 text-xs">
++                                            <SelectTrigger className="w-32 h-7 text-xs">
+                                               <SelectValue />
+                                             </SelectTrigger>
+                                             <SelectContent>
+-                                              <SelectItem value="none">
+-                                                None
+-                                              </SelectItem>
+-                                              <SelectItem value="low">
+-                                                Low
+-                                              </SelectItem>
+-                                              <SelectItem value="med">
+-                                                Medium
+-                                              </SelectItem>
+-                                              <SelectItem value="high">
+-                                                High
+-                                              </SelectItem>
++                                              {STOCK_LEVELS.map((level) => (
++                                                <SelectItem key={level} value={level}>
++                                                  {STOCK_LEVEL_LABELS[level]}
++                                                </SelectItem>
++                                              ))}
+                                             </SelectContent>
+                                           </Select>
+                                           <Button
+@@ -575,10 +573,9 @@ export default function ProductsPageClient() {
+                                           }}
+                                           className="text-muted-foreground hover:text-foreground flex items-center gap-1 ml-auto cursor-pointer"
+                                         >
+-                                          {currentStockLevel
+-                                            .charAt(0)
+-                                            .toUpperCase() +
+-                                            currentStockLevel.slice(1)}
++                                          {STOCK_LEVEL_LABELS[
++                                            normalizeStockLevel(currentStockLevel)
++                                          ]}
+                                           <Edit className="w-3 h-3" />
+                                         </button>
+                                       )}
+@@ -712,7 +709,7 @@ export default function ProductsPageClient() {
+                       (s) => s === stockLevels[0],
+                     );
+                     const stockLabel = allSame
+-                      ? stockLevels[0] || "none"
++                      ? STOCK_LEVEL_LABELS[normalizeStockLevel(stockLevels[0])]
+                       : "Mixed";
+ 
+                     return (
+@@ -741,9 +738,7 @@ export default function ProductsPageClient() {
+                             <span>{p.category_name || p.category}</span>
+                           </div>
+                           <div className="absolute top-3 right-3 bg-black/50 backdrop-blur-sm text-white text-[9px] px-2 py-0.5 rounded-full font-light">
+-                            Stock:{" "}
+-                            {stockLabel.charAt(0).toUpperCase() +
+-                              stockLabel.slice(1)}
++                            Stock: {stockLabel}
+                           </div>
+                         </div>
+                         <div className="p-5 flex-grow flex flex-col">
+diff --git a/src/app/admin/settings/page.tsx b/src/app/admin/settings/page.tsx
+index df6beab..a15b012 100644
+--- a/src/app/admin/settings/page.tsx
++++ b/src/app/admin/settings/page.tsx
+@@ -13,35 +13,23 @@ import {
+ } from "@/app/components/ui/card";
+ import { MessageSquare, Mail, Save, ShieldCheck, Loader2, Boxes } from "lucide-react";
+ import { toast } from "sonner";
++import {
++  STOCK_LEVELS,
++  STOCK_LEVEL_LABELS,
++  STOCK_LEVEL_SETTINGS_KEYS,
++  DEFAULT_STOCK_LIMITS,
++  type StockLevel,
++} from "@/lib/stockLimits";
+ 
+-interface LevelField {
+-  key: "max_qty_none" | "max_qty_low" | "max_qty_med" | "max_qty_high";
+-  label: string;
+-  description: string;
+-}
+-
+-const LEVEL_FIELDS: LevelField[] = [
+-  {
+-    key: "max_qty_none",
+-    label: "None (Out of Stock)",
+-    description: "Forced to 0 — customers cannot order.",
+-  },
+-  {
+-    key: "max_qty_low",
+-    label: "Low",
+-    description: "Max quantity a customer can order for a low-stock variant.",
+-  },
+-  {
+-    key: "max_qty_med",
+-    label: "Medium",
+-    description: "Max quantity a customer can order for a medium-stock variant.",
+-  },
+-  {
+-    key: "max_qty_high",
+-    label: "High",
+-    description: "Max quantity a customer can order for a high-stock variant.",
+-  },
+-];
++const LEVEL_DESCRIPTIONS: Record<StockLevel, string> = {
++  none: "Forced to 0 — customers cannot order.",
++  single: "Max quantity a customer can order when only a single unit remains.",
++  very_low: "Max quantity a customer can order for a very-low-stock variant.",
++  low: "Max quantity a customer can order for a low-stock variant.",
++  medium: "Max quantity a customer can order for a medium-stock variant.",
++  high: "Max quantity a customer can order for a high-stock variant.",
++  very_high: "Max quantity a customer can order for a very-high-stock variant.",
++};
+ 
+ export default function AdminSettingsPage() {
+   const [loading, setLoading] = useState(true);
+@@ -50,10 +38,16 @@ export default function AdminSettingsPage() {
+   const [whatsapp, setWhatsapp] = useState("");
+   const [email, setEmail] = useState("");
+ 
+-  const [maxQtyNone, setMaxQtyNone] = useState("0");
+-  const [maxQtyLow, setMaxQtyLow] = useState("1");
+-  const [maxQtyMed, setMaxQtyMed] = useState("10");
+-  const [maxQtyHigh, setMaxQtyHigh] = useState("25");
++  // One quantity field per stock level, keyed by the level itself.
++  const [maxQtyByLevel, setMaxQtyByLevel] = useState<Record<StockLevel, string>>(
++    () => {
++      const initial = {} as Record<StockLevel, string>;
++      STOCK_LEVELS.forEach((level) => {
++        initial[level] = String(DEFAULT_STOCK_LIMITS[level]);
++      });
++      return initial;
++    },
++  );
+ 
+   useEffect(() => {
+     async function loadSettings() {
+@@ -63,10 +57,17 @@ export default function AdminSettingsPage() {
+           const data = await response.json();
+           if (data.seller_whatsapp) setWhatsapp(data.seller_whatsapp);
+           if (data.seller_email) setEmail(data.seller_email);
+-          if (data.max_qty_none !== undefined) setMaxQtyNone(String(data.max_qty_none));
+-          if (data.max_qty_low !== undefined) setMaxQtyLow(String(data.max_qty_low));
+-          if (data.max_qty_med !== undefined) setMaxQtyMed(String(data.max_qty_med));
+-          if (data.max_qty_high !== undefined) setMaxQtyHigh(String(data.max_qty_high));
++
++          setMaxQtyByLevel((prev) => {
++            const next = { ...prev };
++            STOCK_LEVELS.forEach((level) => {
++              const settingsKey = STOCK_LEVEL_SETTINGS_KEYS[level];
++              if (data[settingsKey] !== undefined) {
++                next[level] = String(data[settingsKey]);
++              }
++            });
++            return next;
++          });
+         }
+       } catch (error) {
+         console.error("Failed to load settings:", error);
+@@ -83,16 +84,22 @@ export default function AdminSettingsPage() {
+     setSaving(true);
+ 
+     try {
++      const stockLimitPayload: Record<string, string> = {};
++      STOCK_LEVELS.forEach((level) => {
++        const settingsKey = STOCK_LEVEL_SETTINGS_KEYS[level];
++        stockLimitPayload[settingsKey] =
++          level === "none"
++            ? "0"
++            : String(Math.max(0, parseInt(maxQtyByLevel[level], 10) || 0));
++      });
++
+       const response = await fetch("/api/settings", {
+         method: "POST",
+         headers: { "Content-Type": "application/json" },
+         body: JSON.stringify({
+           seller_whatsapp: whatsapp.replace(/\D/g, ""),
+           seller_email: email.trim(),
+-          max_qty_none: "0",
+-          max_qty_low: String(Math.max(0, parseInt(maxQtyLow, 10) || 0)),
+-          max_qty_med: String(Math.max(0, parseInt(maxQtyMed, 10) || 0)),
+-          max_qty_high: String(Math.max(0, parseInt(maxQtyHigh, 10) || 0)),
++          ...stockLimitPayload,
+         }),
+       });
+ 
+@@ -198,40 +205,29 @@ export default function AdminSettingsPage() {
+             </CardDescription>
+           </CardHeader>
+           <CardContent className="space-y-5">
+-            {LEVEL_FIELDS.map((field) => {
+-              const value =
+-                field.key === "max_qty_none"
+-                  ? maxQtyNone
+-                  : field.key === "max_qty_low"
+-                    ? maxQtyLow
+-                    : field.key === "max_qty_med"
+-                      ? maxQtyMed
+-                      : maxQtyHigh;
+-              const setter =
+-                field.key === "max_qty_none"
+-                  ? setMaxQtyNone
+-                  : field.key === "max_qty_low"
+-                    ? setMaxQtyLow
+-                    : field.key === "max_qty_med"
+-                      ? setMaxQtyMed
+-                      : setMaxQtyHigh;
+-              return (
+-                <div key={field.key} className="space-y-2">
+-                  <label className="text-sm font-medium">{field.label}</label>
+-                  <Input
+-                    type="number"
+-                    min="0"
+-                    value={value}
+-                    onChange={(e) => setter(e.target.value)}
+-                    disabled={field.key === "max_qty_none"}
+-                    className="max-w-[160px]"
+-                  />
+-                  <p className="text-xs text-muted-foreground">
+-                    {field.description}
+-                  </p>
+-                </div>
+-              );
+-            })}
++            {STOCK_LEVELS.map((level) => (
++              <div key={level} className="space-y-2">
++                <label className="text-sm font-medium">
++                  {STOCK_LEVEL_LABELS[level]}
++                </label>
++                <Input
++                  type="number"
++                  min="0"
++                  value={maxQtyByLevel[level]}
++                  onChange={(e) =>
++                    setMaxQtyByLevel((prev) => ({
++                      ...prev,
++                      [level]: e.target.value,
++                    }))
++                  }
++                  disabled={level === "none"}
++                  className="max-w-[160px]"
++                />
++                <p className="text-xs text-muted-foreground">
++                  {LEVEL_DESCRIPTIONS[level]}
++                </p>
++              </div>
++            ))}
+           </CardContent>
+           <CardFooter className="bg-muted/30 border-t flex justify-end p-4">
+             <Button type="submit" disabled={saving} className="gap-2">
+diff --git a/src/app/api/discount-codes/validate/route.ts b/src/app/api/discount-codes/validate/route.ts
+index 9b02e38..bf353a5 100644
+--- a/src/app/api/discount-codes/validate/route.ts
++++ b/src/app/api/discount-codes/validate/route.ts
+@@ -1,6 +1,6 @@
+ import { NextRequest, NextResponse } from "next/server";
+ import { sql } from "@/lib/db";
+-import { rateLimit } from "@/lib/rateLimit";
++import { rateLimit, getClientIp } from "@/lib/rateLimit";
+ 
+ export async function POST(request: NextRequest) {
+   if (!sql) {
+@@ -9,9 +9,7 @@ export async function POST(request: NextRequest) {
+ 
+   try {
+     // Rate limiting: 10 requests per minute per IP
+-    const ip = request.headers.get("x-forwarded-for") || 
+-               request.headers.get("x-real-ip") || 
+-               "anonymous";
++    const ip = getClientIp(request.headers);
+     
+     const rateLimitResult = rateLimit(`promo-validate:${ip}`, 10, 60 * 1000);
+     
+diff --git a/src/app/api/orders/[id]/route.ts b/src/app/api/orders/[id]/route.ts
+index 2b6b6d8..7c3ad72 100644
+--- a/src/app/api/orders/[id]/route.ts
++++ b/src/app/api/orders/[id]/route.ts
+@@ -1,6 +1,7 @@
+ import { NextRequest, NextResponse } from "next/server";
+ import { sql } from "@/lib/db";
+ import { requireAdmin } from "@/lib/adminAuth";
++import { escapeHtml } from "@/lib/emailTemplatesSimple";
+ 
+ export async function PUT(
+   request: NextRequest,
+@@ -48,17 +49,17 @@ export async function PUT(
+           if (o.customer_email) recipients.push(o.customer_email);
+           if (sellerEmail && !recipients.includes(sellerEmail)) recipients.push(sellerEmail);
+ 
+-          const itemsHtml = (o.items || []).map((i: any) => `<li>${i.quantity}× ${i.snapshot_product_name} (${i.snapshot_variant_label || ''}) — $${(i.snapshot_unit_price * i.quantity).toFixed(2)}</li>`).join('');
++          const itemsHtml = (o.items || []).map((i: any) => `<li>${i.quantity}× ${escapeHtml(i.snapshot_product_name)} (${escapeHtml(i.snapshot_variant_label)}) — $${(i.snapshot_unit_price * i.quantity).toFixed(2)}</li>`).join('');
+ 
+           const pickupNameRow = o.pickup_location_id ? (await sql`SELECT name FROM pickup_locations WHERE id = ${parseInt(o.pickup_location_id)}`)[0]?.name : null;
+ 
+           const html = `
+-            <h2>Order #${o.id} - ${status}</h2>
+-            <p><strong>Name:</strong> ${o.customer_name}</p>
+-            <p><strong>Email:</strong> ${o.customer_email}</p>
+-            <p><strong>Phone:</strong> ${o.customer_phone}</p>
+-            <p><strong>Pickup:</strong> ${pickupNameRow || 'N/A'}</p>
+-            <p><strong>Pickup Slot:</strong> ${o.pickup_slot_at || 'N/A'}</p>
++            <h2>Order #${o.id} - ${escapeHtml(status)}</h2>
++            <p><strong>Name:</strong> ${escapeHtml(o.customer_name)}</p>
++            <p><strong>Email:</strong> ${escapeHtml(o.customer_email)}</p>
++            <p><strong>Phone:</strong> ${escapeHtml(o.customer_phone)}</p>
++            <p><strong>Pickup:</strong> ${escapeHtml(pickupNameRow || 'N/A')}</p>
++            <p><strong>Pickup Slot:</strong> ${escapeHtml(o.pickup_slot_at || 'N/A')}</p>
+             <ul>${itemsHtml}</ul>
+             <p><strong>Total:</strong> $${Number(o.total).toFixed(2)}</p>
+           `;
+diff --git a/src/app/api/orders/route.ts b/src/app/api/orders/route.ts
+index ffccd5e..c20886d 100644
+--- a/src/app/api/orders/route.ts
++++ b/src/app/api/orders/route.ts
+@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
+ import { sql } from "@/lib/db";
+ import { buildCustomerHtml, buildSellerHtml } from "@/lib/emailTemplatesSimple";
+ import { requireAdmin } from "@/lib/adminAuth";
++import { rateLimit, getClientIp } from "@/lib/rateLimit";
++import {
++  parseStockLimitSettings,
++  maxQtyForLevel,
++  STOCK_LEVELS,
++  STOCK_LEVEL_SETTINGS_KEYS,
++} from "@/lib/stockLimits";
+ 
+ export async function GET() {
+   const authError = await requireAdmin();
+@@ -50,6 +57,16 @@ export async function GET() {
+ export async function POST(request: NextRequest) {
+   if (!sql) return NextResponse.json({ error: "Database not configured" }, { status: 500 });
+ 
++  // Basic abuse protection: 5 order attempts per minute per IP.
++  const ip = getClientIp(request.headers);
++  const orderRateLimit = rateLimit(`create-order:${ip}`, 5, 60 * 1000);
++  if (!orderRateLimit.success) {
++    return NextResponse.json(
++      { error: "Too many order attempts. Please wait a moment and try again." },
++      { status: 429 },
++    );
++  }
++
+   let reservedSlot = false;
+   let reservedLocationId: number | null = null;
+   let reservedSlotAt: string | null = null;
+@@ -63,16 +80,130 @@ export async function POST(request: NextRequest) {
+       customer_phone,
+       pickup_location_id,
+       pickup_slot_at,
+-      cart = [],
+-      subtotal = 0,
+-      total = 0,
++      cart: rawCart = [],
+       notes,
++      promo_code,
+     } = body || {};
+ 
+     if (!customer_name || String(customer_name).trim().length < 2) {
+       return NextResponse.json({ error: "Customer name is required and must be at least 2 characters." }, { status: 400 });
+     }
+ 
++    if (!Array.isArray(rawCart) || rawCart.length === 0) {
++      return NextResponse.json({ error: "Your cart is empty." }, { status: 400 });
++    }
++
++    // --- SECURITY: never trust client-supplied prices, subtotal, or total. ---
++    // Re-fetch each cart line's real price/name/stock from the database and
++    // recompute the subtotal server-side. This prevents a modified client
++    // (or a direct API call) from placing an order at an arbitrary price.
++    const stockSettingKeys = STOCK_LEVELS.map((level) => STOCK_LEVEL_SETTINGS_KEYS[level]);
++    const stockSettingsRows = await sql`
++      SELECT key, value FROM store_settings
++      WHERE key = ANY(${stockSettingKeys})
++    `;
++    const stockLimitSettings = Object.fromEntries(
++      stockSettingsRows.map((r: Record<string, any>) => [r.key, r.value]),
++    );
++    const stockLimits = parseStockLimitSettings(stockLimitSettings);
++
++    const verifiedCart: Array<{
++      productId: number | null;
++      variantId: number | null;
++      name: string;
++      variantLabel: string | undefined;
++      price: number;
++      qty: number;
++    }> = [];
++
++    for (const rawItem of rawCart) {
++      const productId = rawItem?.productId ? Number(rawItem.productId) : null;
++      const variantId = rawItem?.variantId ? Number(rawItem.variantId) : null;
++      const qty = Math.max(1, Math.floor(Number(rawItem?.qty) || 0));
++
++      if (!productId || !variantId || qty < 1) {
++        return NextResponse.json({ error: "Invalid item in cart." }, { status: 400 });
++      }
++
++      const variantRows = await sql`
++        SELECT v.id, v.label, v.price, v.stock_level, v.product_id, p.name AS product_name
++        FROM product_variants v
++        JOIN products p ON p.id = v.product_id
++        WHERE v.id = ${variantId} AND v.product_id = ${productId}
++        LIMIT 1
++      `;
++
++      if (variantRows.length === 0) {
++        return NextResponse.json(
++          { error: "One of the items in your cart is no longer available." },
++          { status: 400 },
++        );
++      }
++
++      const variant = variantRows[0];
++      const maxQty = maxQtyForLevel(variant.stock_level, stockLimits);
++
++      if (maxQty <= 0) {
++        return NextResponse.json(
++          { error: `${variant.product_name} is currently out of stock.` },
++          { status: 400 },
++        );
++      }
++
++      if (qty > maxQty) {
++        return NextResponse.json(
++          { error: `Only ${maxQty} of ${variant.product_name} (${variant.label}) can be ordered right now.` },
++          { status: 400 },
++        );
++      }
++
++      verifiedCart.push({
++        productId,
++        variantId,
++        name: variant.product_name,
++        variantLabel: variant.label ?? undefined,
++        price: Number(variant.price),
++        qty,
++      });
++    }
++
++    let subtotal = verifiedCart.reduce((sum, it) => sum + it.price * it.qty, 0);
++    let discountAmount = 0;
++    let appliedPromoCode: string | null = null;
++
++    // Re-validate any promo code server-side rather than trusting the
++    // client-computed discount amount.
++    if (promo_code && String(promo_code).trim()) {
++      const promoRows = await sql`
++        SELECT dc.*,
++          (SELECT COUNT(*) FROM orders WHERE promo_code = dc.code) as current_uses
++        FROM discount_codes dc
++        WHERE UPPER(dc.code) = UPPER(${promo_code})
++          AND dc.active = TRUE
++          AND dc.valid_from <= CURRENT_TIMESTAMP
++          AND (dc.valid_until IS NULL OR dc.valid_until >= CURRENT_TIMESTAMP)
++        LIMIT 1
++      `;
++
++      if (promoRows.length > 0) {
++        const discount = promoRows[0];
++        const withinUsageLimit =
++          !discount.max_uses || discount.current_uses < discount.max_uses;
++
++        if (withinUsageLimit) {
++          if (discount.discount_type === "percentage") {
++            discountAmount = subtotal * (Number(discount.discount_value) / 100);
++          }
++          appliedPromoCode = discount.code;
++        }
++      }
++      // If the code is invalid/expired/exhausted, we simply don't apply a
++      // discount rather than failing the whole order.
++    }
++
++    const total = Math.max(0, subtotal - discountAmount);
++    const cart = verifiedCart;
++
+     const pickupLocationId = pickup_location_id ? Number(pickup_location_id) : null;
+     const slotStart = pickup_slot_at || null;
+     const isCustomLocation = !pickupLocationId || (notes && String(notes).includes('Custom location'));
+@@ -121,8 +252,8 @@ export async function POST(request: NextRequest) {
+     }
+ 
+     const insert = await sql`
+-      INSERT INTO orders (customer_name, customer_email, customer_phone, pickup_location_id, pickup_slot_at, notes, subtotal, total)
+-      VALUES (${customer_name}, ${customer_email}, ${customer_phone}, ${resolvedLocationId}, ${pickup_slot_at || null}, ${notes || orderRef || null}, ${subtotal}, ${total})
++      INSERT INTO orders (customer_name, customer_email, customer_phone, pickup_location_id, pickup_slot_at, notes, subtotal, total, promo_code)
++      VALUES (${customer_name}, ${customer_email}, ${customer_phone}, ${resolvedLocationId}, ${pickup_slot_at || null}, ${notes || orderRef || null}, ${subtotal}, ${total}, ${appliedPromoCode})
+       RETURNING id, created_at
+     `;
+ 
+@@ -131,7 +262,7 @@ export async function POST(request: NextRequest) {
+     for (const it of cart) {
+       await sql`
+         INSERT INTO order_items (order_id, product_id, variant_id, snapshot_product_name, snapshot_variant_label, snapshot_unit_price, quantity)
+-        VALUES (${orderId}, ${it.productId || null}, ${it.variantId || null}, ${it.name}, ${it.variantLabel}, ${it.price}, ${it.qty})
++        VALUES (${orderId}, ${it.productId}, ${it.variantId}, ${it.name}, ${it.variantLabel}, ${it.price}, ${it.qty})
+       `;
+     }
+ 
+diff --git a/src/app/api/products/[id]/route.ts b/src/app/api/products/[id]/route.ts
+index fcb0260..f73ac22 100644
+--- a/src/app/api/products/[id]/route.ts
++++ b/src/app/api/products/[id]/route.ts
+@@ -1,6 +1,8 @@
+ import { NextRequest, NextResponse } from "next/server";
+ import { sql } from "@/lib/db";
+ import { put, del } from "@vercel/blob";
++import { validateImageFile, safeImageKey } from "@/lib/fileValidation";
++import { normalizeStockLevel } from "@/lib/stockLimits";
+ 
+ export async function GET(
+   request: NextRequest,
+@@ -130,11 +132,9 @@ export async function PUT(
+ 
+     for (const variant of variants) {
+       const variantId = `${id}-${variant.id}`;
+-      const stockLevel = (
+-        variant.stock_level ||
+-        variant.stockLevel ||
+-        "none"
+-      ).toLowerCase();
++      const stockLevel = normalizeStockLevel(
++        variant.stock_level || variant.stockLevel,
++      );
+ 
+       await sql`
+         INSERT INTO product_variants (id, product_id, label, price, stock_level, active)
+@@ -145,8 +145,12 @@ export async function PUT(
+         `variantImage_${variant.id}`,
+       ) as File | null;
+       if (variantImageFile) {
++        const validation = validateImageFile(variantImageFile);
++        if (!validation.valid) {
++          return NextResponse.json({ error: validation.error }, { status: 400 });
++        }
+         const blob = await put(
+-          `products/${id}/variants/${variantId}/${variantImageFile.name}`,
++          safeImageKey(`products/${id}/variants/${variantId}`, variantImageFile),
+           variantImageFile,
+           {
+             access: "public",
+@@ -194,7 +198,11 @@ export async function PUT(
+       }> = [];
+       for (let i = 0; i < newImages.length; i++) {
+         const file = newImages[i];
+-        const blob = await put(`products/${id}/${file.name}`, file, {
++        const validation = validateImageFile(file);
++        if (!validation.valid) {
++          return NextResponse.json({ error: validation.error }, { status: 400 });
++        }
++        const blob = await put(safeImageKey(`products/${id}`, file), file, {
+           access: "public",
+           addRandomSuffix: true,
+         });
+diff --git a/src/app/api/products/route.ts b/src/app/api/products/route.ts
+index 6e7e7a9..87037e3 100644
+--- a/src/app/api/products/route.ts
++++ b/src/app/api/products/route.ts
+@@ -1,6 +1,8 @@
+ import { NextRequest, NextResponse } from "next/server";
+ import { sql } from "@/lib/db";
+ import { put } from "@vercel/blob";
++import { validateImageFile, safeImageKey } from "@/lib/fileValidation";
++import { normalizeStockLevel } from "@/lib/stockLimits";
+ 
+ export async function GET(request: NextRequest) {
+   if (!sql) {
+@@ -149,7 +151,11 @@ export async function POST(request: NextRequest) {
+     }> = [];
+     for (let i = 0; i < newImages.length; i++) {
+       const file = newImages[i];
+-      const blob = await put(`products/${productId}/${file.name}`, file, {
++      const validation = validateImageFile(file);
++      if (!validation.valid) {
++        return NextResponse.json({ error: validation.error }, { status: 400 });
++      }
++      const blob = await put(safeImageKey(`products/${productId}`, file), file, {
+         access: "public",
+         addRandomSuffix: true,
+       });
+@@ -167,11 +173,9 @@ export async function POST(request: NextRequest) {
+ 
+     for (const variant of variants) {
+       const variantId = `${productId}-${variant.id}`;
+-      const stockLevel = (
+-        variant.stock_level ||
+-        variant.stockLevel ||
+-        "none"
+-      ).toLowerCase();
++      const stockLevel = normalizeStockLevel(
++        variant.stock_level || variant.stockLevel,
++      );
+ 
+       await sql`
+         INSERT INTO product_variants (id, product_id, label, price, stock_level, active)
+diff --git a/src/app/api/promo-popups/upload/route.ts b/src/app/api/promo-popups/upload/route.ts
+index 9d7354c..7e5ce32 100644
+--- a/src/app/api/promo-popups/upload/route.ts
++++ b/src/app/api/promo-popups/upload/route.ts
+@@ -1,6 +1,7 @@
+ import { NextRequest, NextResponse } from "next/server";
+ import { requireAdmin } from "@/lib/adminAuth";
+ import { put } from "@vercel/blob";
++import { validateImageFile, safeImageKey } from "@/lib/fileValidation";
+ 
+ export async function POST(request: NextRequest) {
+   const authError = await requireAdmin();
+@@ -14,7 +15,12 @@ export async function POST(request: NextRequest) {
+       return NextResponse.json({ error: "No file provided" }, { status: 400 });
+     }
+ 
+-    const blob = await put(`promo-popups/${Date.now()}-${file.name}`, file, {
++    const validation = validateImageFile(file);
++    if (!validation.valid) {
++      return NextResponse.json({ error: validation.error }, { status: 400 });
++    }
++
++    const blob = await put(safeImageKey("promo-popups", file), file, {
+       access: "public",
+     });
+ 
+diff --git a/src/app/api/settings/public/route.ts b/src/app/api/settings/public/route.ts
+index c79f196..e9b4a0b 100644
+--- a/src/app/api/settings/public/route.ts
++++ b/src/app/api/settings/public/route.ts
+@@ -1,5 +1,6 @@
+ import { NextResponse } from "next/server";
+ import { sql } from "@/lib/db";
++import { STOCK_LEVELS, STOCK_LEVEL_SETTINGS_KEYS } from "@/lib/stockLimits";
+ 
+ export const dynamic = "force-dynamic";
+ 
+@@ -7,10 +8,7 @@ export const dynamic = "force-dynamic";
+ const PUBLIC_KEYS = [
+   "hero_image",
+   "scene_image",
+-  "max_qty_none",
+-  "max_qty_low",
+-  "max_qty_med",
+-  "max_qty_high",
++  ...STOCK_LEVELS.map((level) => STOCK_LEVEL_SETTINGS_KEYS[level]),
+ ] as const;
+ 
+ export async function GET() {
+diff --git a/src/app/api/variants/[id]/route.ts b/src/app/api/variants/[id]/route.ts
+index 047644d..f43649f 100644
+--- a/src/app/api/variants/[id]/route.ts
++++ b/src/app/api/variants/[id]/route.ts
+@@ -1,8 +1,7 @@
+ import { NextRequest, NextResponse } from "next/server";
+ import { sql } from "@/lib/db";
+ import { requireAdmin } from "@/lib/adminAuth";
+-
+-const ALLOWED_LEVELS = ["none", "low", "med", "high"];
++import { STOCK_LEVELS, normalizeStockLevel } from "@/lib/stockLimits";
+ 
+ export async function PUT(
+   request: NextRequest,
+@@ -23,13 +22,14 @@ export async function PUT(
+     const body = await request.json();
+     const { stock_level } = body;
+ 
+-    const level = String(stock_level || "").toLowerCase();
+-    if (!ALLOWED_LEVELS.includes(level)) {
++    const rawLevel = String(stock_level || "").toLowerCase();
++    if (!(STOCK_LEVELS as string[]).includes(rawLevel)) {
+       return NextResponse.json(
+         { error: "Invalid stock level" },
+         { status: 400 },
+       );
+     }
++    const level = normalizeStockLevel(rawLevel);
+ 
+     const result = await sql`
+       UPDATE product_variants
+diff --git a/src/components/ProductDetailClient.tsx b/src/components/ProductDetailClient.tsx
+index 72f2029..bc6755a 100644
+--- a/src/components/ProductDetailClient.tsx
++++ b/src/components/ProductDetailClient.tsx
+@@ -15,7 +15,12 @@ import {
+   ChevronLeft,
+   ChevronRight,
+ } from "lucide-react";
+-import { maxQtyForLevel } from "@/lib/stockLimits";
++import {
++  maxQtyForLevel,
++  normalizeStockLevel,
++  STOCK_LEVEL_LABELS,
++  STOCK_LEVEL_BADGE_CLASSES,
++} from "@/lib/stockLimits";
+ 
+ interface ProductDetailClientProps {
+   product: Product;
+@@ -386,17 +391,14 @@ export default function ProductDetailClient({
+                       </span>
+                       <span
+                         className={`font-semibold text-xs uppercase tracking-wider px-2.5 py-1 rounded-full ${
+-                          matchedVariant.stock_level === "none"
+-                            ? "bg-destructive/10 text-destructive"
+-                            : matchedVariant.stock_level === "low"
+-                              ? "bg-orange-500/10 text-orange-600"
+-                              : matchedVariant.stock_level === "med"
+-                                ? "bg-amber-500/10 text-amber-600"
+-                                : "bg-emerald-500/10 text-emerald-600"
++                          STOCK_LEVEL_BADGE_CLASSES[
++                            normalizeStockLevel(matchedVariant.stock_level)
++                          ]
+                         }`}
+                       >
+-                        {matchedVariant.stock_level.charAt(0).toUpperCase() +
+-                          matchedVariant.stock_level.slice(1)}
++                        {STOCK_LEVEL_LABELS[
++                          normalizeStockLevel(matchedVariant.stock_level)
++                        ]}
+                       </span>
+                     </div>
+                   )}
+@@ -448,7 +450,9 @@ export default function ProductDetailClient({
+                 </div>
+                 {matchedVariant && maxQty > 0 && (
+                   <p className="mt-2 text-xs text-muted-foreground">
+-                    {matchedVariant.stock_level === "low"
++                    {["single", "very_low", "low"].includes(
++                      normalizeStockLevel(matchedVariant.stock_level),
++                    )
+                       ? `Low stock: up to ${maxQty} can be purchased.`
+                       : `You can order up to ${maxQty}.`}
+                   </p>
+@@ -458,12 +462,10 @@ export default function ProductDetailClient({
+               {}
+               <button
+                 onClick={handleAdd}
+-                disabled={
+-                  !matchedVariant || matchedVariant.stock_level === "none"
+-                }
++                disabled={!matchedVariant || maxQty <= 0}
+                 className={`w-full py-4 rounded-full font-semibold text-sm tracking-wide transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer
+                   ${
+-                    !matchedVariant || matchedVariant.stock_level === "none"
++                    !matchedVariant || maxQty <= 0
+                       ? "bg-muted text-muted-foreground cursor-not-allowed"
+                       : added
+                         ? "bg-emerald-600 text-white scale-[0.99] shadow-lg shadow-emerald-600/20"
+@@ -475,7 +477,7 @@ export default function ProductDetailClient({
+                     <ShieldCheck className="w-4 h-4 animate-bounce" />
+                     Added to Cart!
+                   </>
+-                ) : matchedVariant?.stock_level === "none" ? (
++                ) : !matchedVariant || maxQty <= 0 ? (
+                   <>
+                     <ShoppingCart className="w-4 h-4" />
+                     Out of Stock
+diff --git a/src/components/ProductsClient.tsx b/src/components/ProductsClient.tsx
+index 3c0dede..0a27678 100644
+--- a/src/components/ProductsClient.tsx
++++ b/src/components/ProductsClient.tsx
+@@ -7,6 +7,7 @@ import { Product } from "@/lib/staticData";
+ import { motion, AnimatePresence } from "motion/react";
+ import { Search, Layers, HelpCircle } from "lucide-react";
+ import { getLucideIconByName } from "@/lib/lucideIcon";
++import { STOCK_LEVEL_LABELS, normalizeStockLevel } from "@/lib/stockLimits";
+ 
+ interface ProductsClientProps {
+   products: Product[];
+@@ -205,9 +206,9 @@ export default function ProductsClient({ products }: ProductsClientProps) {
+                           (s) => s === stockLevels[0],
+                         );
+                         const stockLabel = allSame
+-                          ? stockLevels[0] || "none"
++                          ? STOCK_LEVEL_LABELS[normalizeStockLevel(stockLevels[0])]
+                           : "Mixed";
+-                        return `Stock: ${stockLabel.charAt(0).toUpperCase() + stockLabel.slice(1)}`;
++                        return `Stock: ${stockLabel}`;
+                       })()}
+                     </div>
+                   )}
+diff --git a/src/lib/emailTemplatesSimple.ts b/src/lib/emailTemplatesSimple.ts
+index 92b9dba..b5313e8 100644
+--- a/src/lib/emailTemplatesSimple.ts
++++ b/src/lib/emailTemplatesSimple.ts
+@@ -1,5 +1,19 @@
+ type CartItem = { qty?: number; name?: string; variantLabel?: string; price?: number };
+ 
++// Customer-supplied fields (name, email, phone, order reference, notes, etc.)
++// are attacker-controlled and must never be interpolated into HTML emails
++// without escaping — otherwise a crafted checkout name/notes field could
++// inject markup or break out of an href/tel/mailto attribute.
++export function escapeHtml(value: unknown): string {
++  if (value === null || value === undefined) return "";
++  return String(value)
++    .replace(/&/g, "&amp;")
++    .replace(/</g, "&lt;")
++    .replace(/>/g, "&gt;")
++    .replace(/"/g, "&quot;")
++    .replace(/'/g, "&#39;");
++}
++
+ export function buildCustomerHtml(opts: {
+   customer_name: string;
+   customer_email?: string | null;
+@@ -17,10 +31,10 @@ export function buildCustomerHtml(opts: {
+   currentYear?: number;
+ }) {
+   const {
+-    customer_name,
+-    customer_email = 'N/A',
+-    customer_phone = 'N/A',
+-    orderRef,
++    customer_name: rawCustomerName,
++    customer_email: rawCustomerEmail = 'N/A',
++    customer_phone: rawCustomerPhone = 'N/A',
++    orderRef: rawOrderRef,
+     orderId,
+     cart = [],
+     subtotal = 0,
+@@ -33,13 +47,20 @@ export function buildCustomerHtml(opts: {
+     currentYear = new Date().getFullYear(),
+   } = opts;
+ 
++  // Escape everything the customer typed at checkout before it ever touches
++  // the HTML string, since these values are attacker-controlled.
++  const customer_name = escapeHtml(rawCustomerName);
++  const customer_email = escapeHtml(rawCustomerEmail);
++  const customer_phone = escapeHtml(rawCustomerPhone);
++  const orderRef = escapeHtml(rawOrderRef);
++
+   const itemsHtml = (cart || []).map(i => `
+     <tr>
+       <td style="padding: 16px 0; border-bottom: 1px solid #e2ede4;">
+         <table border="0" cellpadding="0" cellspacing="0" width="100%">
+           <tr>
+             <td align="left" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 15px; color: #0d1f10; line-height: 1.4;">
+-              <strong style="color: #1a6b40;">${i.qty || 0}&times;</strong> ${i.name || ''} <span style="color: #5a7a60; font-size: 14px;">(${i.variantLabel || ''})</span>
++              <strong style="color: #1a6b40;">${i.qty || 0}&times;</strong> ${escapeHtml(i.name)} <span style="color: #5a7a60; font-size: 14px;">(${escapeHtml(i.variantLabel)})</span>
+             </td>
+             <td align="right" valign="top" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 15px; font-weight: bold; color: #0d1f10; padding-left: 10px;">
+               $${Number((i.price || 0) * (i.qty || 0)).toFixed(2)}
+@@ -302,10 +323,10 @@ export function buildSellerHtml(opts: {
+   currentYear?: number;
+ }) {
+   const {
+-    customer_name,
+-    customer_email = 'N/A',
+-    customer_phone = 'N/A',
+-    orderRef,
++    customer_name: rawCustomerName,
++    customer_email: rawCustomerEmail = 'N/A',
++    customer_phone: rawCustomerPhone = 'N/A',
++    orderRef: rawOrderRef,
+     orderId,
+     cart = [],
+     subtotal = 0,
+@@ -318,13 +339,18 @@ export function buildSellerHtml(opts: {
+     currentYear = new Date().getFullYear(),
+   } = opts;
+ 
++  const customer_name = escapeHtml(rawCustomerName);
++  const customer_email = escapeHtml(rawCustomerEmail);
++  const customer_phone = escapeHtml(rawCustomerPhone);
++  const orderRef = escapeHtml(rawOrderRef);
++
+   const itemsHtml = (cart || []).map(i => `
+     <tr>
+       <td style="padding: 14px 0; border-bottom: 1px solid #e2ede4;">
+         <table border="0" cellpadding="0" cellspacing="0" width="100%">
+           <tr>
+             <td align="left" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #0d1f10;">
+-              <strong style="color: #1a6b40;">${i.qty || 0}&times;</strong> ${i.name || ''} <span style="color: #5a7a60; font-size: 13px;">(${i.variantLabel || ''})</span>
++              <strong style="color: #1a6b40;">${i.qty || 0}&times;</strong> ${escapeHtml(i.name)} <span style="color: #5a7a60; font-size: 13px;">(${escapeHtml(i.variantLabel)})</span>
+             </td>
+             <td align="right" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; font-weight: bold; color: #0d1f10;">
+               $${Number((i.price || 0) * (i.qty || 0)).toFixed(2)}
+diff --git a/src/lib/fileValidation.ts b/src/lib/fileValidation.ts
+new file mode 100644
+index 0000000..1f70369
+--- /dev/null
++++ b/src/lib/fileValidation.ts
+@@ -0,0 +1,24 @@
++const ALLOWED_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
++const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5MB
++
++export interface FileValidationResult {
++  valid: boolean;
++  error?: string;
++}
++
++/** Validate an uploaded image's MIME type and size before storing it. */
++export function validateImageFile(file: File): FileValidationResult {
++  if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
++    return { valid: false, error: "Unsupported file type. Please upload a PNG, JPEG, WEBP, or GIF image." };
++  }
++  if (file.size > MAX_IMAGE_BYTES) {
++    return { valid: false, error: "File is too large. Maximum size is 5MB." };
++  }
++  return { valid: true };
++}
++
++/** Build a safe, collision-resistant storage key instead of trusting the client-supplied filename. */
++export function safeImageKey(prefix: string, file: File): string {
++  const extension = file.type.split("/")[1] || "bin";
++  return `${prefix}/${Date.now()}-${Math.random().toString(36).slice(2)}.${extension}`;
++}
+diff --git a/src/lib/rateLimit.ts b/src/lib/rateLimit.ts
+index c01ae6e..5501573 100644
+--- a/src/lib/rateLimit.ts
++++ b/src/lib/rateLimit.ts
+@@ -1,4 +1,11 @@
+ 
++// NOTE on limitations: this rate limiter stores counters in an in-process
++// Map. That's fine for a single long-running Node server, but on serverless
++// platforms (e.g. Vercel) each invocation may hit a different instance with
++// its own memory, so limits are only enforced "best effort" per-instance,
++// not globally. For strict enforcement in production, back this with a
++// shared store such as Upstash Redis / Vercel KV instead of an in-memory Map.
++
+ interface RateLimitEntry {
+   count: number;
+   resetAt: number;
+@@ -16,6 +23,25 @@ setInterval(() => {
+   }
+ }, 5 * 60 * 1000);
+ 
++/**
++ * Extract the client's IP address from request headers.
++ * `x-forwarded-for` can contain a comma-separated chain
++ * ("client, proxy1, proxy2") — the first entry is the original client.
++ * Note: if this app isn't deployed behind a platform/proxy that overwrites
++ * this header (e.g. Vercel), a direct caller could set it arbitrarily and
++ * spoof a fresh identity on every request, bypassing the limiter. This is a
++ * defense-in-depth measure, not a substitute for auth/CAPTCHA on public
++ * write endpoints.
++ */
++export function getClientIp(headers: { get(name: string): string | null }): string {
++  const forwardedFor = headers.get("x-forwarded-for");
++  if (forwardedFor) {
++    const first = forwardedFor.split(",")[0]?.trim();
++    if (first) return first;
++  }
++  return headers.get("x-real-ip") || "unknown";
++}
++
+ export interface RateLimitResult {
+   success: boolean;
+   limit: number;
+diff --git a/src/lib/stockLimits.ts b/src/lib/stockLimits.ts
+index e9391c9..976a924 100644
+--- a/src/lib/stockLimits.ts
++++ b/src/lib/stockLimits.ts
+@@ -1,30 +1,91 @@
+-export type StockLevel = "none" | "low" | "med" | "high";
++export type StockLevel =
++  | "none"
++  | "single"
++  | "very_low"
++  | "low"
++  | "medium"
++  | "high"
++  | "very_high";
+ 
+ export interface StockLimitSettings {
+   max_qty_none?: string;
++  max_qty_single?: string;
++  max_qty_very_low?: string;
+   max_qty_low?: string;
+-  max_qty_med?: string;
++  max_qty_medium?: string;
+   max_qty_high?: string;
++  max_qty_very_high?: string;
+ }
+ 
++// Sensible starting defaults — how many of a single variant a customer can
++// order in one go at each stock level. Store owners can override these per
++// level in Admin > Settings.
+ export const DEFAULT_STOCK_LIMITS: Record<StockLevel, number> = {
+   none: 0,
+-  low: 1,
+-  med: 10,
++  single: 1,
++  very_low: 2,
++  low: 5,
++  medium: 10,
+   high: 25,
++  very_high: 50,
+ };
+ 
+-const LEVEL_KEYS: Record<StockLevel, keyof StockLimitSettings> = {
++export const STOCK_LEVEL_SETTINGS_KEYS: Record<StockLevel, keyof StockLimitSettings> = {
+   none: "max_qty_none",
++  single: "max_qty_single",
++  very_low: "max_qty_very_low",
+   low: "max_qty_low",
+-  med: "max_qty_med",
++  medium: "max_qty_medium",
+   high: "max_qty_high",
++  very_high: "max_qty_very_high",
++};
++
++const LEVEL_KEYS = STOCK_LEVEL_SETTINGS_KEYS;
++
++// Human-readable label for each level, used consistently across admin and
++// customer-facing UI.
++export const STOCK_LEVEL_LABELS: Record<StockLevel, string> = {
++  none: "None",
++  single: "Single",
++  very_low: "Very Low",
++  low: "Low",
++  medium: "Medium",
++  high: "High",
++  very_high: "Very High",
++};
++
++// Ordered list of all levels, lowest to highest — handy for populating
++// <select> dropdowns in a consistent order.
++export const STOCK_LEVELS: StockLevel[] = [
++  "none",
++  "single",
++  "very_low",
++  "low",
++  "medium",
++  "high",
++  "very_high",
++];
++
++// Shared Tailwind class per level so badges look consistent between the
++// storefront and any future admin styling that wants color-coding.
++export const STOCK_LEVEL_BADGE_CLASSES: Record<StockLevel, string> = {
++  none: "bg-destructive/10 text-destructive",
++  single: "bg-red-500/10 text-red-600",
++  very_low: "bg-orange-500/10 text-orange-600",
++  low: "bg-amber-500/10 text-amber-600",
++  medium: "bg-yellow-500/10 text-yellow-700",
++  high: "bg-lime-500/10 text-lime-700",
++  very_high: "bg-emerald-500/10 text-emerald-600",
+ };
+ 
+ export function normalizeStockLevel(level?: string | null): StockLevel {
+-  const l = String(level || "").toLowerCase();
+-  if (l === "medium") return "med";
+-  if (l === "none" || l === "low" || l === "med" || l === "high") return l;
++  const l = String(level || "").toLowerCase().trim();
++  // Accept a few legacy/alternate spellings so existing data and any
++  // in-flight requests keep working during the transition.
++  if (l === "med") return "medium";
++  if (l === "verylow" || l === "very-low") return "very_low";
++  if (l === "veryhigh" || l === "very-high") return "very_high";
++  if ((STOCK_LEVELS as string[]).includes(l)) return l as StockLevel;
+   return "none";
+ }
+ 

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
+import { STOCK_LEVELS, STOCK_LEVEL_SETTINGS_KEYS } from "@/lib/stockLimits";
 
 export const dynamic = "force-dynamic";
 
@@ -7,10 +8,7 @@ export const dynamic = "force-dynamic";
 const PUBLIC_KEYS = [
   "hero_image",
   "scene_image",
-  "max_qty_none",
-  "max_qty_low",
-  "max_qty_med",
-  "max_qty_high",
+  ...STOCK_LEVELS.map((level) => STOCK_LEVEL_SETTINGS_KEYS[level]),
 ] as const;
 
 export async function GET() {

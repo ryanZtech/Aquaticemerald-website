@@ -4,6 +4,11 @@ import { useState, useEffect } from "react";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 import {
+  STOCK_LEVELS,
+  STOCK_LEVEL_LABELS,
+  normalizeStockLevel,
+} from "@/lib/stockLimits";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -523,22 +528,15 @@ export default function ProductsPageClient() {
                                               setTempStockLevel(value)
                                             }
                                           >
-                                            <SelectTrigger className="w-28 h-7 text-xs">
+                                            <SelectTrigger className="w-32 h-7 text-xs">
                                               <SelectValue />
                                             </SelectTrigger>
                                             <SelectContent>
-                                              <SelectItem value="none">
-                                                None
-                                              </SelectItem>
-                                              <SelectItem value="low">
-                                                Low
-                                              </SelectItem>
-                                              <SelectItem value="med">
-                                                Medium
-                                              </SelectItem>
-                                              <SelectItem value="high">
-                                                High
-                                              </SelectItem>
+                                              {STOCK_LEVELS.map((level) => (
+                                                <SelectItem key={level} value={level}>
+                                                  {STOCK_LEVEL_LABELS[level]}
+                                                </SelectItem>
+                                              ))}
                                             </SelectContent>
                                           </Select>
                                           <Button
@@ -575,10 +573,9 @@ export default function ProductsPageClient() {
                                           }}
                                           className="text-muted-foreground hover:text-foreground flex items-center gap-1 ml-auto cursor-pointer"
                                         >
-                                          {currentStockLevel
-                                            .charAt(0)
-                                            .toUpperCase() +
-                                            currentStockLevel.slice(1)}
+                                          {STOCK_LEVEL_LABELS[
+                                            normalizeStockLevel(currentStockLevel)
+                                          ]}
                                           <Edit className="w-3 h-3" />
                                         </button>
                                       )}
@@ -712,7 +709,7 @@ export default function ProductsPageClient() {
                       (s) => s === stockLevels[0],
                     );
                     const stockLabel = allSame
-                      ? stockLevels[0] || "none"
+                      ? STOCK_LEVEL_LABELS[normalizeStockLevel(stockLevels[0])]
                       : "Mixed";
 
                     return (
@@ -741,9 +738,7 @@ export default function ProductsPageClient() {
                             <span>{p.category_name || p.category}</span>
                           </div>
                           <div className="absolute top-3 right-3 bg-black/50 backdrop-blur-sm text-white text-[9px] px-2 py-0.5 rounded-full font-light">
-                            Stock:{" "}
-                            {stockLabel.charAt(0).toUpperCase() +
-                              stockLabel.slice(1)}
+                            Stock: {stockLabel}
                           </div>
                         </div>
                         <div className="p-5 flex-grow flex flex-col">

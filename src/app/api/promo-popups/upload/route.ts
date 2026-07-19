@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/adminAuth";
 import { put } from "@vercel/blob";
+import { validateImageFile, safeImageKey } from "@/lib/fileValidation";
 
 export async function POST(request: NextRequest) {
   const authError = await requireAdmin();
@@ -14,7 +15,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
 
-    const blob = await put(`promo-popups/${Date.now()}-${file.name}`, file, {
+    const validation = validateImageFile(file);
+    if (!validation.valid) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
+    }
+
+    const blob = await put(safeImageKey("promo-popups", file), file, {
       access: "public",
     });
 

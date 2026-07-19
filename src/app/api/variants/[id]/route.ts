@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { requireAdmin } from "@/lib/adminAuth";
-
-const ALLOWED_LEVELS = ["none", "low", "med", "high"];
+import { STOCK_LEVELS, normalizeStockLevel } from "@/lib/stockLimits";
 
 export async function PUT(
   request: NextRequest,
@@ -23,13 +22,14 @@ export async function PUT(
     const body = await request.json();
     const { stock_level } = body;
 
-    const level = String(stock_level || "").toLowerCase();
-    if (!ALLOWED_LEVELS.includes(level)) {
+    const rawLevel = String(stock_level || "").toLowerCase();
+    if (!(STOCK_LEVELS as string[]).includes(rawLevel)) {
       return NextResponse.json(
         { error: "Invalid stock level" },
         { status: 400 },
       );
     }
+    const level = normalizeStockLevel(rawLevel);
 
     const result = await sql`
       UPDATE product_variants
