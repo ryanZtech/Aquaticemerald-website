@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "migrate:stock-levels": "node scripts/migrate-stock-levels.mjs"
   },
   "dependencies": {
     "@emotion/react": "11.14.0",

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { requireAdmin } from "@/lib/adminAuth";
+import { escapeHtml } from "@/lib/emailTemplatesSimple";
 
 export async function PUT(
   request: NextRequest,
@@ -48,17 +49,17 @@ export async function PUT(
           if (o.customer_email) recipients.push(o.customer_email);
           if (sellerEmail && !recipients.includes(sellerEmail)) recipients.push(sellerEmail);
 
-          const itemsHtml = (o.items || []).map((i: any) => `<li>${i.quantity}× ${i.snapshot_product_name} (${i.snapshot_variant_label || ''}) — $${(i.snapshot_unit_price * i.quantity).toFixed(2)}</li>`).join('');
+          const itemsHtml = (o.items || []).map((i: any) => `<li>${i.quantity}× ${escapeHtml(i.snapshot_product_name)} (${escapeHtml(i.snapshot_variant_label)}) — $${(i.snapshot_unit_price * i.quantity).toFixed(2)}</li>`).join('');
 
           const pickupNameRow = o.pickup_location_id ? (await sql`SELECT name FROM pickup_locations WHERE id = ${parseInt(o.pickup_location_id)}`)[0]?.name : null;
 
           const html = `
-            <h2>Order #${o.id} - ${status}</h2>
-            <p><strong>Name:</strong> ${o.customer_name}</p>
-            <p><strong>Email:</strong> ${o.customer_email}</p>
-            <p><strong>Phone:</strong> ${o.customer_phone}</p>
-            <p><strong>Pickup:</strong> ${pickupNameRow || 'N/A'}</p>
-            <p><strong>Pickup Slot:</strong> ${o.pickup_slot_at || 'N/A'}</p>
+            <h2>Order #${o.id} - ${escapeHtml(status)}</h2>
+            <p><strong>Name:</strong> ${escapeHtml(o.customer_name)}</p>
+            <p><strong>Email:</strong> ${escapeHtml(o.customer_email)}</p>
+            <p><strong>Phone:</strong> ${escapeHtml(o.customer_phone)}</p>
+            <p><strong>Pickup:</strong> ${escapeHtml(pickupNameRow || 'N/A')}</p>
+            <p><strong>Pickup Slot:</strong> ${escapeHtml(o.pickup_slot_at || 'N/A')}</p>
             <ul>${itemsHtml}</ul>
             <p><strong>Total:</strong> $${Number(o.total).toFixed(2)}</p>
           `;

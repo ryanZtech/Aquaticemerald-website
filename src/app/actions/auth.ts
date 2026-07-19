@@ -4,6 +4,7 @@ import { cookies, headers } from "next/headers";
 import { compareSync } from "bcrypt-ts";
 import { SignJWT } from "jose";
 import { sql } from "@/lib/db";
+import { getClientIp } from "@/lib/rateLimit";
 
 const sanitizeEnv = (val: string | undefined) => {
   if (!val) return undefined;
@@ -31,7 +32,7 @@ export async function loginAdmin(formData: FormData) {
   } else {
     try {
       const headerList = await headers();
-      const ip = headerList.get("x-forwarded-for") || "unknown";
+      const ip = getClientIp(headerList);
 
       // Clean up old attempts (> 5 mins)
       await sql`DELETE FROM login_attempts WHERE attempted_at < NOW() - INTERVAL '5 minutes'`;

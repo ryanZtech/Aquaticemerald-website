@@ -15,7 +15,12 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
-import { maxQtyForLevel } from "@/lib/stockLimits";
+import {
+  maxQtyForLevel,
+  normalizeStockLevel,
+  STOCK_LEVEL_LABELS,
+  STOCK_LEVEL_BADGE_CLASSES,
+} from "@/lib/stockLimits";
 
 interface ProductDetailClientProps {
   product: Product;
@@ -386,17 +391,14 @@ export default function ProductDetailClient({
                       </span>
                       <span
                         className={`font-semibold text-xs uppercase tracking-wider px-2.5 py-1 rounded-full ${
-                          matchedVariant.stock_level === "none"
-                            ? "bg-destructive/10 text-destructive"
-                            : matchedVariant.stock_level === "low"
-                              ? "bg-orange-500/10 text-orange-600"
-                              : matchedVariant.stock_level === "med"
-                                ? "bg-amber-500/10 text-amber-600"
-                                : "bg-emerald-500/10 text-emerald-600"
+                          STOCK_LEVEL_BADGE_CLASSES[
+                            normalizeStockLevel(matchedVariant.stock_level)
+                          ]
                         }`}
                       >
-                        {matchedVariant.stock_level.charAt(0).toUpperCase() +
-                          matchedVariant.stock_level.slice(1)}
+                        {STOCK_LEVEL_LABELS[
+                          normalizeStockLevel(matchedVariant.stock_level)
+                        ]}
                       </span>
                     </div>
                   )}
@@ -448,7 +450,9 @@ export default function ProductDetailClient({
                 </div>
                 {matchedVariant && maxQty > 0 && (
                   <p className="mt-2 text-xs text-muted-foreground">
-                    {matchedVariant.stock_level === "low"
+                    {["single", "very_low", "low"].includes(
+                      normalizeStockLevel(matchedVariant.stock_level),
+                    )
                       ? `Low stock: up to ${maxQty} can be purchased.`
                       : `You can order up to ${maxQty}.`}
                   </p>
@@ -458,12 +462,10 @@ export default function ProductDetailClient({
               {}
               <button
                 onClick={handleAdd}
-                disabled={
-                  !matchedVariant || matchedVariant.stock_level === "none"
-                }
+                disabled={!matchedVariant || maxQty <= 0}
                 className={`w-full py-4 rounded-full font-semibold text-sm tracking-wide transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer
                   ${
-                    !matchedVariant || matchedVariant.stock_level === "none"
+                    !matchedVariant || maxQty <= 0
                       ? "bg-muted text-muted-foreground cursor-not-allowed"
                       : added
                         ? "bg-emerald-600 text-white scale-[0.99] shadow-lg shadow-emerald-600/20"
@@ -475,7 +477,7 @@ export default function ProductDetailClient({
                     <ShieldCheck className="w-4 h-4 animate-bounce" />
                     Added to Cart!
                   </>
-                ) : matchedVariant?.stock_level === "none" ? (
+                ) : !matchedVariant || maxQty <= 0 ? (
                   <>
                     <ShoppingCart className="w-4 h-4" />
                     Out of Stock

@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { buildCustomerHtml, buildSellerHtml } from "@/lib/emailTemplatesSimple";
 import { requireAdmin } from "@/lib/adminAuth";
+import { rateLimit, getClientIp } from "@/lib/rateLimit";
+import {
+  parseStockLimitSettings,
+  maxQtyForLevel,
+  STOCK_LEVELS,
+  STOCK_LEVEL_SETTINGS_KEYS,
+} from "@/lib/stockLimits";
 
 export async function GET() {
   const authError = await requireAdmin();
@@ -50,6 +57,16 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   if (!sql) return NextResponse.json({ error: "Database not configured" }, { status: 500 });
 
+  // Basic abuse protection: 5 order attempts per minute per IP.
+  const ip = getClientIp(request.headers);
+  const orderRateLimit = rateLimit(`create-order:${ip}`, 5, 60 * 1000);
+  if (!orderRateLimit.success) {
+    return NextResponse.json(
+      { error: "Too many order attempts. Please wait a moment and try again." },
+      { status: 429 },
+    );
+  }
+
   let reservedSlot = false;
   let reservedLocationId: number | null = null;
   let reservedSlotAt: string | null = null;
@@ -63,15 +80,129 @@ export async function POST(request: NextRequest) {
       customer_phone,
       pickup_location_id,
       pickup_slot_at,
-      cart = [],
-      subtotal = 0,
-      total = 0,
+      cart: rawCart = [],
       notes,
+      promo_code,
     } = body || {};
 
     if (!customer_name || String(customer_name).trim().length < 2) {
       return NextResponse.json({ error: "Customer name is required and must be at least 2 characters." }, { status: 400 });
     }
+
+    if (!Array.isArray(rawCart) || rawCart.length === 0) {
+      return NextResponse.json({ error: "Your cart is empty." }, { status: 400 });
+    }
+
+    // --- SECURITY: never trust client-supplied prices, subtotal, or total. ---
+    // Re-fetch each cart line's real price/name/stock from the database and
+    // recompute the subtotal server-side. This prevents a modified client
+    // (or a direct API call) from placing an order at an arbitrary price.
+    const stockSettingKeys = STOCK_LEVELS.map((level) => STOCK_LEVEL_SETTINGS_KEYS[level]);
+    const stockSettingsRows = await sql`
+      SELECT key, value FROM store_settings
+      WHERE key = ANY(${stockSettingKeys})
+    `;
+    const stockLimitSettings = Object.fromEntries(
+      stockSettingsRows.map((r: Record<string, any>) => [r.key, r.value]),
+    );
+    const stockLimits = parseStockLimitSettings(stockLimitSettings);
+
+    const verifiedCart: Array<{
+      productId: number | null;
+      variantId: number | null;
+      name: string;
+      variantLabel: string | undefined;
+      price: number;
+      qty: number;
+    }> = [];
+
+    for (const rawItem of rawCart) {
+      const productId = rawItem?.productId ? Number(rawItem.productId) : null;
+      const variantId = rawItem?.variantId ? Number(rawItem.variantId) : null;
+      const qty = Math.max(1, Math.floor(Number(rawItem?.qty) || 0));
+
+      if (!productId || !variantId || qty < 1) {
+        return NextResponse.json({ error: "Invalid item in cart." }, { status: 400 });
+      }
+
+      const variantRows = await sql`
+        SELECT v.id, v.label, v.price, v.stock_level, v.product_id, p.name AS product_name
+        FROM product_variants v
+        JOIN products p ON p.id = v.product_id
+        WHERE v.id = ${variantId} AND v.product_id = ${productId}
+        LIMIT 1
+      `;
+
+      if (variantRows.length === 0) {
+        return NextResponse.json(
+          { error: "One of the items in your cart is no longer available." },
+          { status: 400 },
+        );
+      }
+
+      const variant = variantRows[0];
+      const maxQty = maxQtyForLevel(variant.stock_level, stockLimits);
+
+      if (maxQty <= 0) {
+        return NextResponse.json(
+          { error: `${variant.product_name} is currently out of stock.` },
+          { status: 400 },
+        );
+      }
+
+      if (qty > maxQty) {
+        return NextResponse.json(
+          { error: `Only ${maxQty} of ${variant.product_name} (${variant.label}) can be ordered right now.` },
+          { status: 400 },
+        );
+      }
+
+      verifiedCart.push({
+        productId,
+        variantId,
+        name: variant.product_name,
+        variantLabel: variant.label ?? undefined,
+        price: Number(variant.price),
+        qty,
+      });
+    }
+
+    let subtotal = verifiedCart.reduce((sum, it) => sum + it.price * it.qty, 0);
+    let discountAmount = 0;
+    let appliedPromoCode: string | null = null;
+
+    // Re-validate any promo code server-side rather than trusting the
+    // client-computed discount amount.
+    if (promo_code && String(promo_code).trim()) {
+      const promoRows = await sql`
+        SELECT dc.*,
+          (SELECT COUNT(*) FROM orders WHERE promo_code = dc.code) as current_uses
+        FROM discount_codes dc
+        WHERE UPPER(dc.code) = UPPER(${promo_code})
+          AND dc.active = TRUE
+          AND dc.valid_from <= CURRENT_TIMESTAMP
+          AND (dc.valid_until IS NULL OR dc.valid_until >= CURRENT_TIMESTAMP)
+        LIMIT 1
+      `;
+
+      if (promoRows.length > 0) {
+        const discount = promoRows[0];
+        const withinUsageLimit =
+          !discount.max_uses || discount.current_uses < discount.max_uses;
+
+        if (withinUsageLimit) {
+          if (discount.discount_type === "percentage") {
+            discountAmount = subtotal * (Number(discount.discount_value) / 100);
+          }
+          appliedPromoCode = discount.code;
+        }
+      }
+      // If the code is invalid/expired/exhausted, we simply don't apply a
+      // discount rather than failing the whole order.
+    }
+
+    const total = Math.max(0, subtotal - discountAmount);
+    const cart = verifiedCart;
 
     const pickupLocationId = pickup_location_id ? Number(pickup_location_id) : null;
     const slotStart = pickup_slot_at || null;
@@ -121,8 +252,8 @@ export async function POST(request: NextRequest) {
     }
 
     const insert = await sql`
-      INSERT INTO orders (customer_name, customer_email, customer_phone, pickup_location_id, pickup_slot_at, notes, subtotal, total)
-      VALUES (${customer_name}, ${customer_email}, ${customer_phone}, ${resolvedLocationId}, ${pickup_slot_at || null}, ${notes || orderRef || null}, ${subtotal}, ${total})
+      INSERT INTO orders (customer_name, customer_email, customer_phone, pickup_location_id, pickup_slot_at, notes, subtotal, total, promo_code)
+      VALUES (${customer_name}, ${customer_email}, ${customer_phone}, ${resolvedLocationId}, ${pickup_slot_at || null}, ${notes || orderRef || null}, ${subtotal}, ${total}, ${appliedPromoCode})
       RETURNING id, created_at
     `;
 
@@ -131,7 +262,7 @@ export async function POST(request: NextRequest) {
     for (const it of cart) {
       await sql`
         INSERT INTO order_items (order_id, product_id, variant_id, snapshot_product_name, snapshot_variant_label, snapshot_unit_price, quantity)
-        VALUES (${orderId}, ${it.productId || null}, ${it.variantId || null}, ${it.name}, ${it.variantLabel}, ${it.price}, ${it.qty})
+        VALUES (${orderId}, ${it.productId}, ${it.variantId}, ${it.name}, ${it.variantLabel}, ${it.price}, ${it.qty})
       `;
     }
 

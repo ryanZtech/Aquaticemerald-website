@@ -7,6 +7,7 @@ import { Product } from "@/lib/staticData";
 import { motion, AnimatePresence } from "motion/react";
 import { Search, Layers, HelpCircle } from "lucide-react";
 import { getLucideIconByName } from "@/lib/lucideIcon";
+import { STOCK_LEVEL_LABELS, normalizeStockLevel } from "@/lib/stockLimits";
 
 interface ProductsClientProps {
   products: Product[];
@@ -205,9 +206,9 @@ export default function ProductsClient({ products }: ProductsClientProps) {
                           (s) => s === stockLevels[0],
                         );
                         const stockLabel = allSame
-                          ? stockLevels[0] || "none"
+                          ? STOCK_LEVEL_LABELS[normalizeStockLevel(stockLevels[0])]
                           : "Mixed";
-                        return `Stock: ${stockLabel.charAt(0).toUpperCase() + stockLabel.slice(1)}`;
+                        return `Stock: ${stockLabel}`;
                       })()}
                     </div>
                   )}

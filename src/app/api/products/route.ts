@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { put } from "@vercel/blob";
+import { validateImageFile, safeImageKey } from "@/lib/fileValidation";
+import { normalizeStockLevel } from "@/lib/stockLimits";
 
 export async function GET(request: NextRequest) {
   if (!sql) {
@@ -149,7 +151,11 @@ export async function POST(request: NextRequest) {
     }> = [];
     for (let i = 0; i < newImages.length; i++) {
       const file = newImages[i];
-      const blob = await put(`products/${productId}/${file.name}`, file, {
+      const validation = validateImageFile(file);
+      if (!validation.valid) {
+        return NextResponse.json({ error: validation.error }, { status: 400 });
+      }
+      const blob = await put(safeImageKey(`products/${productId}`, file), file, {
         access: "public",
         addRandomSuffix: true,
       });
@@ -167,11 +173,9 @@ export async function POST(request: NextRequest) {
 
     for (const variant of variants) {
       const variantId = `${productId}-${variant.id}`;
-      const stockLevel = (
-        variant.stock_level ||
-        variant.stockLevel ||
-        "none"
-      ).toLowerCase();
+      const stockLevel = normalizeStockLevel(
+        variant.stock_level || variant.stockLevel,
+      );
 
       await sql`
         INSERT INTO product_variants (id, product_id, label, price, stock_level, active)
