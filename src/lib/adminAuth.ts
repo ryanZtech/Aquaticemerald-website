@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
 import { NextResponse } from "next/server";
+import { sanitizeEnv } from "@/lib/env";
 
 export async function requireAdmin(): Promise<NextResponse | null> {
   try {
@@ -11,7 +12,7 @@ export async function requireAdmin(): Promise<NextResponse | null> {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const secretStr = process.env.JWT_SECRET;
+    const secretStr = sanitizeEnv(process.env.JWT_SECRET);
     if (!secretStr) {
       console.error("adminAuth: JWT_SECRET is not configured");
       return NextResponse.json(

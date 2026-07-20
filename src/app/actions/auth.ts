@@ -5,16 +5,12 @@ import { compareSync } from "bcrypt-ts";
 import { SignJWT } from "jose";
 import { sql } from "@/lib/db";
 import { getClientIp } from "@/lib/rateLimit";
-
-const sanitizeEnv = (val: string | undefined) => {
-  if (!val) return undefined;
-  return val.replace(/^['"]|['"]$/g, "");
-};
+import { sanitizeEnv } from "@/lib/env";
 
 export async function loginAdmin(formData: FormData) {
   const password = formData.get("password") as string;
-  const expectedHash = process.env.ADMIN_PASSWORD_HASH;
-  const jwtSecret = process.env.JWT_SECRET;
+  const expectedHash = sanitizeEnv(process.env.ADMIN_PASSWORD_HASH);
+  const jwtSecret = sanitizeEnv(process.env.JWT_SECRET);
 
   // 0. Check for Server Config Error
   if (!expectedHash || !jwtSecret) {
