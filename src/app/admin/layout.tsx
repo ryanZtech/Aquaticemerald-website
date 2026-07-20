@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { jwtVerify } from "jose";
 import { redirect } from "next/navigation";
+import { sanitizeEnv } from "@/lib/env";
 import { Button } from "@/app/components/ui/button";
 import { LogOut, Package, MapPin, Settings, FolderTree, ShoppingCart, BookOpen, Clock, CircleHelp, Percent } from "lucide-react";
 import Link from "next/link";
@@ -19,7 +20,7 @@ export default async function AdminLayout({
   }
 
   try {
-    const secretStr = process.env.JWT_SECRET;
+    const secretStr = sanitizeEnv(process.env.JWT_SECRET);
     if (!secretStr) throw new Error("JWT_SECRET missing");
     const secret = new TextEncoder().encode(secretStr);
     await jwtVerify(token, secret);
