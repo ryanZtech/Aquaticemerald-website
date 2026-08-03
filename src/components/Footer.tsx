@@ -63,51 +63,52 @@ export default function Footer({ whatsapp }: FooterProps) {
         </div>
 
         {}
-        <nav className="flex flex-col items-center sm:items-start gap-2">
-          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
-            Explore
-          </span>
-          <div className="grid grid-cols-2 gap-x-8 gap-y-2 sm:grid-cols-1">
-            {EXPLORE_LINKS.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className="text-sm text-muted-foreground hover:text-primary transition-colors"
-              >
-                {link.label}
-              </Link>
-            ))}
-          </div>
-        </nav>
+        <div className="flex flex-row gap-10 sm:gap-16">
+          {}
+          <nav className="flex flex-col items-start text-left gap-2">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+              Explore
+            </span>
+            <div className="flex flex-col gap-2">
+              {EXPLORE_LINKS.map((link) => (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className="text-sm text-muted-foreground hover:text-primary transition-colors"
+                >
+                  {link.label}
+                </Link>
+              ))}
+            </div>
+          </nav>
 
-        {}
-        <div className="flex flex-col items-center sm:items-start gap-3">
-          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
-            Follow &amp; Message
-          </span>
-          <div className="flex items-center gap-3">
-            {socialLinks.map(({ href, label, Icon }) => (
-              <a
-                key={label}
-                href={href}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label={label}
-                className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-accent transition-colors"
-              >
-                <Icon className="w-4 h-4" />
-              </a>
-            ))}
+          {}
+          <div className="flex flex-col items-start text-left gap-3">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+              Follow &amp; Message
+            </span>
+            <div className="flex items-center gap-3">
+              {socialLinks.map(({ href, label, Icon }) => (
+                <a
+                  key={label}
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={label}
+                  className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-accent transition-colors"
+                >
+                  <Icon className="w-4 h-4" />
+                </a>
+              ))}
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="mt-10 pt-6 border-t border-border/60 text-center">
-        <p className="text-xs text-muted-foreground">
-          © 2026 Aquatic Emerald · Hills District, Sydney · All sales subject
-          to availability
-        </p>
-      </div>
+      <p className="mt-10 text-xs text-muted-foreground text-center">
+        © 2026 Aquatic Emerald · Hills District, Sydney · All sales subject to
+        availability
+      </p>
     </footer>
   );
 }
