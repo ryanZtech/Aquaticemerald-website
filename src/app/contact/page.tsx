@@ -1,32 +1,23 @@
-import { getSellerWhatsApp, getStoreSettings, getLocations } from "@/lib/dataService";
+import { getSellerWhatsApp, getLocations } from "@/lib/dataService";
 import { InstagramIcon, FacebookIcon, WhatsAppIcon } from "@/components/icons/SocialIcons";
 import { FACEBOOK_URL, INSTAGRAM_URL, getWhatsAppUrl } from "@/lib/socialLinks";
-import { Mail, MapPin } from "lucide-react";
+import { MapPin } from "lucide-react";
 import type { ComponentType, SVGProps } from "react";
 
 export const revalidate = 60;
 
 export default async function ContactPage() {
-  const [whatsapp, settings, locations] = await Promise.all([
+  const [whatsapp, locations] = await Promise.all([
     getSellerWhatsApp(),
-    getStoreSettings(),
     getLocations(),
   ]);
-
-  const email = settings.seller_email || "";
 
   const contactMethods = [
     whatsapp && {
       label: "WhatsApp",
-      description: "Fastest way to reach us — chat with a real person.",
+      description: "Aquatic Emerald",
       href: getWhatsAppUrl(whatsapp),
       Icon: WhatsAppIcon,
-    },
-    email && {
-      label: "Email",
-      description: email,
-      href: `mailto:${email}`,
-      Icon: Mail,
     },
     {
       label: "Instagram",
@@ -51,7 +42,7 @@ export default async function ContactPage() {
     <div className="pt-24 pb-20 px-4 max-w-4xl mx-auto min-h-screen">
       {}
       <div className="mb-12">
-        <p className="text-xs font-semibold tracking-[0.35em] text-primary uppercase mb-3 animate-pulse">
+        <p className="text-xs font-semibold tracking-[0.35em] text-primary uppercase mb-3">
           Get In Touch
         </p>
         <h1 className="font-serif text-4xl sm:text-5xl font-medium mb-5">
