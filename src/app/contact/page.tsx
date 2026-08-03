@@ -1,16 +1,12 @@
-import { getSellerWhatsApp, getLocations } from "@/lib/dataService";
+import { getSellerWhatsApp } from "@/lib/dataService";
 import { InstagramIcon, FacebookIcon, WhatsAppIcon } from "@/components/icons/SocialIcons";
 import { FACEBOOK_URL, INSTAGRAM_URL, getWhatsAppUrl } from "@/lib/socialLinks";
-import { MapPin } from "lucide-react";
 import type { ComponentType, SVGProps } from "react";
 
 export const revalidate = 60;
 
 export default async function ContactPage() {
-  const [whatsapp, locations] = await Promise.all([
-    getSellerWhatsApp(),
-    getLocations(),
-  ]);
+  const whatsapp = await getSellerWhatsApp();
 
   const contactMethods = [
     whatsapp && {
@@ -56,7 +52,7 @@ export default async function ContactPage() {
       </div>
 
       {}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-16">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {contactMethods.map(({ label, description, href, Icon }) => (
           <a
             key={label}
@@ -77,31 +73,6 @@ export default async function ContactPage() {
           </a>
         ))}
       </div>
-
-      {}
-      {locations.length > 0 && (
-        <>
-          <h2 className="font-serif text-2xl font-medium mb-6">
-            Pickup Locations
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {locations.map((loc) => (
-              <div
-                key={loc.id}
-                className="bg-card border border-border rounded-2xl p-5 shadow-sm hover:border-primary/20 transition-all duration-200"
-              >
-                <MapPin className="w-5 h-5 text-primary mb-3" />
-                <h3 className="font-medium text-sm mb-1">
-                  {loc.name.split(" — ")[0]}
-                </h3>
-                <p className="text-xs text-muted-foreground font-light">
-                  {loc.detail || "Sydney, Australia"}
-                </p>
-              </div>
-            ))}
-          </div>
-        </>
-      )}
     </div>
   );
 }
