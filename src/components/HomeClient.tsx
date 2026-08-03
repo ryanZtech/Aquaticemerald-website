@@ -200,23 +200,6 @@ export default function HomeClient({ products, settings }: HomeClientProps) {
         </div>
       </section>
 
-      {}
-      <footer className="border-t border-border py-8 px-4 text-center">
-        <div className="flex items-center justify-center gap-2 mb-2">
-          <img
-            src="/logo.png"
-            alt="Aquatic Emerald Logo"
-            className="w-4 h-4 object-contain"
-          />
-          <span className="font-serif text-sm font-medium">
-            Aquatic Emerald
-          </span>
-        </div>
-        <p className="text-xs text-muted-foreground">
-          © 2026 Aquatic Emerald · Hills District, Sydney · All sales subject to
-          availability
-        </p>
-      </footer>
     </div>
   );
 }

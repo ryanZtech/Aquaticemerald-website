@@ -111,22 +111,6 @@ export default async function InfoPage() {
         </p>
       </div>
 
-      {}
-      <div className="mt-16 pt-8 border-t border-border text-center">
-        <div className="flex items-center justify-center gap-2 mb-2">
-          <img
-            src="/logo.png"
-            alt="Aquatic Emerald Logo"
-            className="w-4 h-4 object-contain"
-          />
-          <span className="font-serif text-sm font-medium">
-            Aquatic Emerald
-          </span>
-        </div>
-        <p className="text-xs text-muted-foreground">
-          © 2026 Aquatic Emerald · Hills District, Sydney
-        </p>
-      </div>
     </div>
   );
 }
