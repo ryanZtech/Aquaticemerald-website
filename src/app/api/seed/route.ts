@@ -354,7 +354,7 @@ export async function GET() {
     }
 
     const sellerEmail = process.env.SELLER_EMAIL || "seller@example.com";
-    await sql`INSERT INTO store_settings (key, value) VALUES ('seller_whatsapp', ${SELLER_WHATSAPP}), ('seller_email', ${sellerEmail}), ('hero_image', 'https://images.unsplash.com/photo-1779436853149-2e7d501f71cf?w=1600&h=900&fit=crop&auto=format'), ('scene_image', 'https://images.unsplash.com/photo-1779436853049-c19542e3c81c?w=1400&h=700&fit=crop&auto=format') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;`;
+    await sql`INSERT INTO store_settings (key, value) VALUES ('seller_whatsapp', ${SELLER_WHATSAPP}), ('seller_email', ${sellerEmail}), ('hero_image', '/hero.png'), ('scene_image', '/front1.png') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;`;
 
     console.log("Neon Seed API: Seeding complete.");
     return NextResponse.json({
