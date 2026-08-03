@@ -1,6 +1,19 @@
+import { fileURLToPath } from "url";
+import { dirname } from "path";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // Pin the workspace root to this project explicitly. Without this, Next.js
+  // walks up the filesystem looking for lockfiles and can pick the wrong
+  // directory as the root if another lockfile exists further up the tree
+  // (e.g. a stray package-lock.json in a parent folder like ~/Downloads),
+  // which triggers the "inferred workspace root" warning.
+  turbopack: {
+    root: __dirname,
+  },
   async headers() {
     return [
       {

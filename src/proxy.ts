@@ -20,7 +20,7 @@ import { sanitizeEnv } from "@/lib/env";
  * that already exist in each route file. Keep adding requireAdmin() to any
  * new admin-only API route directly.
  */
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const token = request.cookies.get("admin_session")?.value;
 
   if (!token) {

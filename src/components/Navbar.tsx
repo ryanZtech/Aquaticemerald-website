@@ -194,6 +194,15 @@ export default function Navbar() {
           >
             FAQ
           </Link>
+
+          <Link
+            href="/contact"
+            className={`text-sm font-medium transition-colors hover:text-primary ${
+              pathname === "/contact" ? "text-primary" : "text-muted-foreground"
+            }`}
+          >
+            Contact
+          </Link>
         </div>
 
         {}
@@ -319,6 +328,17 @@ export default function Navbar() {
               }`}
             >
               FAQ
+            </Link>
+
+            <Link
+              href="/contact"
+              className={`block text-sm font-medium py-2 px-3 rounded-lg hover:bg-accent ${
+                pathname === "/contact"
+                  ? "text-primary bg-primary/5"
+                  : "text-foreground"
+              }`}
+            >
+              Contact
             </Link>
           </motion.div>
         )}
