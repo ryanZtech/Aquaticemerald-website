@@ -239,11 +239,6 @@ export default function CheckoutClient({
   const totalDays = daysInMonth(year, month);
   const firstDay = firstDayOfMonth(year, month);
 
-  // Treat the DB row named "Custom" as the special negotiate-via-WhatsApp option
-  const selectedLoc = locations.find((l) => l.id.toString() === location);
-  const isCustomLocation = selectedLoc?.name?.toLowerCase() === "custom";
-  const selectedLocationId = location ? parseInt(location, 10) : NaN;
-
   const isDayDisabled = (d: number) => {
     // Block past dates
     if (year < todayY) return true;
@@ -273,6 +268,8 @@ export default function CheckoutClient({
   };
 
   const selectedDow = day !== null ? new Date(year, month, day).getDay() : -1;
+  const isCustomLocation = location === "custom";
+  const selectedLocationId = !isCustomLocation && location ? parseInt(location, 10) : NaN;
   const selectedRules = Number.isNaN(selectedLocationId)
     ? []
     : timeRules.filter(
@@ -424,7 +421,7 @@ export default function CheckoutClient({
         customer_name: name || "",
         customer_email: email,
         customer_phone: phone,
-        pickup_location_id: parseInt(location) || null,
+        pickup_location_id: isCustomLocation ? null : parseInt(location) || null,
         pickup_slot_at,
         cart,
         subtotal,
@@ -678,10 +675,6 @@ export default function CheckoutClient({
                 onClick={() => {
                   setLocation(loc.id.toString());
                   setTimeWindow("");
-                  // Clear date when switching to the special Custom location
-                  if (loc.name?.toLowerCase() === "custom") {
-                    setDay(null);
-                  }
                 }}
                 className={`w-full flex items-center gap-3 px-4 py-4 rounded-xl border text-sm transition-all text-left cursor-pointer ${location === loc.id.toString() ? "border-primary bg-primary/5 text-primary" : "border-border hover:border-primary/40"}`}
               >
@@ -693,9 +686,7 @@ export default function CheckoutClient({
                   )}
                 </div>
                 <div>
-                  <p className="font-medium">
-                    {loc.name?.toLowerCase() === "custom" ? "Custom Location" : loc.name}
-                  </p>
+                  <p className="font-medium">{loc.name}</p>
                   {loc.detail && (
                     <p className="text-xs text-muted-foreground font-light mt-0.5">
                       {loc.detail}
@@ -704,6 +695,28 @@ export default function CheckoutClient({
                 </div>
               </button>
             ))}
+            <button
+              onClick={() => {
+                setLocation("custom");
+                setTimeWindow("");
+                setDay(null);
+              }}
+              className={`w-full flex items-center gap-3 px-4 py-4 rounded-xl border text-sm transition-all text-left cursor-pointer ${location === "custom" ? "border-primary bg-primary/5 text-primary" : "border-border hover:border-primary/40"}`}
+            >
+              <div
+                className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition ${location === "custom" ? "border-primary bg-primary" : "border-muted-foreground/40"}`}
+              >
+                {location === "custom" && (
+                  <Check className="w-3 h-3 text-primary-foreground" />
+                )}
+              </div>
+              <div className="flex-1">
+                <p className="font-medium">Custom Location</p>
+                <p className="text-xs text-muted-foreground font-light mt-0.5">
+                  Negotiate pickup location via WhatsApp
+                </p>
+              </div>
+            </button>
           </div>
         </div>
 

@@ -11,7 +11,7 @@ export default async function InfoPage() {
   ]);
 
   const sceneImg =
-    allSettings.scene_image || "/front1.png";
+    allSettings.scene_image || "https://aquaticemerald.com/front1.png";
 
   const guides = [
     {

@@ -21,9 +21,9 @@ export default function HomeClient({ products, settings }: HomeClientProps) {
   
   const featured = products.filter((p) => p.variants.length > 0).slice(0, 4);
 
-  // Prefer settings (admin/seed), fall back to local public assets
-  const heroImg = settings.hero_image || "/hero.png";
-  const sceneImg = settings.scene_image || "/front1.png";
+  const heroImg = settings.hero_image || "https://aquaticemerald.com/hero.png";
+  const sceneImg =
+    settings.scene_image || "https://aquaticemerald.com/front1.png";
 
   return (
     <div className="pt-16">
