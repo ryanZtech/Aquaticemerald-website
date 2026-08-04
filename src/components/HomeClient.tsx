@@ -26,12 +26,12 @@ export default function HomeClient({ products, settings }: HomeClientProps) {
     settings.scene_image || "https://aquaticemerald.com/front1.png";
 
   return (
-    <div className="pt-16">
+    <div>
       {/* Promo Popup */}
       <PromoPopup />
       
       {}
-      <section className="relative h-screen min-h-[560px] flex items-center justify-center overflow-hidden bg-black">
+      <section className="relative h-[calc(100vh-4rem)] min-h-[560px] flex items-center justify-center overflow-hidden bg-black">
         {heroImg ? (
           <img
             src={heroImg}
