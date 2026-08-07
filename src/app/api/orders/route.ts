@@ -108,8 +108,8 @@ export async function POST(request: NextRequest) {
     const stockLimits = parseStockLimitSettings(stockLimitSettings);
 
     const verifiedCart: Array<{
-      productId: number | null;
-      variantId: number | null;
+      productId: string | null;
+      variantId: string | null;
       name: string;
       variantLabel: string | undefined;
       price: number;
@@ -117,8 +117,11 @@ export async function POST(request: NextRequest) {
     }> = [];
 
     for (const rawItem of rawCart) {
-      const productId = rawItem?.productId ? Number(rawItem.productId) : null;
-      const variantId = rawItem?.variantId ? Number(rawItem.variantId) : null;
+      // NOTE: products.id and product_variants.id are TEXT (slug-style) primary
+      // keys, not numeric IDs — do not coerce with Number(), or every valid
+      // item will be rejected as NaN.
+      const productId = rawItem?.productId ? String(rawItem.productId) : null;
+      const variantId = rawItem?.variantId ? String(rawItem.variantId) : null;
       const qty = Math.max(1, Math.floor(Number(rawItem?.qty) || 0));
 
       if (!productId || !variantId || qty < 1) {
