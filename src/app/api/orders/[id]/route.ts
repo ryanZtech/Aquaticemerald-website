@@ -13,10 +13,23 @@ export async function PUT(
     return NextResponse.json({ error: "Database not configured" }, { status: 500 });
   }
 
+  // Only these values are ever meaningful to the app (the "picked up"
+  // toggle only ever sends "pending"/"picked_up", but the notification
+  // logic below also understands a couple of others). Reject anything
+  // else instead of writing an arbitrary string into the status column.
+  const ALLOWED_STATUSES = ["pending", "picked_up", "finalised", "completed", "cancelled"];
+
   try {
     const { id } = await params;
     const body = await request.json();
     const { status } = body;
+
+    if (!ALLOWED_STATUSES.includes(status)) {
+      return NextResponse.json(
+        { error: `Invalid status. Must be one of: ${ALLOWED_STATUSES.join(", ")}` },
+        { status: 400 },
+      );
+    }
 
     await sql`
       UPDATE orders

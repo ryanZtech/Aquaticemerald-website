@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sql } from "@/lib/db";
+import { sql, pool } from "@/lib/db";
 import { buildCustomerHtml, buildSellerHtml } from "@/lib/emailTemplatesSimple";
 import { requireAdmin } from "@/lib/adminAuth";
 import { rateLimit, getClientIp } from "@/lib/rateLimit";
@@ -9,6 +9,46 @@ import {
   STOCK_LEVELS,
   STOCK_LEVEL_SETTINGS_KEYS,
 } from "@/lib/stockLimits";
+
+interface OrderLineItem {
+  productId: string | null;
+  variantId: string | null;
+  name: string;
+  variantLabel: string | undefined;
+  price: number;
+  qty: number;
+}
+
+/** Look up a single variant + its parent product, for validating a free-item reward. */
+async function findFreeVariant(
+  productId: string,
+  preferredVariantId: string | null,
+): Promise<{ id: string; label: string | null; product_name: string } | null> {
+  if (!sql) return null;
+  if (preferredVariantId) {
+    const rows = await sql`
+      SELECT v.id, v.label, v.stock_level, p.name AS product_name
+      FROM product_variants v
+      JOIN products p ON p.id = v.product_id
+      WHERE v.id = ${preferredVariantId} AND v.product_id = ${productId}
+      LIMIT 1
+    `;
+    if (rows.length > 0 && rows[0].stock_level !== "none") {
+      return { id: rows[0].id, label: rows[0].label, product_name: rows[0].product_name };
+    }
+  }
+  // Fall back to the cheapest in-stock variant of the product.
+  const fallbackRows = await sql`
+    SELECT v.id, v.label, v.stock_level, p.name AS product_name
+    FROM product_variants v
+    JOIN products p ON p.id = v.product_id
+    WHERE v.product_id = ${productId} AND v.stock_level != 'none'
+    ORDER BY v.price ASC
+    LIMIT 1
+  `;
+  if (fallbackRows.length === 0) return null;
+  return { id: fallbackRows[0].id, label: fallbackRows[0].label, product_name: fallbackRows[0].product_name };
+}
 
 export async function GET() {
   const authError = await requireAdmin();
@@ -170,42 +210,63 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    let subtotal = verifiedCart.reduce((sum, it) => sum + it.price * it.qty, 0);
-    let discountAmount = 0;
-    let appliedPromoCode: string | null = null;
+    const subtotal = verifiedCart.reduce((sum, it) => sum + it.price * it.qty, 0);
 
-    // Re-validate any promo code server-side rather than trusting the
-    // client-computed discount amount.
-    if (promo_code && String(promo_code).trim()) {
-      const promoRows = await sql`
-        SELECT dc.*,
-          (SELECT COUNT(*) FROM orders WHERE promo_code = dc.code) as current_uses
-        FROM discount_codes dc
-        WHERE UPPER(dc.code) = UPPER(${promo_code})
-          AND dc.active = TRUE
-          AND dc.valid_from <= CURRENT_TIMESTAMP
-          AND (dc.valid_until IS NULL OR dc.valid_until >= CURRENT_TIMESTAMP)
-        LIMIT 1
+    // --- Auto-discounts (e.g. "spend $50 get $10 off", "buy X get Y free") ---
+    // These were previously evaluated only for display on the cart page
+    // (/api/auto-discounts/evaluate) and never actually applied when the
+    // order was placed — customers would see a discount or a free item
+    // promised, then get charged full price with nothing free. Evaluate the
+    // same rules here, server-side, against the *verified* cart/subtotal, so
+    // whatever the cart page promised is what the order actually reflects.
+    let autoDiscountAmount = 0;
+    let autoFreeItem: OrderLineItem | null = null;
+    try {
+      const autoDiscounts = await sql`
+        SELECT ad.*, fp.name AS effect_free_product_name
+        FROM auto_discounts ad
+        LEFT JOIN products fp ON ad.effect_free_product_id = fp.id
+        WHERE ad.active = TRUE
+        ORDER BY ad.priority DESC
       `;
 
-      if (promoRows.length > 0) {
-        const discount = promoRows[0];
-        const withinUsageLimit =
-          !discount.max_uses || discount.current_uses < discount.max_uses;
-
-        if (withinUsageLimit) {
-          if (discount.discount_type === "percentage") {
-            discountAmount = subtotal * (Number(discount.discount_value) / 100);
-          }
-          appliedPromoCode = discount.code;
+      for (const discount of autoDiscounts) {
+        let triggerMet = false;
+        if (discount.trigger_type === "spend_amount") {
+          triggerMet = subtotal >= Number(discount.trigger_spend_amount || 0);
+        } else if (discount.trigger_type === "item_in_cart") {
+          triggerMet = verifiedCart.some((it) => it.productId === discount.trigger_product_id);
+        } else if (discount.trigger_type === "both") {
+          const spendMet = subtotal >= Number(discount.trigger_spend_amount || 0);
+          const itemMet = verifiedCart.some((it) => it.productId === discount.trigger_product_id);
+          triggerMet = spendMet && itemMet;
         }
-      }
-      // If the code is invalid/expired/exhausted, we simply don't apply a
-      // discount rather than failing the whole order.
-    }
 
-    const total = Math.max(0, subtotal - discountAmount);
-    const cart = verifiedCart;
+        if (!triggerMet) continue;
+
+        if (discount.effect_type === "fixed_amount") {
+          autoDiscountAmount = Number(discount.effect_value || 0);
+        } else if (discount.effect_type === "percentage") {
+          autoDiscountAmount = subtotal * (Number(discount.effect_value || 0) / 100);
+        } else if (discount.effect_type === "free_item" && discount.effect_free_product_id) {
+          const variant = await findFreeVariant(discount.effect_free_product_id, discount.effect_free_variant_id);
+          if (variant) {
+            autoFreeItem = {
+              productId: discount.effect_free_product_id,
+              variantId: variant.id,
+              name: `${variant.product_name} (Free — ${discount.name})`,
+              variantLabel: variant.label ?? undefined,
+              price: 0,
+              qty: 1,
+            };
+          }
+        }
+        break; // highest-priority matching discount wins
+      }
+    } catch (e) {
+      // An auto-discount misconfiguration shouldn't block checkout.
+      console.error("Failed to evaluate auto-discounts:", e);
+    }
 
     const pickupLocationId = pickup_location_id ? Number(pickup_location_id) : null;
     const slotStart = pickup_slot_at || null;
@@ -254,19 +315,130 @@ export async function POST(request: NextRequest) {
       reservedSlotAt = slotStart;
     }
 
-    const insert = await sql`
-      INSERT INTO orders (customer_name, customer_email, customer_phone, pickup_location_id, pickup_slot_at, notes, subtotal, total, promo_code)
-      VALUES (${customer_name}, ${customer_email}, ${customer_phone}, ${resolvedLocationId}, ${pickup_slot_at || null}, ${notes || orderRef || null}, ${subtotal}, ${total}, ${appliedPromoCode})
-      RETURNING id, created_at
-    `;
+    if (!pool) {
+      return NextResponse.json({ error: "Database not configured" }, { status: 500 });
+    }
 
-    const orderId = insert[0]?.id;
+    // From here on, everything happens inside one real, interactive
+    // Postgres transaction (BEGIN/COMMIT/ROLLBACK) rather than as several
+    // independent HTTP requests. Two reasons:
+    //
+    // 1. Order + line items must be all-or-nothing. Previously each
+    //    `order_items` INSERT was its own request; if one failed partway
+    //    through the loop (a bad value, a dropped connection, etc.) the
+    //    order row and whichever items *had* already been inserted were
+    //    left behind — a corrupt, partial order with no rollback.
+    //
+    // 2. Promo code redemption must be race-free. Previously "how many
+    //    times has this code been used" was read, checked against
+    //    max_uses, and only *then* — in a later, separate request — did the
+    //    order (which counts as a use) get written. Two checkouts redeeming
+    //    the same code at the same moment could both pass the check before
+    //    either order exists, letting a code be used more than its max_uses
+    //    allows. `SELECT ... FOR UPDATE` below locks the discount code's
+    //    row so a second concurrent redemption blocks until the first
+    //    transaction commits (or rolls back), then re-checks the count.
+    const client = await pool.connect();
+    let orderId: number | null = null;
+    let discountAmount = autoDiscountAmount;
+    let appliedPromoCode: string | null = null;
+    let promoFreeItem: OrderLineItem | null = null;
 
-    for (const it of cart) {
-      await sql`
-        INSERT INTO order_items (order_id, product_id, variant_id, snapshot_product_name, snapshot_variant_label, snapshot_unit_price, quantity)
-        VALUES (${orderId}, ${it.productId}, ${it.variantId}, ${it.name}, ${it.variantLabel}, ${it.price}, ${it.qty})
-      `;
+    try {
+      await client.query("BEGIN");
+
+      if (promo_code && String(promo_code).trim()) {
+        const promoRows = await client.query(
+          `SELECT * FROM discount_codes
+           WHERE UPPER(code) = UPPER($1)
+             AND active = TRUE
+             AND valid_from <= CURRENT_TIMESTAMP
+             AND (valid_until IS NULL OR valid_until >= CURRENT_TIMESTAMP)
+           LIMIT 1
+           FOR UPDATE`,
+          [promo_code],
+        );
+
+        if (promoRows.rows.length > 0) {
+          const discount = promoRows.rows[0];
+          const usesResult = await client.query(
+            `SELECT COUNT(*) FROM orders WHERE promo_code = $1`,
+            [discount.code],
+          );
+          const currentUses = parseInt(usesResult.rows[0].count, 10);
+          const withinUsageLimit = !discount.max_uses || currentUses < discount.max_uses;
+
+          if (withinUsageLimit) {
+            if (discount.discount_type === "percentage") {
+              discountAmount += subtotal * (Number(discount.discount_value) / 100);
+            } else if (discount.discount_type === "free_item" && discount.free_product_id) {
+              const variant = await findFreeVariant(discount.free_product_id, discount.free_variant_id);
+              if (variant) {
+                promoFreeItem = {
+                  productId: discount.free_product_id,
+                  variantId: variant.id,
+                  name: `${variant.product_name} (Free — ${discount.code})`,
+                  variantLabel: variant.label ?? undefined,
+                  price: 0,
+                  qty: 1,
+                };
+              }
+            }
+            appliedPromoCode = discount.code;
+          }
+          // If the code is invalid/expired/exhausted, we simply don't apply
+          // a discount rather than failing the whole order.
+        }
+      }
+
+      const total = Math.max(0, subtotal - discountAmount);
+      const finalItems: OrderLineItem[] = [...verifiedCart];
+      if (autoFreeItem) finalItems.push(autoFreeItem);
+      // Don't give the same free item away twice if both a promo code and
+      // an auto-discount happen to reward the exact same product+variant.
+      if (promoFreeItem && !(autoFreeItem && autoFreeItem.productId === promoFreeItem.productId && autoFreeItem.variantId === promoFreeItem.variantId)) {
+        finalItems.push(promoFreeItem);
+      }
+
+      const insertResult = await client.query(
+        `INSERT INTO orders (customer_name, customer_email, customer_phone, pickup_location_id, pickup_slot_at, notes, subtotal, total, promo_code)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+         RETURNING id, created_at`,
+        [
+          customer_name,
+          customer_email,
+          customer_phone,
+          resolvedLocationId,
+          pickup_slot_at || null,
+          notes || orderRef || null,
+          subtotal,
+          total,
+          appliedPromoCode,
+        ],
+      );
+      orderId = insertResult.rows[0].id;
+
+      for (const it of finalItems) {
+        await client.query(
+          `INSERT INTO order_items (order_id, product_id, variant_id, snapshot_product_name, snapshot_variant_label, snapshot_unit_price, quantity)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          [orderId, it.productId, it.variantId, it.name, it.variantLabel, it.price, it.qty],
+        );
+      }
+
+      await client.query("COMMIT");
+    } catch (err) {
+      await client.query("ROLLBACK").catch(() => {});
+      throw err;
+    } finally {
+      client.release();
+    }
+
+    const total = Math.max(0, subtotal - discountAmount);
+    const cart: OrderLineItem[] = [...verifiedCart];
+    if (autoFreeItem) cart.push(autoFreeItem);
+    if (promoFreeItem && !(autoFreeItem && autoFreeItem.productId === promoFreeItem.productId && autoFreeItem.variantId === promoFreeItem.variantId)) {
+      cart.push(promoFreeItem);
     }
 
     let sellerEmail: string | null = null;

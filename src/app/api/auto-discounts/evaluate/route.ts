@@ -10,26 +10,42 @@ export async function POST(request: NextRequest) {
     const { cart, cartTotal } = await request.json();
 
     // Fetch active auto-discounts ordered by priority
+    //
+    // NOTE: this used to alias two subqueries as `effect_free_variant_id` /
+    // `effect_free_variant_label` — the *same* names as columns already
+    // pulled in by `ad.*`. With duplicate column names in a Postgres result,
+    // the driver keeps only the last one, so the admin's actual configured
+    // free variant (`ad.effect_free_variant_id`) was always silently
+    // discarded in favor of "whatever variant of that product is cheapest".
+    // We now select the fallback under different names and COALESCE, so the
+    // admin's explicit choice wins when set, falling back to the cheapest
+    // active variant only when they didn't pick one.
     const discounts = await sql`
       SELECT 
         ad.*,
         tp.name as trigger_product_name,
         fp.name as effect_free_product_name,
         fp.slug as effect_free_product_slug,
-        (
-          SELECT v.id
-          FROM product_variants v
-          WHERE v.product_id = fp.id
-          ORDER BY v.price ASC
-          LIMIT 1
-        ) as effect_free_variant_id,
-        (
-          SELECT v.label
-          FROM product_variants v
-          WHERE v.product_id = fp.id
-          ORDER BY v.price ASC
-          LIMIT 1
-        ) as effect_free_variant_label
+        COALESCE(
+          ad.effect_free_variant_id,
+          (
+            SELECT v.id
+            FROM product_variants v
+            WHERE v.product_id = fp.id
+            ORDER BY v.price ASC
+            LIMIT 1
+          )
+        ) as resolved_free_variant_id,
+        COALESCE(
+          (SELECT v.label FROM product_variants v WHERE v.id = ad.effect_free_variant_id),
+          (
+            SELECT v.label
+            FROM product_variants v
+            WHERE v.product_id = fp.id
+            ORDER BY v.price ASC
+            LIMIT 1
+          )
+        ) as resolved_free_variant_label
       FROM auto_discounts ad
       LEFT JOIN products tp ON ad.trigger_product_id = tp.id
       LEFT JOIN products fp ON ad.effect_free_product_id = fp.id
@@ -70,8 +86,8 @@ export async function POST(request: NextRequest) {
             productId: discount.effect_free_product_id,
             productName: discount.effect_free_product_name,
             productSlug: discount.effect_free_product_slug,
-            variantId: discount.effect_free_variant_id,
-            variantLabel: discount.effect_free_variant_label || "Default",
+            variantId: discount.resolved_free_variant_id,
+            variantLabel: discount.resolved_free_variant_label || "Default",
           };
         }
 

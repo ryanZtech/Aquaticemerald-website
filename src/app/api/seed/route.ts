@@ -282,7 +282,19 @@ export async function GET() {
 
     await sql`CREATE TABLE IF NOT EXISTS availability_overrides (id SERIAL PRIMARY KEY, pickup_location_id INTEGER REFERENCES pickup_locations(id) ON DELETE CASCADE, start_at TIMESTAMP WITH TIME ZONE NOT NULL, end_at TIMESTAMP WITH TIME ZONE NOT NULL, override_type TEXT NOT NULL, custom_hours_json JSONB, reason TEXT, active BOOLEAN DEFAULT TRUE);`;
 
-    await sql`CREATE TABLE IF NOT EXISTS orders (id SERIAL PRIMARY KEY, customer_name TEXT NOT NULL, customer_email TEXT NOT NULL, customer_phone TEXT, pickup_location_id INTEGER REFERENCES pickup_locations(id), pickup_slot_at TIMESTAMP WITH TIME ZONE NOT NULL, status TEXT DEFAULT 'pending', notes TEXT, subtotal NUMERIC(10, 2) NOT NULL, total NUMERIC(10, 2) NOT NULL, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP);`;
+    // NOTE: pickup_slot_at must be nullable. "Custom location" checkouts
+    // (see CheckoutClient.tsx: `isCustomLocation ? null : timeWindow`)
+    // intentionally submit no fixed slot — pickup time is arranged with the
+    // customer over WhatsApp afterwards instead. With this column
+    // NOT NULL (as it originally was), every custom-location order fails
+    // outright at the database with a constraint violation, surfaced to the
+    // customer as a generic "Failed to create order."
+    await sql`CREATE TABLE IF NOT EXISTS orders (id SERIAL PRIMARY KEY, customer_name TEXT NOT NULL, customer_email TEXT NOT NULL, customer_phone TEXT, pickup_location_id INTEGER REFERENCES pickup_locations(id), pickup_slot_at TIMESTAMP WITH TIME ZONE, status TEXT DEFAULT 'pending', notes TEXT, subtotal NUMERIC(10, 2) NOT NULL, total NUMERIC(10, 2) NOT NULL, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP);`;
+
+    // `CREATE TABLE IF NOT EXISTS` above only affects a brand-new database —
+    // it does nothing to a table that already exists (which is the case for
+    // any store that's already taken orders). Patch existing installs too.
+    await sql`ALTER TABLE orders ALTER COLUMN pickup_slot_at DROP NOT NULL;`;
 
     await sql`CREATE TABLE IF NOT EXISTS order_items (id SERIAL PRIMARY KEY, order_id INTEGER REFERENCES orders(id) ON DELETE CASCADE, product_id TEXT, variant_id TEXT, snapshot_product_name TEXT NOT NULL, snapshot_variant_label TEXT, snapshot_unit_price NUMERIC(10, 2) NOT NULL, quantity INTEGER NOT NULL);`;
 
