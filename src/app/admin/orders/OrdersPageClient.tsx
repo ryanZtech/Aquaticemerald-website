@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/app/components/ui/table";
 import { Button } from "@/app/components/ui/button";
-import { Copy, Check, Trash2, ChevronDown, ChevronRight, Phone, Mail } from "lucide-react";
+import { Copy, Check, X, Trash2, ChevronDown, ChevronRight, Phone, Mail } from "lucide-react";
 import { toast } from "sonner";
 
 interface OrderItem {
@@ -143,10 +143,13 @@ export default function OrdersPageClient() {
 
   const formatPickupTime = (dateStr: string) => {
     const date = new Date(dateStr);
-    const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-    const day = dayNames[date.getDay()];
+    const datePart = date.toLocaleDateString("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    });
     const time = date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-    return `${day}, ${time}`;
+    return `${datePart}, ${time}`;
   };
 
   const copyMessage = (order: Order) => {
@@ -366,19 +369,21 @@ export default function OrdersPageClient() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/50">
-                  <TableHead className="w-[32px]" />
-                  <TableHead>Order #</TableHead>
+                  <TableHead className="w-[40px]" />
+                  <TableHead className="w-[40px]" />
+                  <TableHead>Order</TableHead>
                   <TableHead>Customer</TableHead>
                   <TableHead>Items</TableHead>
                   <TableHead>Total</TableHead>
-                  <TableHead>Pickup Time</TableHead>
+                  <TableHead>Pickup</TableHead>
+                  <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {picked.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-12 text-muted-foreground font-light">No picked up orders</TableCell>
+                    <TableCell colSpan={9} className="text-center py-12 text-muted-foreground font-light">No picked up orders</TableCell>
                   </TableRow>
                 ) : (
                   picked.map((o) => (
@@ -388,6 +393,7 @@ export default function OrdersPageClient() {
                         className="cursor-pointer hover:bg-muted/30 transition-colors"
                         onClick={() => toggleExpand(o.id)}
                       >
+                        <TableCell />
                         <TableCell>
                           {expandedOrders.has(o.id)
                             ? <ChevronDown className="w-4 h-4 text-muted-foreground" />
@@ -406,20 +412,28 @@ export default function OrdersPageClient() {
                         </TableCell>
                         <TableCell>${Number(o.total).toFixed(2)}</TableCell>
                         <TableCell>{o.pickup_slot_at ? formatPickupTime(o.pickup_slot_at) : "—"}</TableCell>
+                        <TableCell>
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400">
+                            {o.status}
+                          </span>
+                        </TableCell>
                         <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                           <div className="flex justify-end gap-2">
-                            <Button variant="ghost" size="icon" onClick={() => toggleCopy(o.id, () => copyMessage(o))}>
+                            <Button variant="ghost" size="icon" onClick={() => toggleCopy(o.id, () => copyMessage(o))} className="cursor-pointer">
                               {copyState[o.id] ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
                             </Button>
-                            <Button variant="ghost" size="icon" onClick={() => handleTogglePicked(o)}>
-                              <Check className="w-4 h-4" />
+                            <Button variant="ghost" size="icon" onClick={() => handleTogglePicked(o)} className="cursor-pointer" title="Move back to incomplete">
+                              <X className="w-4 h-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => handleDeleteOrder(o)} className="cursor-pointer text-destructive hover:text-destructive" title="Delete order">
+                              <Trash2 className="w-4 h-4" />
                             </Button>
                           </div>
                         </TableCell>
                       </TableRow>
                       {expandedOrders.has(o.id) && (
                         <TableRow key={`${o.id}-detail`} className="bg-muted/10 hover:bg-muted/10">
-                          <TableCell colSpan={7} className="p-0">
+                          <TableCell colSpan={9} className="p-0">
                             <OrderItemsDetail items={o.items} total={o.total} />
                           </TableCell>
                         </TableRow>
