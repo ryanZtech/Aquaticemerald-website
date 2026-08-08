@@ -310,6 +310,67 @@ export async function GET() {
       );
     `;
 
+    // --- Fix mistyped variant-reference columns on discount_codes / auto_discounts ---
+    // discount_codes.free_variant_id, auto_discounts.trigger_variant_id, and
+    // auto_discounts.effect_free_variant_id were created as INTEGER, but
+    // product_variants.id is TEXT (slug-style ids like
+    // "redroot-var_1699999999_0"), so a valid variant reference could never
+    // actually be stored in any of them — comparing them against
+    // product_variants.id even threw "operator does not exist: text =
+    // integer". The admin promo UI compounded this further by running
+    // parseInt() on the (text) variant id before saving, which is always
+    // NaN for a non-numeric id and silently became null — so in practice
+    // these fields have always saved as null regardless of what an admin
+    // picked (not that there's currently a variant picker in that UI at
+    // all). Neither table is created by this script (both predate it /
+    // were added by hand outside of it), so guard with to_regclass and only
+    // touch them if they exist. ALTER COLUMN ... TYPE is a no-op if the
+    // column is already TEXT; ADD CONSTRAINT is caught and ignored if it's
+    // already there — both safe to run every time this endpoint is hit.
+    const discountCodesExists = await sql`SELECT to_regclass('public.discount_codes') AS reg`;
+    if (discountCodesExists[0]?.reg) {
+      try {
+        await sql`ALTER TABLE discount_codes ALTER COLUMN free_variant_id TYPE TEXT USING free_variant_id::text`;
+      } catch (e: any) {
+        console.warn("Seed: could not convert discount_codes.free_variant_id to TEXT:", e?.message || e);
+      }
+      try {
+        await sql`ALTER TABLE discount_codes ADD CONSTRAINT discount_codes_free_variant_id_fkey FOREIGN KEY (free_variant_id) REFERENCES product_variants(id) ON DELETE SET NULL`;
+      } catch (e: any) {
+        if (!/already exists/i.test(e?.message || "")) {
+          console.warn("Seed: could not add FK on discount_codes.free_variant_id:", e?.message || e);
+        }
+      }
+    }
+
+    const autoDiscountsExists = await sql`SELECT to_regclass('public.auto_discounts') AS reg`;
+    if (autoDiscountsExists[0]?.reg) {
+      try {
+        await sql`ALTER TABLE auto_discounts ALTER COLUMN trigger_variant_id TYPE TEXT USING trigger_variant_id::text`;
+      } catch (e: any) {
+        console.warn("Seed: could not convert auto_discounts.trigger_variant_id to TEXT:", e?.message || e);
+      }
+      try {
+        await sql`ALTER TABLE auto_discounts ALTER COLUMN effect_free_variant_id TYPE TEXT USING effect_free_variant_id::text`;
+      } catch (e: any) {
+        console.warn("Seed: could not convert auto_discounts.effect_free_variant_id to TEXT:", e?.message || e);
+      }
+      try {
+        await sql`ALTER TABLE auto_discounts ADD CONSTRAINT auto_discounts_trigger_variant_id_fkey FOREIGN KEY (trigger_variant_id) REFERENCES product_variants(id) ON DELETE CASCADE`;
+      } catch (e: any) {
+        if (!/already exists/i.test(e?.message || "")) {
+          console.warn("Seed: could not add FK on auto_discounts.trigger_variant_id:", e?.message || e);
+        }
+      }
+      try {
+        await sql`ALTER TABLE auto_discounts ADD CONSTRAINT auto_discounts_effect_free_variant_id_fkey FOREIGN KEY (effect_free_variant_id) REFERENCES product_variants(id) ON DELETE SET NULL`;
+      } catch (e: any) {
+        if (!/already exists/i.test(e?.message || "")) {
+          console.warn("Seed: could not add FK on auto_discounts.effect_free_variant_id:", e?.message || e);
+        }
+      }
+    }
+
     console.log("Neon Seed API: Tables validated. Seeding records...");
 
     const categories = Array.from(new Set(PRODUCTS.map((p) => p.category)));
@@ -318,8 +379,54 @@ export async function GET() {
     }
 
     const attributeNames = ["Care Level", "Light", "Average Size", "Origin"];
+
+    // --- One-time cleanup of duplicate product_attributes rows ---
+    // The insert below used to be `ON CONFLICT DO NOTHING` with no target,
+    // but product_attributes only had a UNIQUE constraint on `id` (which
+    // auto-increments and never collides) — nothing was ever actually
+    // deduplicated on `name`. Every hit of this endpoint therefore inserted
+    // 4 fresh duplicate rows ("Care Level", "Light", "Average Size",
+    // "Origin"). Once a product has product_attribute_values under two
+    // different ids that both mean e.g. "Care Level", the public product
+    // list's query throws "more than one row returned by a subquery used
+    // as an expression" and the ENTIRE storefront goes down (not just that
+    // one product) — see src/lib/dataService.ts:getProducts(). Merge any
+    // existing duplicates onto their lowest id before adding the
+    // constraint that prevents this from recurring.
+    const dupeGroups = await sql`
+      SELECT name, array_agg(id ORDER BY id) AS ids
+      FROM product_attributes
+      GROUP BY name
+      HAVING COUNT(*) > 1
+    `;
+    for (const group of dupeGroups as any[]) {
+      const ids: number[] = group.ids;
+      const keeperId = ids[0];
+      const dupeIds = ids.slice(1);
+      for (const dupeId of dupeIds) {
+        await sql`
+          DELETE FROM product_attribute_values pav
+          WHERE pav.attribute_id = ${dupeId}
+            AND EXISTS (
+              SELECT 1 FROM product_attribute_values k
+              WHERE k.attribute_id = ${keeperId} AND k.product_id = pav.product_id
+            )
+        `;
+        await sql`UPDATE product_attribute_values SET attribute_id = ${keeperId} WHERE attribute_id = ${dupeId}`;
+      }
+      await sql`DELETE FROM product_attributes WHERE id = ANY(${dupeIds})`;
+      console.warn(`Seed: merged ${dupeIds.length} duplicate "${group.name}" attribute row(s) onto id ${keeperId}.`);
+    }
+    try {
+      await sql`ALTER TABLE product_attributes ADD CONSTRAINT product_attributes_name_key UNIQUE (name)`;
+    } catch (e: any) {
+      if (!/already exists/i.test(e?.message || "")) {
+        console.warn("Seed: could not add UNIQUE constraint on product_attributes.name:", e?.message || e);
+      }
+    }
+
     for (const name of attributeNames) {
-      await sql`INSERT INTO product_attributes (name, data_type) VALUES (${name}, 'string') ON CONFLICT DO NOTHING;`;
+      await sql`INSERT INTO product_attributes (name, data_type) VALUES (${name}, 'string') ON CONFLICT (name) DO NOTHING;`;
     }
     const attributesResult =
       await sql`SELECT id, name FROM product_attributes;`;
@@ -333,7 +440,33 @@ export async function GET() {
     );
 
     for (const p of PRODUCTS) {
-      await sql`INSERT INTO products (id, name, slug, short_description, full_description, category_id) VALUES (${p.id}, ${p.name}, ${p.slug}, ${p.description.substring(0, 100) + "..."}, ${p.description}, ${catMap[p.category]}) ON CONFLICT (id) DO NOTHING;`;
+      // Each product is inserted (with its variants/image/attributes) as its
+      // own try/catch unit. Previously a single `ON CONFLICT (id) DO
+      // NOTHING` only guarded against an id collision — but products.slug
+      // has its own independent UNIQUE constraint, so if some other row
+      // already holds this slug (e.g. a product was recreated by hand
+      // through the admin panel with a new id but the same slug), the
+      // INSERT throws "duplicate key value violates unique constraint
+      // products_slug_key" instead of being ignored, which aborted the
+      // *entire* seed run — every product after the colliding one, plus
+      // locations/settings below, never got seeded either.
+      //
+      // Catching per-product means one stale/colliding row just gets
+      // skipped (logged below) instead of taking down the whole run. We
+      // also skip that product's variants/image/attributes in the same
+      // pass: if the products row wasn't actually inserted (because a
+      // different row owns this slug), then `p.id` doesn't exist as a real
+      // products.id, and inserting product_variants/images referencing it
+      // would just fail its own foreign-key constraint next.
+      try {
+        await sql`INSERT INTO products (id, name, slug, short_description, full_description, category_id) VALUES (${p.id}, ${p.name}, ${p.slug}, ${p.description.substring(0, 100) + "..."}, ${p.description}, ${catMap[p.category]}) ON CONFLICT (id) DO NOTHING;`;
+      } catch (err: any) {
+        console.warn(
+          `Seed: skipping product "${p.id}" (slug "${p.slug}") — insert failed, likely a slug collision with an existing row: ${err?.message || err}`,
+        );
+        continue;
+      }
+
       for (const v of p.variants) {
         const varId = `${p.id}-${v.id}`;
         await sql`INSERT INTO product_variants (id, product_id, label, price) VALUES (${varId}, ${p.id}, ${v.label}, ${v.price}) ON CONFLICT (id) DO NOTHING;`;

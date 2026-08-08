@@ -128,10 +128,22 @@ export async function PUT(
       WHERE id = ${id}
     `;
 
-    await sql`DELETE FROM product_variants WHERE product_id = ${id}`;
+    // Upsert (not delete-then-recreate) each submitted variant. Variant
+    // rows that simply persist across an edit now keep their existing
+    // variant_images row(s) intact — variant_images.variant_id cascades on
+    // delete, so wiping every variant on every save (even just to fix a
+    // typo elsewhere on the product) was silently dropping every variant
+    // photo down to whichever single image this form resubmitted (and
+    // resetting sku/sort_order to their defaults every time too, since
+    // neither was ever included in the re-insert). Only variants actually
+    // removed from the form (no longer present in `variants`) get deleted
+    // below — which still correctly cascades their images away, since the
+    // variant itself is genuinely gone.
+    const submittedVariantIds: string[] = [];
 
     for (const variant of variants) {
       const variantId = `${id}-${variant.id}`;
+      submittedVariantIds.push(variantId);
       const stockLevel = normalizeStockLevel(
         variant.stock_level || variant.stockLevel,
       );
@@ -139,6 +151,12 @@ export async function PUT(
       await sql`
         INSERT INTO product_variants (id, product_id, label, price, stock_level, active)
         VALUES (${variantId}, ${id}, ${variant.label}, ${variant.price}, ${stockLevel}, TRUE)
+        ON CONFLICT (id) DO UPDATE SET
+          label = EXCLUDED.label,
+          price = EXCLUDED.price,
+          stock_level = EXCLUDED.stock_level,
+          active = TRUE,
+          updated_at = CURRENT_TIMESTAMP
       `;
 
       const variantImageFile = formData.get(
@@ -157,17 +175,43 @@ export async function PUT(
             addRandomSuffix: true,
           },
         );
+        // A new image was uploaded for this variant — replace only its
+        // primary image row, leaving any other images it might have alone.
+        await sql`DELETE FROM variant_images WHERE variant_id = ${variantId} AND is_primary = TRUE`;
         await sql`
           INSERT INTO variant_images (variant_id, image_url, alt_text, is_primary)
           VALUES (${variantId}, ${blob.url}, ${variant.label}, TRUE)
         `;
       } else if (variant.image_url) {
-        await sql`
-          INSERT INTO variant_images (variant_id, image_url, alt_text, is_primary)
-          VALUES (${variantId}, ${variant.image_url}, ${variant.label}, TRUE)
+        // No new upload — the form is just echoing back the image it
+        // already had. Make sure a primary row exists (covers a brand-new
+        // variant, or one whose image predates this fix) without
+        // duplicating it if one's already there, and keep alt_text in sync
+        // with the variant's current label.
+        const existingPrimary = await sql`
+          SELECT id FROM variant_images WHERE variant_id = ${variantId} AND is_primary = TRUE LIMIT 1
         `;
+        if (existingPrimary.length > 0) {
+          await sql`
+            UPDATE variant_images SET alt_text = ${variant.label}
+            WHERE id = ${existingPrimary[0].id}
+          `;
+        } else {
+          await sql`
+            INSERT INTO variant_images (variant_id, image_url, alt_text, is_primary)
+            VALUES (${variantId}, ${variant.image_url}, ${variant.label}, TRUE)
+          `;
+        }
       }
     }
+
+    // Now remove any variant the admin actually deleted from the form (and,
+    // via cascade, its images) — but only those, not every variant.
+    await sql`
+      DELETE FROM product_variants
+      WHERE product_id = ${id}
+        AND id != ALL(${submittedVariantIds.length > 0 ? submittedVariantIds : [null]})
+    `;
 
     if (newImages.length > 0 || productImages.length > 0) {
       const existingImages: any[] =
