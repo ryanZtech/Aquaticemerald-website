@@ -26,12 +26,26 @@ interface Order {
   pickup_slot_at: string | null;
   status: string;
   subtotal: number;
+  discount_amount: number | null;
+  promo_code: string | null;
   total: number;
   created_at: string;
   items: OrderItem[];
 }
 
-function OrderItemsDetail({ items, total }: { items: OrderItem[]; total: number }) {
+function OrderItemsDetail({
+  items,
+  subtotal,
+  discountAmount,
+  promoCode,
+  total,
+}: {
+  items: OrderItem[];
+  subtotal: number;
+  discountAmount: number | null;
+  promoCode: string | null;
+  total: number;
+}) {
   return (
     <div className="px-4 pb-4 pt-1">
       <div className="bg-muted/40 rounded-xl border border-border/60 overflow-hidden">
@@ -59,6 +73,20 @@ function OrderItemsDetail({ items, total }: { items: OrderItem[]; total: number 
             ))}
           </tbody>
           <tfoot>
+            <tr className="border-t border-border/60">
+              <td colSpan={4} className="px-4 py-1.5 text-right text-muted-foreground">Subtotal</td>
+              <td className="px-4 py-1.5 text-right text-muted-foreground">${Number(subtotal).toFixed(2)}</td>
+            </tr>
+            {Boolean(discountAmount) && Number(discountAmount) > 0 && (
+              <tr>
+                <td colSpan={4} className="px-4 py-1.5 text-right text-emerald-600 dark:text-emerald-400">
+                  Discount{promoCode ? ` (${promoCode})` : ""}
+                </td>
+                <td className="px-4 py-1.5 text-right text-emerald-600 dark:text-emerald-400">
+                  -${Number(discountAmount).toFixed(2)}
+                </td>
+              </tr>
+            )}
             <tr className="bg-muted/60">
               <td colSpan={4} className="px-4 py-2 text-right font-semibold text-sm">Total</td>
               <td className="px-4 py-2 text-right font-semibold text-primary">${Number(total).toFixed(2)}</td>
@@ -323,7 +351,7 @@ export default function OrdersPageClient() {
                         {o.items.map(i => `${i.quantity}× ${i.snapshot_product_name}`).join(", ")}
                       </div>
                     </TableCell>
-                    <TableCell className="font-medium">${Number(o.total).toFixed(2)}</TableCell>
+                    <TableCell className="font-medium">${Number(o.total).toFixed(2)}{o.promo_code && (<span className="ml-1.5 text-[10px] font-normal text-emerald-600 dark:text-emerald-400 align-middle">{o.promo_code}</span>)}</TableCell>
                     <TableCell>
                       <div>{o.pickup_location_name || "—"}</div>
                       <span className="text-xs text-muted-foreground">
@@ -349,7 +377,7 @@ export default function OrdersPageClient() {
                   {expandedOrders.has(o.id) && (
                     <TableRow key={`${o.id}-detail`} className="bg-muted/10 hover:bg-muted/10">
                       <TableCell colSpan={9} className="p-0">
-                        <OrderItemsDetail items={o.items} total={o.total} />
+                        <OrderItemsDetail items={o.items} subtotal={o.subtotal} discountAmount={o.discount_amount} promoCode={o.promo_code} total={o.total} />
                       </TableCell>
                     </TableRow>
                   )}
@@ -410,7 +438,7 @@ export default function OrdersPageClient() {
                             {o.items.map(i => `${i.quantity}× ${i.snapshot_product_name}`).join(", ")}
                           </div>
                         </TableCell>
-                        <TableCell>${Number(o.total).toFixed(2)}</TableCell>
+                        <TableCell>${Number(o.total).toFixed(2)}{o.promo_code && (<span className="ml-1.5 text-[10px] font-normal text-emerald-600 dark:text-emerald-400 align-middle">{o.promo_code}</span>)}</TableCell>
                         <TableCell>{o.pickup_slot_at ? formatPickupTime(o.pickup_slot_at) : "—"}</TableCell>
                         <TableCell>
                           <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400">
@@ -434,7 +462,7 @@ export default function OrdersPageClient() {
                       {expandedOrders.has(o.id) && (
                         <TableRow key={`${o.id}-detail`} className="bg-muted/10 hover:bg-muted/10">
                           <TableCell colSpan={9} className="p-0">
-                            <OrderItemsDetail items={o.items} total={o.total} />
+                            <OrderItemsDetail items={o.items} subtotal={o.subtotal} discountAmount={o.discount_amount} promoCode={o.promo_code} total={o.total} />
                           </TableCell>
                         </TableRow>
                       )}

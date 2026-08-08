@@ -63,7 +63,7 @@ export async function GET() {
 
   try {
     const rows = await sql`
-      SELECT o.id, o.customer_name, o.customer_email, o.customer_phone, o.pickup_location_id, pl.name as pickup_location_name, o.pickup_slot_at, o.status, o.subtotal, o.total, o.created_at,
+      SELECT o.id, o.customer_name, o.customer_email, o.customer_phone, o.pickup_location_id, pl.name as pickup_location_name, o.pickup_slot_at, o.status, o.subtotal, o.discount_amount, o.promo_code, o.total, o.created_at,
         coalesce(
           json_agg(
             json_build_object(
@@ -401,8 +401,8 @@ export async function POST(request: NextRequest) {
       }
 
       const insertResult = await client.query(
-        `INSERT INTO orders (customer_name, customer_email, customer_phone, pickup_location_id, pickup_slot_at, notes, subtotal, total, promo_code)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        `INSERT INTO orders (customer_name, customer_email, customer_phone, pickup_location_id, pickup_slot_at, notes, subtotal, discount_amount, total, promo_code)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
          RETURNING id, created_at`,
         [
           customer_name,
@@ -412,6 +412,7 @@ export async function POST(request: NextRequest) {
           pickup_slot_at || null,
           notes || orderRef || null,
           subtotal,
+          discountAmount,
           total,
           appliedPromoCode,
         ],
@@ -561,7 +562,15 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ success: true, orderId });
+    return NextResponse.json({
+      success: true,
+      orderId,
+      subtotal,
+      discountAmount,
+      total,
+      promoCode: appliedPromoCode,
+      freeItems: cart.filter((it) => it.price === 0).map((it) => it.name),
+    });
   } catch (error) {
     console.error("Error creating order:", error);
     if (reservedSlot && reservedLocationId && reservedSlotAt) {

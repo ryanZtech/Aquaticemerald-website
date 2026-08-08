@@ -93,7 +93,7 @@ export default function CheckoutClient({
   hours,
   whatsapp,
 }: CheckoutClientProps) {
-  const { cart, cartTotal, clearCart } = useCart();
+  const { cart, cartTotal, clearCart, autoDiscount } = useCart();
   const router = useRouter();
 
   const today = new Date();
@@ -202,7 +202,14 @@ export default function CheckoutClient({
   };
 
   const subtotal = cart.reduce((s, it) => s + it.price * it.qty, 0);
-  const discountAmount = appliedPromo?.discount_amount || 0;
+  // Combine the automatic discount (evaluated from the cart, no code
+  // needed) with any manually-applied promo code — this mirrors exactly
+  // how the server computes it in orders/route.ts (autoDiscountAmount +
+  // promo discount, additive), so what's shown here is what will actually
+  // be charged rather than a guess that only ever reflected the promo code.
+  const autoDiscountAmount = autoDiscount?.discount_amount || 0;
+  const promoDiscountAmount = appliedPromo?.discount_amount || 0;
+  const discountAmount = autoDiscountAmount + promoDiscountAmount;
   const finalTotal = Math.max(0, subtotal - discountAmount);
 
   const availableMonths = Array.from({ length: 6 }, (_, i) => {
@@ -530,6 +537,34 @@ export default function CheckoutClient({
             ))}
           </div>
 
+          {/* Automatic discount — evaluated from the cart itself, no code
+              needed. Shown here so what the customer sees before submitting
+              matches what the cart page already promised them (previously
+              this never appeared anywhere in checkout at all). */}
+          {autoDiscount && (
+            <div className="mb-4 pb-4 border-b border-border">
+              <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg px-3 py-2">
+                <p className="text-xs font-semibold text-green-700 dark:text-green-400">
+                  {autoDiscount.name}
+                </p>
+                {autoDiscount.description && (
+                  <p className="text-xs text-green-600 dark:text-green-500 mt-0.5">
+                    {autoDiscount.description}
+                  </p>
+                )}
+                {autoDiscount.free_item ? (
+                  <p className="text-xs text-green-600 dark:text-green-500 mt-1 font-medium">
+                    🎁 Includes free: {autoDiscount.free_item.productName}
+                  </p>
+                ) : autoDiscount.discount_amount > 0 ? (
+                  <p className="text-xs text-green-600 dark:text-green-500 mt-1 font-medium">
+                    💰 ${autoDiscount.discount_amount.toFixed(2)} off
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          )}
+
           {/* Promo Code Input */}
           {!appliedPromo ? (
             <div className="mb-4 pb-4 border-b border-border">
@@ -593,7 +628,10 @@ export default function CheckoutClient({
             </div>
             {discountAmount > 0 && (
               <div className="flex justify-between text-sm text-green-600 dark:text-green-400">
-                <span>Discount</span>
+                <span>
+                  Discount
+                  {autoDiscountAmount > 0 && promoDiscountAmount > 0 ? " (auto + promo)" : autoDiscountAmount > 0 ? " (auto)" : ""}
+                </span>
                 <span>-${discountAmount.toFixed(2)}</span>
               </div>
             )}
