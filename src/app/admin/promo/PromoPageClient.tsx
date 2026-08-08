@@ -18,7 +18,7 @@ interface DiscountCode {
   discount_type: string;
   discount_value: number | null;
   free_product_id: number | null;
-  free_variant_id: number | null;
+  free_variant_id: string | null;
   free_product_name: string | null;
   valid_from: string;
   valid_until: string | null;
@@ -34,12 +34,12 @@ interface AutoDiscount {
   trigger_type: string;
   trigger_spend_amount: number | null;
   trigger_product_id: number | null;
-  trigger_variant_id: number | null;
+  trigger_variant_id: string | null;
   trigger_product_name: string | null;
   effect_type: string;
   effect_value: number | null;
   effect_free_product_id: number | null;
-  effect_free_variant_id: number | null;
+  effect_free_variant_id: string | null;
   effect_free_product_name: string | null;
   priority: number;
   active: boolean;
@@ -197,7 +197,7 @@ export default function PromoPageClient() {
       discount_type: code.discount_type,
       discount_value: code.discount_value?.toString() || "",
       free_product_id: code.free_product_id?.toString() || "",
-      free_variant_id: code.free_variant_id?.toString() || "",
+      free_variant_id: code.free_variant_id || "",
       valid_from: new Date(code.valid_from).toISOString().slice(0, 16),
       valid_until: code.valid_until ? new Date(code.valid_until).toISOString().slice(0, 16) : "",
       max_uses: code.max_uses?.toString() || "",
@@ -215,7 +215,12 @@ export default function PromoPageClient() {
         ...codeForm,
         discount_value: codeForm.discount_value ? parseFloat(codeForm.discount_value) : null,
         free_product_id: codeForm.free_product_id || null,
-        free_variant_id: codeForm.free_variant_id ? parseInt(codeForm.free_variant_id) : null,
+        // free_variant_id is product_variants.id, a TEXT (slug-style) key —
+        // NOT a number. It used to go through parseInt(), which on a
+        // non-numeric id like "redroot-var_123" returns NaN, and
+        // `NaN || null` is always `null` — so this field could never
+        // actually be saved even if a variant picker existed in the UI.
+        free_variant_id: codeForm.free_variant_id || null,
         max_uses: codeForm.max_uses ? parseInt(codeForm.max_uses) : null,
       };
 
@@ -290,11 +295,11 @@ export default function PromoPageClient() {
       trigger_type: discount.trigger_type,
       trigger_spend_amount: discount.trigger_spend_amount?.toString() || "",
       trigger_product_id: discount.trigger_product_id?.toString() || "",
-      trigger_variant_id: discount.trigger_variant_id?.toString() || "",
+      trigger_variant_id: discount.trigger_variant_id || "",
       effect_type: discount.effect_type,
       effect_value: discount.effect_value?.toString() || "",
       effect_free_product_id: discount.effect_free_product_id?.toString() || "",
-      effect_free_variant_id: discount.effect_free_variant_id?.toString() || "",
+      effect_free_variant_id: discount.effect_free_variant_id || "",
       priority: discount.priority.toString(),
       active: discount.active,
     });
@@ -310,10 +315,12 @@ export default function PromoPageClient() {
         ...autoForm,
         trigger_spend_amount: autoForm.trigger_spend_amount ? parseFloat(autoForm.trigger_spend_amount) : null,
         trigger_product_id: autoForm.trigger_product_id || null,
-        trigger_variant_id: autoForm.trigger_variant_id ? parseInt(autoForm.trigger_variant_id) : null,
+        // Same TEXT-id-not-a-number issue as discount_codes.free_variant_id
+        // above — see comment there.
+        trigger_variant_id: autoForm.trigger_variant_id || null,
         effect_value: autoForm.effect_value ? parseFloat(autoForm.effect_value) : null,
         effect_free_product_id: autoForm.effect_free_product_id || null,
-        effect_free_variant_id: autoForm.effect_free_variant_id ? parseInt(autoForm.effect_free_variant_id) : null,
+        effect_free_variant_id: autoForm.effect_free_variant_id || null,
         priority: parseInt(autoForm.priority) || 0,
       };
 

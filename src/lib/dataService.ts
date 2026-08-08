@@ -92,11 +92,11 @@ export async function getProducts(category?: string): Promise<Product[]> {
       SELECT
         p.id, p.slug, p.name, c.slug as category, p.full_description as description,
         i.image_url as img,
-        (SELECT value FROM product_attribute_values pav JOIN product_attributes pa ON pav.attribute_id = pa.id WHERE pav.product_id = p.id AND pa.name = 'Care Level') as care_level,
-        (SELECT value FROM product_attribute_values pav JOIN product_attributes pa ON pav.attribute_id = pa.id WHERE pav.product_id = p.id AND pa.name = 'Light') as light,
-        (SELECT value FROM product_attribute_values pav JOIN product_attributes pa ON pav.attribute_id = pa.id WHERE pav.product_id = p.id AND pa.name = 'Average Size') as avg_size,
-        (SELECT value FROM product_attribute_values pav JOIN product_attributes pa ON pav.attribute_id = pa.id WHERE pav.product_id = p.id AND pa.name = 'Origin') as origin,
-        (SELECT value FROM product_attribute_values pav JOIN product_attributes pa ON pav.attribute_id = pa.id WHERE pav.product_id = p.id AND pa.name = 'Variant Options') as variant_options,
+        (SELECT value FROM product_attribute_values pav JOIN product_attributes pa ON pav.attribute_id = pa.id WHERE pav.product_id = p.id AND pa.name = 'Care Level' LIMIT 1) as care_level,
+        (SELECT value FROM product_attribute_values pav JOIN product_attributes pa ON pav.attribute_id = pa.id WHERE pav.product_id = p.id AND pa.name = 'Light' LIMIT 1) as light,
+        (SELECT value FROM product_attribute_values pav JOIN product_attributes pa ON pav.attribute_id = pa.id WHERE pav.product_id = p.id AND pa.name = 'Average Size' LIMIT 1) as avg_size,
+        (SELECT value FROM product_attribute_values pav JOIN product_attributes pa ON pav.attribute_id = pa.id WHERE pav.product_id = p.id AND pa.name = 'Origin' LIMIT 1) as origin,
+        (SELECT value FROM product_attribute_values pav JOIN product_attributes pa ON pav.attribute_id = pa.id WHERE pav.product_id = p.id AND pa.name = 'Variant Options' LIMIT 1) as variant_options,
         coalesce((
           SELECT json_agg(
             json_build_object(
@@ -158,11 +158,11 @@ export async function getProductBySlug(slug: string): Promise<Product | null> {
       SELECT
         p.id, p.slug, p.name, c.slug as category, p.full_description as description,
         i.image_url as img,
-        (SELECT value FROM product_attribute_values pav JOIN product_attributes pa ON pav.attribute_id = pa.id WHERE pav.product_id = p.id AND pa.name = 'Care Level') as care_level,
-        (SELECT value FROM product_attribute_values pav JOIN product_attributes pa ON pav.attribute_id = pa.id WHERE pav.product_id = p.id AND pa.name = 'Light') as light,
-        (SELECT value FROM product_attribute_values pav JOIN product_attributes pa ON pav.attribute_id = pa.id WHERE pav.product_id = p.id AND pa.name = 'Average Size') as avg_size,
-        (SELECT value FROM product_attribute_values pav JOIN product_attributes pa ON pav.attribute_id = pa.id WHERE pav.product_id = p.id AND pa.name = 'Origin') as origin,
-        (SELECT value FROM product_attribute_values pav JOIN product_attributes pa ON pav.attribute_id = pa.id WHERE pav.product_id = p.id AND pa.name = 'Variant Options') as variant_options,
+        (SELECT value FROM product_attribute_values pav JOIN product_attributes pa ON pav.attribute_id = pa.id WHERE pav.product_id = p.id AND pa.name = 'Care Level' LIMIT 1) as care_level,
+        (SELECT value FROM product_attribute_values pav JOIN product_attributes pa ON pav.attribute_id = pa.id WHERE pav.product_id = p.id AND pa.name = 'Light' LIMIT 1) as light,
+        (SELECT value FROM product_attribute_values pav JOIN product_attributes pa ON pav.attribute_id = pa.id WHERE pav.product_id = p.id AND pa.name = 'Average Size' LIMIT 1) as avg_size,
+        (SELECT value FROM product_attribute_values pav JOIN product_attributes pa ON pav.attribute_id = pa.id WHERE pav.product_id = p.id AND pa.name = 'Origin' LIMIT 1) as origin,
+        (SELECT value FROM product_attribute_values pav JOIN product_attributes pa ON pav.attribute_id = pa.id WHERE pav.product_id = p.id AND pa.name = 'Variant Options' LIMIT 1) as variant_options,
         coalesce((
           SELECT json_agg(
             json_build_object(
