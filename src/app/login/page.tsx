@@ -4,6 +4,7 @@ import { useState } from "react";
 import { loginAdmin } from "@/app/actions/auth";
 import { useRouter } from "next/navigation";
 import { Button } from "@/app/components/ui/button";
+import Link from "next/link";
 import { Input } from "@/app/components/ui/input";
 import {
   Card,
@@ -64,13 +65,21 @@ export default function LoginPage() {
               </p>
             )}
           </CardContent>
-          <CardFooter className="pb-8">
+          <CardFooter className="pb-8 flex flex-col gap-3">
             <Button
               type="submit"
               className="w-full h-12 text-base font-semibold"
               disabled={loading}
             >
               {loading ? "Verifying..." : "Login"}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              className="w-full h-10 text-sm text-muted-foreground"
+              asChild
+            >
+              <Link href="/">← Back to Home</Link>
             </Button>
           </CardFooter>
         </form>

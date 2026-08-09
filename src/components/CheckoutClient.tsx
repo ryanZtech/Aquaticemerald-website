@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCart } from "@/context/CartContext";
 import TurnstileWidget, { TurnstileHandle } from "@/components/TurnstileWidget";
-import { TURNSTILE_SITE_KEY } from "@/lib/turnstileSiteKey";
+const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
 import {
   PickupLocation,
   PickupHour,

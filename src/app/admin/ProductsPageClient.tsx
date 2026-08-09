@@ -57,6 +57,7 @@ export default function ProductsPageClient() {
   const [loading, setLoading] = useState(true);
   const [formDialogOpen, setFormDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [confirmClear, setConfirmClear] = useState(false);
 
   const [detailProduct, setDetailProduct] = useState<Product | null>(null);
   const [viewingProduct, setViewingProduct] = useState(false);
@@ -165,12 +166,6 @@ export default function ProductsPageClient() {
   };
 
   const handleClearProducts = async () => {
-    if (
-      !confirm(
-        "This will permanently delete ALL products in your database. Continue?",
-      )
-    )
-      return;
     try {
       const res = await fetch("/api/products/clear", { method: "POST" });
       if (res.ok) {
@@ -185,6 +180,8 @@ export default function ProductsPageClient() {
     } catch (err) {
       console.error(err);
       toast.error("Failed to wipe products");
+    } finally {
+      setConfirmClear(false);
     }
   };
 
@@ -632,13 +629,36 @@ export default function ProductsPageClient() {
                   >
                     <Plus className="w-4 h-4" /> New Product
                   </Button>
-                  <Button
-                    variant="ghost"
-                    className="gap-2 text-destructive hover:bg-destructive/10 cursor-pointer"
-                    onClick={handleClearProducts}
-                  >
-                    Clear Inventory
-                  </Button>
+                  {confirmClear ? (
+                    <div className="flex items-center gap-2 bg-destructive/10 border border-destructive/30 rounded-lg px-3 py-1.5">
+                      <span className="text-xs text-destructive font-medium">
+                        Delete ALL products?
+                      </span>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 px-2 text-xs cursor-pointer"
+                        onClick={() => setConfirmClear(false)}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="h-7 px-2 text-xs bg-destructive hover:bg-destructive/90 text-destructive-foreground cursor-pointer"
+                        onClick={handleClearProducts}
+                      >
+                        Yes, delete all
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      className="gap-2 text-destructive hover:bg-destructive/10 cursor-pointer"
+                      onClick={() => setConfirmClear(true)}
+                    >
+                      Clear Inventory
+                    </Button>
+                  )}
                 </div>
               </div>
 

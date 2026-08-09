@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { Send, CheckCircle2, Loader2 } from "lucide-react";
 import TurnstileWidget, { TurnstileHandle } from "@/components/TurnstileWidget";
-import { TURNSTILE_SITE_KEY } from "@/lib/turnstileSiteKey";
+const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
 
 type Status = "idle" | "submitting" | "success" | "error";
 
