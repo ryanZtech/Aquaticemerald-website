@@ -76,7 +76,7 @@ export default async function ContactPage() {
       </div>
 
       {}
-      <div className="max-w-lg">
+      <div>
         <h2 className="font-serif text-2xl font-medium mb-4">
           Or send us a message
         </h2>

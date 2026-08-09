@@ -5,6 +5,7 @@ import { loginAdmin } from "@/app/actions/auth";
 import { useRouter } from "next/navigation";
 import { Button } from "@/app/components/ui/button";
 import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { Input } from "@/app/components/ui/input";
 import {
   Card,
@@ -76,10 +77,10 @@ export default function LoginPage() {
             <Button
               type="button"
               variant="ghost"
-              className="w-full h-10 text-sm text-muted-foreground"
+              className="w-full h-10 text-sm text-muted-foreground gap-2"
               asChild
             >
-              <Link href="/">← Back to Home</Link>
+              <Link href="/"><ArrowLeft className="w-4 h-4" /> Back to Home</Link>
             </Button>
           </CardFooter>
         </form>

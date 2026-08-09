@@ -6,6 +6,19 @@ import { escapeHtml } from "@/lib/emailTemplatesSimple";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+// Ensure the table exists — runs once per cold start, cheap after that.
+async function ensureTable() {
+  if (!sql) return;
+  await sql`
+    CREATE TABLE IF NOT EXISTS contact_submissions (
+      id         SERIAL PRIMARY KEY,
+      email      TEXT NOT NULL,
+      message    TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `;
+}
+
 export async function POST(request: NextRequest) {
   // Rate limit first and cheaply, before spending a Turnstile siteverify
   // call or a DB round trip on an obviously abusive burst of requests.
@@ -47,6 +60,20 @@ export async function POST(request: NextRequest) {
 
   const cleanEmail = email.trim().slice(0, 320);
   const cleanMessage = message.trim().slice(0, 2000);
+
+  // Persist submission to the database
+  try {
+    await ensureTable();
+    if (sql) {
+      await sql`
+        INSERT INTO contact_submissions (email, message)
+        VALUES (${cleanEmail}, ${cleanMessage})
+      `;
+    }
+  } catch (e) {
+    console.error("Failed to save contact submission to DB:", e);
+    // Non-fatal — we still attempt to send the email.
+  }
 
   let sellerEmail: string | null = null;
   try {

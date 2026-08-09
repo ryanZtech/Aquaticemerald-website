@@ -3,7 +3,7 @@ import { jwtVerify } from "jose";
 import { redirect } from "next/navigation";
 import { sanitizeEnv } from "@/lib/env";
 import { Button } from "@/app/components/ui/button";
-import { LogOut, Package, MapPin, Settings, FolderTree, ShoppingCart, BookOpen, Clock, CircleHelp, Percent } from "lucide-react";
+import { LogOut, Package, MapPin, Settings, FolderTree, ShoppingCart, BookOpen, Clock, CircleHelp, Percent, MessageSquare } from "lucide-react";
 import Link from "next/link";
 import { logoutAdmin } from "@/app/actions/auth";
 
@@ -55,6 +55,12 @@ export default async function AdminLayout({
             className="group flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-accent text-sm font-medium transition-colors"
           >
             <ShoppingCart className="w-4 h-4 text-foreground transition-transform duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)] group-hover:scale-125 group-hover:-rotate-6" /> Orders
+          </Link>
+          <Link
+            href="/admin/messages"
+            className="group flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-accent text-sm font-medium transition-colors"
+          >
+            <MessageSquare className="w-4 h-4 text-foreground transition-transform duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)] group-hover:scale-125 group-hover:-rotate-6" /> Messages
           </Link>
           <Link
             href="/admin/categories"
