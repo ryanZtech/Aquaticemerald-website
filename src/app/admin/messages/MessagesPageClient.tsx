@@ -138,7 +138,7 @@ export default function MessagesPageClient() {
                     className="flex-shrink-0 h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 cursor-pointer"
                     onClick={(e) => {
                       e.stopPropagation();
-                      window.location.href = `mailto:${s.email}`;
+                      window.open(`https://mail.google.com/mail/u/0/?fs=1&to=${encodeURIComponent(s.email)}&tf=cm`, "_blank");
                     }}
                   >
                     <Mail className="w-4 h-4" />
