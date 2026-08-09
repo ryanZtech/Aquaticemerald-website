@@ -121,9 +121,6 @@ export default function MessagesPageClient() {
                       <ChevronRight className="w-4 h-4" />
                     )}
                   </div>
-                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                    <Mail className="w-4 h-4 text-primary" />
-                  </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-3 flex-wrap">
                       <span className="font-medium text-sm">{s.email}</span>
@@ -135,6 +132,17 @@ export default function MessagesPageClient() {
                       </p>
                     )}
                   </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="flex-shrink-0 h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 cursor-pointer"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      window.location.href = `mailto:${s.email}`;
+                    }}
+                  >
+                    <Mail className="w-4 h-4" />
+                  </Button>
                   <Button
                     variant="ghost"
                     size="icon"
@@ -154,16 +162,7 @@ export default function MessagesPageClient() {
                     <p className="text-sm leading-relaxed whitespace-pre-wrap text-foreground/90 font-light">
                       {s.message}
                     </p>
-                    <div className="mt-4 flex gap-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="gap-2 cursor-pointer text-xs h-8 text-destructive hover:bg-destructive/10"
-                        onClick={() => handleDelete(s.id, s.email)}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" /> Delete
-                      </Button>
-                    </div>
+
                   </div>
                 )}
               </div>
