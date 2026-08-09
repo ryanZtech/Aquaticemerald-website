@@ -125,11 +125,11 @@ export default function CartPage() {
                     )}
                     {autoDiscount.free_item ? (
                       <p className="text-sm font-medium text-emerald-800 dark:text-emerald-200">
-                        🎁 Free: {autoDiscount.free_item.productName} ({autoDiscount.free_item.variantLabel})
+                        Free: {autoDiscount.free_item.productName} ({autoDiscount.free_item.variantLabel})
                       </p>
                     ) : (
                       <p className="text-sm font-medium text-emerald-800 dark:text-emerald-200">
-                        💰 ${autoDiscount.discount_amount.toFixed(2)} off your order
+                        ${autoDiscount.discount_amount.toFixed(2)} off your order
                       </p>
                     )}
                   </div>

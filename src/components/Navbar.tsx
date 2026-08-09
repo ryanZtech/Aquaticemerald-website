@@ -17,8 +17,7 @@ export default function Navbar() {
   const router = useRouter();
 
   const [dropOpen, setDropOpen] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const dropRef = useRef<HTMLDivElement>(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);  const dropRef = useRef<HTMLDivElement>(null);
 
   const [categories, setCategories] = useState<
     { slug: string; name: string; icon_name?: string; image_url?: string }[]
@@ -74,6 +73,13 @@ export default function Navbar() {
     router.push(`/products?category=${cat}`);
     setDropOpen(false);
   };
+
+  // The admin panel and its login screen render their own self-contained
+  // shell (see admin/layout.tsx and login/page.tsx) — they don't need (or
+  // want) the public site's fixed navbar on top of it.
+  if (pathname?.startsWith("/admin") || pathname?.startsWith("/login")) {
+    return null;
+  }
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-background/90 backdrop-blur-lg border-b border-border transition-colors duration-200">

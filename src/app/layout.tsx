@@ -1,6 +1,6 @@
 import "@/styles/index.css";
 import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
+import SiteChrome from "@/components/SiteChrome";
 import { CartProvider } from "@/context/CartContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { getSellerWhatsApp } from "@/lib/dataService";
@@ -32,10 +32,7 @@ export default async function RootLayout({
         <ThemeProvider>
           <CartProvider>
             <Navbar />
-            <div className="flex flex-col min-h-screen">
-              <div className="flex-grow pt-16">{children}</div>
-              <Footer whatsapp={whatsapp} />
-            </div>
+            <SiteChrome whatsapp={whatsapp}>{children}</SiteChrome>
           </CartProvider>
         </ThemeProvider>
       </body>

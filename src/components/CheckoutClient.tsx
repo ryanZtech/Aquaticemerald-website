@@ -554,11 +554,11 @@ export default function CheckoutClient({
                 )}
                 {autoDiscount.free_item ? (
                   <p className="text-xs text-green-600 dark:text-green-500 mt-1 font-medium">
-                    🎁 Includes free: {autoDiscount.free_item.productName}
+                    Includes free: {autoDiscount.free_item.productName}
                   </p>
                 ) : autoDiscount.discount_amount > 0 ? (
                   <p className="text-xs text-green-600 dark:text-green-500 mt-1 font-medium">
-                    💰 ${autoDiscount.discount_amount.toFixed(2)} off
+                    ${autoDiscount.discount_amount.toFixed(2)} off
                   </p>
                 ) : null}
               </div>
@@ -607,7 +607,7 @@ export default function CheckoutClient({
                   )}
                   {appliedPromo.free_item && (
                     <p className="text-xs text-green-600 dark:text-green-500 mt-1 font-medium">
-                      🎁 Includes free: {appliedPromo.free_item.productName}
+                      Includes free: {appliedPromo.free_item.productName}
                     </p>
                   )}
                 </div>

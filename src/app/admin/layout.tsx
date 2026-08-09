@@ -43,60 +43,60 @@ export default async function AdminLayout({
           </span>
         </Link>
 
-        <nav className="flex-1 flex flex-col gap-2 overflow-y-auto pr-2 pb-4">
+        <nav className="flex-1 min-h-0 flex flex-col gap-2 overflow-y-auto pr-2 pb-4">
           <Link
             href="/admin"
-            className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-accent text-sm font-medium transition-colors"
+            className="group flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-accent text-sm font-medium transition-colors"
           >
-            <Package className="w-4 h-4 text-foreground" /> Products
+            <Package className="w-4 h-4 text-foreground transition-transform duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)] group-hover:scale-125 group-hover:-rotate-6" /> Products
           </Link>
           <Link
             href="/admin/orders"
-            className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-accent text-sm font-medium transition-colors"
+            className="group flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-accent text-sm font-medium transition-colors"
           >
-            <ShoppingCart className="w-4 h-4 text-foreground" /> Orders
+            <ShoppingCart className="w-4 h-4 text-foreground transition-transform duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)] group-hover:scale-125 group-hover:-rotate-6" /> Orders
           </Link>
           <Link
             href="/admin/categories"
-            className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-accent text-sm font-medium transition-colors"
+            className="group flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-accent text-sm font-medium transition-colors"
           >
-            <FolderTree className="w-4 h-4 text-foreground" /> Categories
+            <FolderTree className="w-4 h-4 text-foreground transition-transform duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)] group-hover:scale-125 group-hover:-rotate-6" /> Categories
           </Link>
           <Link
             href="/admin/locations"
-            className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-accent text-sm font-medium transition-colors"
+            className="group flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-accent text-sm font-medium transition-colors"
           >
-            <MapPin className="w-4 h-4 text-foreground" /> Locations
+            <MapPin className="w-4 h-4 text-foreground transition-transform duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)] group-hover:scale-125 group-hover:-rotate-6" /> Locations
           </Link>
           <Link
             href="/admin/times"
-            className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-accent text-sm font-medium transition-colors"
+            className="group flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-accent text-sm font-medium transition-colors"
           >
-            <Clock className="w-4 h-4 text-foreground" /> Times
+            <Clock className="w-4 h-4 text-foreground transition-transform duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)] group-hover:scale-125 group-hover:-rotate-6" /> Times
           </Link>
           <Link
             href="/admin/settings"
-            className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-accent text-sm font-medium transition-colors"
+            className="group flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-accent text-sm font-medium transition-colors"
           >
-            <Settings className="w-4 h-4 text-foreground" /> Settings
+            <Settings className="w-4 h-4 text-foreground transition-transform duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)] group-hover:scale-125 group-hover:-rotate-6" /> Settings
           </Link>
           <Link
             href="/admin/guides"
-            className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-accent text-sm font-medium transition-colors"
+            className="group flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-accent text-sm font-medium transition-colors"
           >
-            <BookOpen className="w-4 h-4 text-foreground" /> Care Guides
+            <BookOpen className="w-4 h-4 text-foreground transition-transform duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)] group-hover:scale-125 group-hover:-rotate-6" /> Care Guides
           </Link>
           <Link
             href="/admin/faq"
-            className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-accent text-sm font-medium transition-colors"
+            className="group flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-accent text-sm font-medium transition-colors"
           >
-            <CircleHelp className="w-4 h-4 text-foreground" /> FAQ
+            <CircleHelp className="w-4 h-4 text-foreground transition-transform duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)] group-hover:scale-125 group-hover:-rotate-6" /> FAQ
           </Link>
           <Link
             href="/admin/promo"
-            className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-accent text-sm font-medium transition-colors"
+            className="group flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-accent text-sm font-medium transition-colors"
           >
-            <Percent className="w-4 h-4 text-foreground" /> Promotions
+            <Percent className="w-4 h-4 text-foreground transition-transform duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)] group-hover:scale-125 group-hover:-rotate-6" /> Promotions
           </Link>
         </nav>
         <div className="pt-4 border-t border-border">
