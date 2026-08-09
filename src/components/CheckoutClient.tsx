@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCart } from "@/context/CartContext";
+import TurnstileWidget, { TurnstileHandle } from "@/components/TurnstileWidget";
+import { TURNSTILE_SITE_KEY } from "@/lib/turnstileSiteKey";
 import {
   PickupLocation,
   PickupHour,
@@ -106,6 +108,8 @@ export default function CheckoutClient({
   const [name, setName] = useState("");
   const [location, setLocation] = useState("");
   const [saving, setSaving] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const turnstileRef = useRef<TurnstileHandle>(null);
   const [year, setYear] = useState(todayY);
   const [month, setMonth] = useState(todayM);
   const [day, setDay] = useState<number | null>(null);
@@ -381,7 +385,8 @@ export default function CheckoutClient({
     phone.trim().length >= 8 &&
     email.trim().includes("@") &&
     location &&
-    (isCustomLocation || (day !== null && timeWindow));
+    (isCustomLocation || (day !== null && timeWindow)) &&
+    Boolean(turnstileToken);
 
   const getMissingFields = () => {
     const missing: string[] = [];
@@ -393,6 +398,7 @@ export default function CheckoutClient({
       if (day === null) missing.push("date");
       if (!timeWindow) missing.push("time");
     }
+    if (!turnstileToken) missing.push("verification check");
     return missing;
   };
 
@@ -419,6 +425,11 @@ export default function CheckoutClient({
       return;
     }
 
+    if (!turnstileToken) {
+      alert("Please complete the verification check before confirming your order.");
+      return;
+    }
+
     setSaving(true);
     try {
       const pickup_slot_at = isCustomLocation ? null : timeWindow;
@@ -436,6 +447,7 @@ export default function CheckoutClient({
         promo_code: appliedPromo?.code || null,
         discount_amount: discountAmount,
         notes: isCustomLocation ? `Custom location - to be negotiated via WhatsApp` : "",
+        turnstile_token: turnstileToken,
       };
 
       const res = await fetch("/api/orders", {
@@ -447,12 +459,17 @@ export default function CheckoutClient({
       if (!res.ok) {
         const err = await res.json();
         console.error("Order creation failed:", err);
-        alert("Failed to create order. Please try again.");
+        alert(err.error || "Failed to create order. Please try again.");
+        // The Turnstile token is single-use — whether it was this request
+        // that consumed it or it had simply expired, a retry needs a fresh
+        // one either way.
+        setTurnstileToken(null);
+        turnstileRef.current?.reset();
         return;
       }
 
       const result = await res.json();
-      console.log("✅ Order created successfully:", result);
+      console.log("Order created successfully:", result);
 
       const msg = isCustomLocation 
         ? `my order number is ${orderId}, please confirm my order. I would like to arrange a custom pickup location and time with you.`
@@ -468,6 +485,8 @@ export default function CheckoutClient({
     } catch (e) {
       console.error(e);
       alert("Failed to submit order");
+      setTurnstileToken(null);
+      turnstileRef.current?.reset();
     } finally {
       setSaving(false);
     }
@@ -872,6 +891,15 @@ export default function CheckoutClient({
           initial={{ opacity: 0, scale: 0.97 }}
           animate={{ opacity: 1, scale: 1 }}
         >
+          <div className="flex justify-center mb-4">
+            <TurnstileWidget
+              ref={turnstileRef}
+              siteKey={TURNSTILE_SITE_KEY}
+              onVerify={setTurnstileToken}
+              onExpire={() => setTurnstileToken(null)}
+              onError={() => setTurnstileToken(null)}
+            />
+          </div>
           <button
             onClick={handleConfirm}
             disabled={!canConfirm || saving}

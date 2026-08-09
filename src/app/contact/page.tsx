@@ -1,6 +1,7 @@
 import { getSellerWhatsApp } from "@/lib/dataService";
 import { InstagramIcon, FacebookIcon, WhatsAppIcon } from "@/components/icons/SocialIcons";
 import { FACEBOOK_URL, INSTAGRAM_URL, getWhatsAppUrl } from "@/lib/socialLinks";
+import ContactForm from "@/components/ContactForm";
 import type { ComponentType, SVGProps } from "react";
 
 export const revalidate = 60;
@@ -52,7 +53,7 @@ export default async function ContactPage() {
       </div>
 
       {}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-12">
         {contactMethods.map(({ label, description, href, Icon }) => (
           <a
             key={label}
@@ -72,6 +73,14 @@ export default async function ContactPage() {
             </div>
           </a>
         ))}
+      </div>
+
+      {}
+      <div className="max-w-lg">
+        <h2 className="font-serif text-2xl font-medium mb-4">
+          Or send us a message
+        </h2>
+        <ContactForm />
       </div>
     </div>
   );

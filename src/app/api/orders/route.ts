@@ -3,6 +3,7 @@ import { sql, pool } from "@/lib/db";
 import { buildCustomerHtml, buildSellerHtml } from "@/lib/emailTemplatesSimple";
 import { requireAdmin } from "@/lib/adminAuth";
 import { rateLimit, getClientIp } from "@/lib/rateLimit";
+import { verifyTurnstileToken } from "@/lib/turnstile";
 import {
   parseStockLimitSettings,
   maxQtyForLevel,
@@ -123,6 +124,7 @@ export async function POST(request: NextRequest) {
       cart: rawCart = [],
       notes,
       promo_code,
+      turnstile_token,
     } = body || {};
 
     if (!customer_name || String(customer_name).trim().length < 2) {
@@ -131,6 +133,19 @@ export async function POST(request: NextRequest) {
 
     if (!Array.isArray(rawCart) || rawCart.length === 0) {
       return NextResponse.json({ error: "Your cart is empty." }, { status: 400 });
+    }
+
+    // Same rule as everywhere else Turnstile is used in this app: verify
+    // server-side, never trust the client's own claim that the widget
+    // succeeded. This runs after the cheap validation above (so a
+    // malformed request fails fast without spending a siteverify call) but
+    // before any database writes.
+    const turnstileResult = await verifyTurnstileToken(turnstile_token, ip);
+    if (!turnstileResult.success) {
+      return NextResponse.json(
+        { error: "Verification failed. Please complete the check again and resubmit." },
+        { status: 400 },
+      );
     }
 
     // --- SECURITY: never trust client-supplied prices, subtotal, or total. ---

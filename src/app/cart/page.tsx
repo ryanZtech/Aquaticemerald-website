@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCart } from "@/context/CartContext";
 import { maxQtyForLevel } from "@/lib/stockLimits";
-import { ShoppingCart, Minus, Plus, X, ArrowLeft } from "lucide-react";
+import { ShoppingCart, Minus, Plus, X, ArrowLeft, PartyPopper } from "lucide-react";
 
 export default function CartPage() {
   const { cart, updateQty, removeItem, cartTotal, stockLimits, autoDiscount } = useCart();
@@ -112,7 +112,7 @@ export default function CartPage() {
               <div className="mb-6 p-4 bg-emerald-50 dark:bg-emerald-950/30 border-2 border-emerald-200 dark:border-emerald-800 rounded-xl">
                 <div className="flex items-start gap-3">
                   <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <span className="text-white text-lg">🎉</span>
+                    <PartyPopper className="w-4 h-4 text-white" />
                   </div>
                   <div className="flex-1">
                     <p className="font-semibold text-emerald-900 dark:text-emerald-100 mb-1">
