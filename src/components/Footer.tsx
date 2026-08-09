@@ -60,6 +60,14 @@ export default function Footer({ whatsapp }: FooterProps) {
             Home-grown freshwater plants, shrimp and snails for the planted
             aquarium hobbyist. Hills District, Sydney.
           </p>
+          <a
+            href="https://shimpi.dev"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-block text-xs text-muted-foreground hover:text-primary cursor-pointer hover:font-semibold hover:scale-105 origin-left transition-all duration-200"
+          >
+            Made by Sahas
+          </a>
         </div>
 
         {}
