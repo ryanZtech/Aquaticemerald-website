@@ -46,6 +46,40 @@ interface CartContextType {
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
+// The persisted cart is untrusted client data: a corrupted or hand-edited
+// localStorage value must not be able to inject NaN prices/quantities into
+// the UI. Anything that doesn't shape-check is dropped. (Prices are
+// re-verified server-side at order time regardless.)
+function sanitizeCartItems(raw: unknown): CartItem[] {
+  if (!Array.isArray(raw)) return [];
+  const items: CartItem[] = [];
+  for (const entry of raw.slice(0, 100)) {
+    if (!entry || typeof entry !== "object") continue;
+    const e = entry as Record<string, unknown>;
+    const productId = typeof e.productId === "string" ? e.productId : null;
+    const variantId = typeof e.variantId === "string" ? e.variantId : null;
+    const name = typeof e.name === "string" ? e.name : "";
+    const variantLabel =
+      typeof e.variantLabel === "string" ? e.variantLabel : "";
+    const price = Number(e.price);
+    const qty = Math.floor(Number(e.qty));
+    if (!productId || !variantId || !name) continue;
+    if (!Number.isFinite(price) || price < 0 || price > 1_000_000) continue;
+    if (!Number.isFinite(qty) || qty < 1 || qty > 99) continue;
+    items.push({
+      productId,
+      variantId,
+      name,
+      variantLabel,
+      price,
+      qty,
+      img: typeof e.img === "string" ? e.img : undefined,
+      stock_level: typeof e.stock_level === "string" ? e.stock_level : undefined,
+    });
+  }
+  return items;
+}
+
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isHydrated, setIsHydrated] = useState(false);
@@ -69,7 +103,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     const savedCart = localStorage.getItem("aquatic_emerald_cart");
     if (savedCart) {
       try {
-        setCart(JSON.parse(savedCart));
+        setCart(sanitizeCartItems(JSON.parse(savedCart)));
       } catch (e) {
         console.error("Failed to parse cart from localStorage:", e);
       }

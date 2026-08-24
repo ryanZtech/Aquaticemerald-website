@@ -7,7 +7,12 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { cart, cartTotal } = await request.json();
+    const body = await request.json().catch(() => ({}));
+
+    // Public endpoint, untrusted body: coerce rather than trust. A
+    // non-array cart or non-numeric total would otherwise throw mid-query.
+    const cart = Array.isArray(body?.cart) ? body.cart : [];
+    const cartTotal = Number(body?.cartTotal) || 0;
 
     // Fetch active auto-discounts ordered by priority
     //

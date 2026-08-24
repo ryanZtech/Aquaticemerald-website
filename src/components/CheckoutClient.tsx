@@ -90,6 +90,14 @@ function buildSlotsForDate(
   return slots;
 }
 
+function isPlainObject(value: unknown): value is Record<string, number> {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value)
+  );
+}
+
 export default function CheckoutClient({
   locations,
   hours,
@@ -310,21 +318,17 @@ export default function CheckoutClient({
     async function loadBookedSlots() {
       setLoadingSlots(true);
       try {
-        const res = await fetch("/api/orders", { cache: "no-store" });
+        // Aggregate booked counts only — the admin-only /api/orders endpoint
+        // would (correctly) 401 for customers.
+        const res = await fetch(
+          `/api/slots/availability?locationId=${selectedLocationId}`,
+          { cache: "no-store" }
+        );
         if (!res.ok) return;
         const data = await res.json();
-        const counts: Record<string, number> = {};
-
-        for (const order of Array.isArray(data) ? data : []) {
-          if (
-            order?.pickup_location_id === selectedLocationId &&
-            order?.pickup_slot_at &&
-            order?.status !== "cancelled"
-          ) {
-            counts[order.pickup_slot_at] =
-              (counts[order.pickup_slot_at] || 0) + 1;
-          }
-        }
+        const counts: Record<string, number> = isPlainObject(data)
+          ? data
+          : {};
 
         if (!cancelled) {
           setBookedSlotCounts(counts);
@@ -598,7 +602,7 @@ export default function CheckoutClient({
                   }}
                   placeholder="Enter code"
                   className="flex-1 px-3 py-2 rounded-lg bg-secondary border border-border text-sm outline-none focus:border-primary"
-                  onKeyPress={(e) => e.key === "Enter" && handleApplyPromo()}
+                  onKeyDown={(e) => e.key === "Enter" && handleApplyPromo()}
                 />
                 <button
                   onClick={() => handleApplyPromo()}

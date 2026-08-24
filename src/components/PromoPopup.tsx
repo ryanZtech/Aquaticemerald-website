@@ -23,25 +23,39 @@ export default function PromoPopup() {
   const [showCornerButton, setShowCornerButton] = useState(false);
 
   useEffect(() => {
-    // Check if already viewed in localStorage
-    const viewedPopups = JSON.parse(localStorage.getItem("viewed_popups") || "[]");
-    
+    // Read the viewed list defensively — a corrupt value in localStorage
+    // shouldn't take down the whole page's popup handling.
+    const readViewedPopups = (): unknown[] => {
+      try {
+        const parsed = JSON.parse(
+          localStorage.getItem("viewed_popups") || "[]"
+        );
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    };
+
+    const viewedPopups = readViewedPopups();
+
     // Fetch active popup
     fetch("/api/promo-popups")
       .then((res) => res.json())
       .then((data) => {
         if (data && data.id) {
           setPopup(data);
-          
+
           // Check if this popup was already viewed
           if (viewedPopups.includes(data.id)) {
             // Already viewed - show corner button immediately
             setShowCornerButton(true);
           } else {
             // Not viewed yet - show after delay
+            const delayMs =
+              Math.max(0, Number(data.delay_seconds) || 3) * 1000;
             setTimeout(() => {
               setShowPopup(true);
-            }, data.delay_seconds * 1000);
+            }, delayMs);
           }
         }
       })
@@ -51,10 +65,16 @@ export default function PromoPopup() {
   const handleDismiss = () => {
     if (popup) {
       // Mark as viewed in localStorage
-      const viewedPopups = JSON.parse(localStorage.getItem("viewed_popups") || "[]");
-      if (!viewedPopups.includes(popup.id)) {
-        viewedPopups.push(popup.id);
-        localStorage.setItem("viewed_popups", JSON.stringify(viewedPopups));
+      try {
+        const viewedPopups = JSON.parse(
+          localStorage.getItem("viewed_popups") || "[]"
+        );
+        if (Array.isArray(viewedPopups) && !viewedPopups.includes(popup.id)) {
+          viewedPopups.push(popup.id);
+          localStorage.setItem("viewed_popups", JSON.stringify(viewedPopups));
+        }
+      } catch {
+        // Ignore storage failures — dismissing the popup still works.
       }
     }
     setShowPopup(false);
@@ -66,6 +86,13 @@ export default function PromoPopup() {
   };
 
   if (!popup) return null;
+
+  // Defense-in-depth for a DB value that ends up in an href: allow only
+  // web/mail/tel schemes and site-relative paths, never javascript:/data:
+  // URLs (which would execute for every visitor if ever stored).
+  const buttonUrl = /^(https?:\/\/|mailto:|tel:|\/|#)/i.test(popup.button_url)
+    ? popup.button_url
+    : "#";
 
   return (
     <>
@@ -135,7 +162,7 @@ export default function PromoPopup() {
                       </p>
                     )}
                     <Link
-                      href={popup.button_url}
+                      href={buttonUrl}
                       onClick={handleDismiss}
                       className="inline-block px-8 py-4 bg-primary text-primary-foreground rounded-full font-semibold text-center hover:opacity-90 hover:shadow-xl hover:shadow-primary/30 transition-all duration-200"
                     >

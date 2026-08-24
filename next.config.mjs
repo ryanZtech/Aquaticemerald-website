@@ -31,6 +31,21 @@ const nextConfig = {
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           // Disable browser features this site doesn't use.
           { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+          // HSTS: force HTTPS for two years once the browser has seen one
+          // secure response. No effect on plain-HTTP localhost dev.
+          {
+            key: "Strict-Transport-Security",
+            value: "max-age=63072000; includeSubDomains",
+          },
+          // CSP directives that carry no risk of breaking Next.js's inline
+          // bootstrap scripts or Tailwind/MUI inline styles, but still close
+          // off plugin content, rogue <base> tags, and framing (belt to
+          // X-Frame-Options' braces).
+          {
+            key: "Content-Security-Policy",
+            value:
+              "frame-ancestors 'self'; object-src 'none'; base-uri 'self'",
+          },
         ],
       },
     ];

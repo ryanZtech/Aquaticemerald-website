@@ -131,6 +131,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Customer name is required and must be at least 2 characters." }, { status: 400 });
     }
 
+    // Bound the free-text fields — they're stored verbatim and echoed into
+    // confirmation emails and WhatsApp links, so an unbounded request body
+    // would just become database/mail bloat.
+    const cleanName = String(customer_name).trim().slice(0, 100);
+    const cleanEmail = customer_email ? String(customer_email).trim().slice(0, 320) : "";
+    const cleanPhone = customer_phone ? String(customer_phone).trim().slice(0, 40) : "";
+    const cleanNotes = notes ? String(notes).slice(0, 2000) : "";
+    const cleanPromoCode = promo_code ? String(promo_code).trim().slice(0, 60) : null;
+    const cleanOrderRef = orderRef ? String(orderRef).trim().slice(0, 40) : "";
+
     if (!Array.isArray(rawCart) || rawCart.length === 0) {
       return NextResponse.json({ error: "Your cart is empty." }, { status: 400 });
     }
@@ -285,7 +295,7 @@ export async function POST(request: NextRequest) {
 
     const pickupLocationId = pickup_location_id ? Number(pickup_location_id) : null;
     const slotStart = pickup_slot_at || null;
-    const isCustomLocation = !pickupLocationId || (notes && String(notes).includes('Custom location'));
+    const isCustomLocation = !pickupLocationId || (cleanNotes && cleanNotes.includes('Custom location'));
 
     // If custom location, resolve it to the 'Custom' pickup_location entry in DB
     let resolvedLocationId: number | null = pickupLocationId;
@@ -362,7 +372,7 @@ export async function POST(request: NextRequest) {
     try {
       await client.query("BEGIN");
 
-      if (promo_code && String(promo_code).trim()) {
+      if (cleanPromoCode) {
         const promoRows = await client.query(
           `SELECT * FROM discount_codes
            WHERE UPPER(code) = UPPER($1)
@@ -371,7 +381,7 @@ export async function POST(request: NextRequest) {
              AND (valid_until IS NULL OR valid_until >= CURRENT_TIMESTAMP)
            LIMIT 1
            FOR UPDATE`,
-          [promo_code],
+          [cleanPromoCode],
         );
 
         if (promoRows.rows.length > 0) {
@@ -420,12 +430,12 @@ export async function POST(request: NextRequest) {
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
          RETURNING id, created_at`,
         [
-          customer_name,
-          customer_email,
-          customer_phone,
+          cleanName,
+          cleanEmail,
+          cleanPhone,
           resolvedLocationId,
           pickup_slot_at || null,
-          notes || orderRef || null,
+          cleanNotes || cleanOrderRef || null,
           subtotal,
           discountAmount,
           total,
@@ -471,9 +481,9 @@ export async function POST(request: NextRequest) {
     }
     if (sellerWhatsApp && sellerWhatsApp.startsWith('0')) sellerWhatsApp = '61' + sellerWhatsApp.substring(1);
 
-    const cleanCustomerPhone = String(customer_phone || '').replace(/\D/g, '');
+    const cleanCustomerPhone = cleanPhone.replace(/\D/g, '');
     const waCustomerPhone = cleanCustomerPhone.startsWith('0') && cleanCustomerPhone.length > 1 ? '61' + cleanCustomerPhone.substring(1) : cleanCustomerPhone;
-    const customerWaLink = waCustomerPhone ? `https://wa.me/${waCustomerPhone}?text=${encodeURIComponent(`Hi ${customer_name}, this is Aquatic Emerald regarding your order #${orderRef || orderId}!`)}` : '';
+    const customerWaLink = waCustomerPhone ? `https://wa.me/${waCustomerPhone}?text=${encodeURIComponent(`Hi ${cleanName}, this is Aquatic Emerald regarding your order #${cleanOrderRef || orderId}!`)}` : '';
     const sellerWaLink = sellerWhatsApp ? `https://wa.me/${sellerWhatsApp}` : '';
 
     const currentYear = new Date().getFullYear();
@@ -492,12 +502,12 @@ export async function POST(request: NextRequest) {
     if (RESEND_API_KEY) {
       const fromEmail = process.env.EMAIL_FROM || 'Aquatic Emerald <orders@aquaticemerald.com>';
 
-      if (customer_email) {
+      if (cleanEmail) {
         const customerHtml = buildCustomerHtml({
-          customer_name,
-          customer_email,
-          customer_phone,
-          orderRef,
+          customer_name: cleanName,
+          customer_email: cleanEmail,
+          customer_phone: cleanPhone,
+          orderRef: cleanOrderRef,
           orderId,
           cart,
           subtotal,
@@ -519,27 +529,27 @@ export async function POST(request: NextRequest) {
             },
             body: JSON.stringify({
               from: fromEmail,
-              to: customer_email,
-              subject: `Order Confirmation - ${orderRef || orderId}`,
+              to: cleanEmail,
+              subject: `Order Confirmation - ${cleanOrderRef || orderId}`,
               html: customerHtml,
             }),
           });
-          
+
           if (!response.ok) {
             const errorData = await response.json();
             console.error('Failed to send customer email:', errorData);
           }
         } catch (e) {
-          console.error('Failed to send email to customer:', customer_email, e);
+          console.error('Failed to send email to customer:', cleanEmail, e);
         }
       }
 
       if (sellerEmail) {
         const sellerHtml = buildSellerHtml({
-          customer_name,
-          customer_email,
-          customer_phone,
-          orderRef,
+          customer_name: cleanName,
+          customer_email: cleanEmail,
+          customer_phone: cleanPhone,
+          orderRef: cleanOrderRef,
           orderId,
           cart,
           subtotal,
@@ -562,7 +572,7 @@ export async function POST(request: NextRequest) {
             body: JSON.stringify({
               from: fromEmail,
               to: sellerEmail,
-              subject: `NEW ORDER RECEIVED - ${orderRef || orderId}`,
+              subject: `NEW ORDER RECEIVED - ${cleanOrderRef || orderId}`,
               html: sellerHtml,
             }),
           });

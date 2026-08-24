@@ -186,8 +186,15 @@ export async function POST(request: NextRequest) {
         `variantImage_${variant.id}`,
       ) as File | null;
       if (variantImageFile) {
+        // Same validation + safe storage key as the product-image uploads and
+        // the PUT route below use: never trust the client-supplied filename
+        // in a storage path, and never store an unvalidated file type/size.
+        const validation = validateImageFile(variantImageFile);
+        if (!validation.valid) {
+          return NextResponse.json({ error: validation.error }, { status: 400 });
+        }
         const blob = await put(
-          `products/${productId}/variants/${variantId}/${variantImageFile.name}`,
+          safeImageKey(`products/${productId}/variants/${variantId}`, variantImageFile),
           variantImageFile,
           {
             access: "public",
