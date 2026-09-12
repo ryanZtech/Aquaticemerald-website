@@ -31,10 +31,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { code, cartTotal } = await request.json();
+    const body = await request.json();
+    const code = typeof body?.code === "string" ? body.code.trim().slice(0, 60) : "";
+    const cartTotal = Number(body?.cartTotal);
 
-    if (!code || !code.trim()) {
+    if (!code) {
       return NextResponse.json({ error: "Code is required" }, { status: 400 });
+    }
+    if (!Number.isFinite(cartTotal) || cartTotal < 0 || cartTotal > 1_000_000) {
+      return NextResponse.json({ error: "Invalid cart total" }, { status: 400 });
     }
 
     const rows = await sql`
@@ -59,15 +64,19 @@ export async function POST(request: NextRequest) {
     const discount = rows[0];
 
     // Check max uses
-    if (discount.max_uses && discount.current_uses >= discount.max_uses) {
+    if (discount.max_uses !== null && discount.max_uses !== undefined && Number(discount.current_uses) >= Number(discount.max_uses)) {
       return NextResponse.json({ error: "Code usage limit reached" }, { status: 400 });
     }
     let discountAmount = 0;
     let freeItem = null;
 
-    if (discount.discount_type === 'percentage') {
-      discountAmount = (cartTotal * (discount.discount_value / 100));
-    } else if (discount.discount_type === 'free_item') {
+    if (discount.discount_type === "percentage") {
+      const percentage = Number(discount.discount_value);
+      if (!Number.isFinite(percentage) || percentage < 0 || percentage > 100) {
+        return NextResponse.json({ error: "Invalid discount configuration" }, { status: 500 });
+      }
+      discountAmount = Math.min(cartTotal, cartTotal * (percentage / 100));
+    } else if (discount.discount_type === "free_item") {
       freeItem = {
         productId: discount.free_product_id,
         variantId: discount.free_variant_id,

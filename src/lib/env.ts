@@ -7,6 +7,14 @@
  * reads the raw value, tokens will always fail to verify.
  */
 export function sanitizeEnv(val: string | undefined): string | undefined {
-  if (!val) return undefined;
-  return val.replace(/^['"]|['"]$/g, "");
+  if (val === undefined) return undefined;
+  const trimmed = val.trim();
+  if (trimmed.length >= 2) {
+    const first = trimmed[0];
+    const last = trimmed[trimmed.length - 1];
+    if ((first === "'" || first === '"') && last === first) {
+      return trimmed.slice(1, -1);
+    }
+  }
+  return trimmed || undefined;
 }

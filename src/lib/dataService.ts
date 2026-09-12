@@ -46,21 +46,26 @@ function mapDbProduct(row: any): Product {
     }
   }
 
-  let dbVariantOptions = [];
-  if (row.variant_options) {
+  let dbVariantOptions: string[] = [];
+  if (Array.isArray(row.variant_options)) {
+    dbVariantOptions = row.variant_options.filter((value: unknown): value is string => typeof value === "string");
+  } else if (row.variant_options) {
     try {
-      dbVariantOptions = JSON.parse(row.variant_options);
+      const parsed = typeof row.variant_options === "string" ? JSON.parse(row.variant_options) : row.variant_options;
+      if (Array.isArray(parsed)) {
+        dbVariantOptions = parsed.filter((value: unknown): value is string => typeof value === "string");
+      }
     } catch {
       dbVariantOptions = [];
     }
   }
 
   return {
-    id: row.id,
-    slug: row.slug || row.id,
-    name: row.name,
-    category: row.category,
-    description: row.description,
+    id: String(row.id),
+    slug: String(row.slug || row.id),
+    name: String(row.name || "Unnamed product"),
+    category: row.category || "plants",
+    description: row.description || "",
     careLevel: row.care_level || "",
     light: row.light || "",
     avgSize: row.avg_size || "",
@@ -114,7 +119,7 @@ export async function getProducts(category?: string): Promise<Product[]> {
             ORDER BY v.label
           )
           FROM product_variants v
-          WHERE v.product_id = p.id
+          WHERE v.product_id = p.id AND v.active = TRUE
         ), '[]'::json) as variants,
         coalesce((
           SELECT json_agg(
@@ -132,14 +137,13 @@ export async function getProducts(category?: string): Promise<Product[]> {
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
       LEFT JOIN images i ON p.id = i.product_id AND i.is_primary = TRUE
+      WHERE p.active = TRUE
+        AND (c.id IS NULL OR c.active = TRUE)
+        AND (${!category || category === "all" ? true : false} OR c.slug = ${category})
       GROUP BY p.id, p.slug, p.name, c.slug, p.full_description, i.image_url
     `;
 
     const allProducts = rows.map(mapDbProduct);
-
-    if (category && category !== "all") {
-      return allProducts.filter((p) => p.category === category);
-    }
     return allProducts;
   } catch (error) {
     console.error("Neon Database query failed for products:", error);
@@ -180,7 +184,7 @@ export async function getProductBySlug(slug: string): Promise<Product | null> {
             ORDER BY v.label
           )
           FROM product_variants v
-          WHERE v.product_id = p.id
+          WHERE v.product_id = p.id AND v.active = TRUE
         ), '[]'::json) as variants,
         coalesce((
           SELECT json_agg(
@@ -198,7 +202,9 @@ export async function getProductBySlug(slug: string): Promise<Product | null> {
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
       LEFT JOIN images i ON p.id = i.product_id AND i.is_primary = TRUE
-      WHERE p.slug = ${slug} OR p.id = ${slug}
+      WHERE (p.slug = ${slug} OR p.id = ${slug})
+        AND p.active = TRUE
+        AND (c.id IS NULL OR c.active = TRUE)
       GROUP BY p.id, p.slug, p.name, c.slug, p.full_description, i.image_url
       LIMIT 1
     `;

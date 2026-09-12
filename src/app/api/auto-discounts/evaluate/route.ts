@@ -11,8 +11,11 @@ export async function POST(request: NextRequest) {
 
     // Public endpoint, untrusted body: coerce rather than trust. A
     // non-array cart or non-numeric total would otherwise throw mid-query.
-    const cart = Array.isArray(body?.cart) ? body.cart : [];
-    const cartTotal = Number(body?.cartTotal) || 0;
+    const cart = Array.isArray(body?.cart) ? body.cart.slice(0, 100) : [];
+    const cartTotal = Number(body?.cartTotal);
+    if (!Number.isFinite(cartTotal) || cartTotal < 0 || cartTotal > 1_000_000) {
+      return NextResponse.json({ error: "Invalid cart total" }, { status: 400 });
+    }
 
     // Fetch active auto-discounts ordered by priority
     //
@@ -32,17 +35,17 @@ export async function POST(request: NextRequest) {
         fp.name as effect_free_product_name,
         fp.slug as effect_free_product_slug,
         COALESCE(
-          ad.effect_free_variant_id,
+          ad.effect_free_variant_id::text,
           (
-            SELECT v.id
+            SELECT v.id::text
             FROM product_variants v
-            WHERE v.product_id = fp.id
+            WHERE v.product_id::text = fp.id::text AND v.active = TRUE
             ORDER BY v.price ASC
             LIMIT 1
           )
         ) as resolved_free_variant_id,
         COALESCE(
-          (SELECT v.label FROM product_variants v WHERE v.id = ad.effect_free_variant_id),
+          (SELECT v.label FROM product_variants v WHERE v.id::text = ad.effect_free_variant_id::text AND v.active = TRUE),
           (
             SELECT v.label
             FROM product_variants v
@@ -52,8 +55,8 @@ export async function POST(request: NextRequest) {
           )
         ) as resolved_free_variant_label
       FROM auto_discounts ad
-      LEFT JOIN products tp ON ad.trigger_product_id = tp.id
-      LEFT JOIN products fp ON ad.effect_free_product_id = fp.id
+      LEFT JOIN products tp ON tp.id::text = ad.trigger_product_id::text
+      LEFT JOIN products fp ON fp.id::text = ad.effect_free_product_id::text
       WHERE ad.active = TRUE
       ORDER BY ad.priority DESC
     `;
@@ -70,10 +73,10 @@ export async function POST(request: NextRequest) {
       if (discount.trigger_type === "spend_amount") {
         triggerMet = cartTotal >= (discount.trigger_spend_amount || 0);
       } else if (discount.trigger_type === "item_in_cart") {
-        triggerMet = cart.some((item: any) => item.productId === discount.trigger_product_id);
+        triggerMet = cart.some((item: any) => String(item?.productId || "") === String(discount.trigger_product_id || ""));
       } else if (discount.trigger_type === "both") {
         const spendMet = cartTotal >= (discount.trigger_spend_amount || 0);
-        const itemMet = cart.some((item: any) => item.productId === discount.trigger_product_id);
+        const itemMet = cart.some((item: any) => String(item?.productId || "") === String(discount.trigger_product_id || ""));
         triggerMet = spendMet && itemMet;
       }
 
@@ -83,9 +86,9 @@ export async function POST(request: NextRequest) {
         let freeItem = null;
 
         if (discount.effect_type === "fixed_amount") {
-          discountAmount = discount.effect_value || 0;
+          discountAmount = Math.min(cartTotal, Math.max(0, Number(discount.effect_value) || 0));
         } else if (discount.effect_type === "percentage") {
-          discountAmount = cartTotal * ((discount.effect_value || 0) / 100);
+          discountAmount = Math.min(cartTotal, cartTotal * ((Number(discount.effect_value) || 0) / 100));
         } else if (discount.effect_type === "free_item" && discount.effect_free_product_id) {
           freeItem = {
             productId: discount.effect_free_product_id,

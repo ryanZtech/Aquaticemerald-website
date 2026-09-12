@@ -6,3 +6,11 @@ node_modules
 .env*
 .env.local
 next-env.d.ts
+.**/**.freebuff/
+**.freebuff/
+**/.freebuff/
+**/.freebuff
+.freebuff/
+.freebuff
+**/.freebuff/
+**/.freebuff/**/

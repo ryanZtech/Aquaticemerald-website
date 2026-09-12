@@ -114,13 +114,21 @@ export default function ProductFormDialog({
       const rawVariants = typeof data.variants === "string" ? JSON.parse(data.variants) : (data.variants || []);
 
 
-      const loadedVariants = rawVariants.map((v: any) => ({
-        id: v.id ? v.id.toString().split("-").pop() : Math.random().toString(),
-        label: v.label,
-        price: parseFloat(v.price),
-        stock_level: v.stock_level || "none",
-        image_url: v.image_url,
-      }));
+      const loadedVariants = rawVariants.map((v: any) => {
+        const rawId = String(v.id || "");
+        const prefix = `${editingProduct.id}-`;
+        const variantId = rawId.startsWith(prefix)
+          ? rawId.slice(prefix.length)
+          : rawId;
+        return {
+          id: variantId || Math.random().toString(),
+          label: v.label,
+          price: parseFloat(v.price),
+          stock_level: v.stock_level || "none",
+          image_url: v.image_url,
+        };
+      });
+
       setVariants(loadedVariants);
       
       setCareLevel(data.attributes?.["Care Level"] || "");

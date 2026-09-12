@@ -209,6 +209,10 @@ export async function POST(request: NextRequest) {
       }
 
       const variant = variantRows[0];
+      const variantPrice = Number(variant.price);
+      if (!Number.isFinite(variantPrice) || variantPrice < 0) {
+        return NextResponse.json({ error: "One of the items in your cart has an invalid price." }, { status: 500 });
+      }
       const maxQty = maxQtyForLevel(variant.stock_level, stockLimits);
 
       if (maxQty <= 0) {
@@ -230,7 +234,7 @@ export async function POST(request: NextRequest) {
         variantId,
         name: variant.product_name,
         variantLabel: variant.label ?? undefined,
-        price: Number(variant.price),
+        price: variantPrice,
         qty,
       });
     }
@@ -250,7 +254,7 @@ export async function POST(request: NextRequest) {
       const autoDiscounts = await sql`
         SELECT ad.*, fp.name AS effect_free_product_name
         FROM auto_discounts ad
-        LEFT JOIN products fp ON ad.effect_free_product_id = fp.id
+        LEFT JOIN products fp ON fp.id::text = ad.effect_free_product_id::text
         WHERE ad.active = TRUE
         ORDER BY ad.priority DESC
       `;
@@ -258,21 +262,21 @@ export async function POST(request: NextRequest) {
       for (const discount of autoDiscounts) {
         let triggerMet = false;
         if (discount.trigger_type === "spend_amount") {
-          triggerMet = subtotal >= Number(discount.trigger_spend_amount || 0);
+          triggerMet = subtotal >= Math.max(0, Number(discount.trigger_spend_amount || 0));
         } else if (discount.trigger_type === "item_in_cart") {
-          triggerMet = verifiedCart.some((it) => it.productId === discount.trigger_product_id);
+          triggerMet = verifiedCart.some((it) => String(it.productId || "") === String(discount.trigger_product_id || ""));
         } else if (discount.trigger_type === "both") {
-          const spendMet = subtotal >= Number(discount.trigger_spend_amount || 0);
-          const itemMet = verifiedCart.some((it) => it.productId === discount.trigger_product_id);
+          const spendMet = subtotal >= Math.max(0, Number(discount.trigger_spend_amount || 0));
+          const itemMet = verifiedCart.some((it) => String(it.productId || "") === String(discount.trigger_product_id || ""));
           triggerMet = spendMet && itemMet;
         }
 
         if (!triggerMet) continue;
 
         if (discount.effect_type === "fixed_amount") {
-          autoDiscountAmount = Number(discount.effect_value || 0);
+          autoDiscountAmount = Math.min(subtotal, Math.max(0, Number(discount.effect_value || 0)));
         } else if (discount.effect_type === "percentage") {
-          autoDiscountAmount = subtotal * (Number(discount.effect_value || 0) / 100);
+          autoDiscountAmount = Math.min(subtotal, subtotal * Math.max(0, Math.min(100, Number(discount.effect_value || 0))) / 100);
         } else if (discount.effect_type === "free_item" && discount.effect_free_product_id) {
           const variant = await findFreeVariant(discount.effect_free_product_id, discount.effect_free_variant_id);
           if (variant) {

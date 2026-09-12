@@ -152,14 +152,17 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           body: JSON.stringify({ cart, cartTotal }),
         });
         
-        if (!res.ok || cancelled) return;
+        if (!res.ok || cancelled) {
+          if (!cancelled) setAutoDiscount(null);
+          return;
+        }
         
         const data = await res.json();
         if (data.applicable && !cancelled) {
           setAutoDiscount({
             name: data.discount.name,
             description: data.discount.description,
-            discount_amount: data.discount.discount_amount || 0,
+            discount_amount: Number(data.discount.discount_amount) || 0,
             free_item: data.discount.free_item || null,
           });
         } else if (!cancelled) {

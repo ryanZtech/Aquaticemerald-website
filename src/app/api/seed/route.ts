@@ -260,13 +260,18 @@ export async function GET() {
     const sql = neon(dbUrl);
     console.log("Neon Seed API: Initializing full schema...");
 
-    await sql`CREATE TABLE IF NOT EXISTS categories (id SERIAL PRIMARY KEY, name TEXT NOT NULL, slug TEXT UNIQUE NOT NULL, description TEXT, image_url TEXT, parent_id INTEGER REFERENCES categories(id), sort_order INTEGER DEFAULT 0, active BOOLEAN DEFAULT TRUE);`;
+    await sql`CREATE TABLE IF NOT EXISTS categories (id SERIAL PRIMARY KEY, name TEXT NOT NULL, slug TEXT UNIQUE NOT NULL, description TEXT, image_url TEXT, icon_name TEXT DEFAULT 'package', parent_id INTEGER REFERENCES categories(id), sort_order INTEGER DEFAULT 0, active BOOLEAN DEFAULT TRUE, updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP);`;
+    await sql`ALTER TABLE categories ADD COLUMN IF NOT EXISTS icon_name TEXT DEFAULT 'package';`;
+    await sql`ALTER TABLE categories ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;`;
 
     await sql`CREATE TABLE IF NOT EXISTS products (id TEXT PRIMARY KEY, name TEXT NOT NULL, slug TEXT UNIQUE NOT NULL, short_description TEXT, full_description TEXT, category_id INTEGER REFERENCES categories(id), featured BOOLEAN DEFAULT FALSE, active BOOLEAN DEFAULT TRUE, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP);`;
 
-    await sql`CREATE TABLE IF NOT EXISTS product_variants (id TEXT PRIMARY KEY, product_id TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE, label TEXT NOT NULL, price NUMERIC(10, 2) NOT NULL, active BOOLEAN DEFAULT TRUE, sku TEXT, sort_order INTEGER DEFAULT 0);`;
+    await sql`CREATE TABLE IF NOT EXISTS product_variants (id TEXT PRIMARY KEY, product_id TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE, label TEXT NOT NULL, price NUMERIC(10, 2) NOT NULL, stock_level TEXT NOT NULL DEFAULT 'none', active BOOLEAN DEFAULT TRUE, sku TEXT, sort_order INTEGER DEFAULT 0, updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP);`;
+    await sql`ALTER TABLE product_variants ADD COLUMN IF NOT EXISTS stock_level TEXT NOT NULL DEFAULT 'none';`;
+    await sql`ALTER TABLE product_variants ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;`;
 
     await sql`CREATE TABLE IF NOT EXISTS images (id SERIAL PRIMARY KEY, product_id TEXT REFERENCES products(id) ON DELETE CASCADE, variant_id TEXT REFERENCES product_variants(id) ON DELETE CASCADE, image_url TEXT NOT NULL, alt_text TEXT, is_primary BOOLEAN DEFAULT FALSE, sort_order INTEGER DEFAULT 0, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP);`;
+    await sql`CREATE TABLE IF NOT EXISTS variant_images (id SERIAL PRIMARY KEY, variant_id TEXT NOT NULL REFERENCES product_variants(id) ON DELETE CASCADE, image_url TEXT NOT NULL, alt_text TEXT, is_primary BOOLEAN DEFAULT FALSE, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP);`;
 
     await sql`CREATE TABLE IF NOT EXISTS tags (id SERIAL PRIMARY KEY, name TEXT NOT NULL, slug TEXT UNIQUE NOT NULL);`;
 
@@ -279,6 +284,8 @@ export async function GET() {
     await sql`CREATE TABLE IF NOT EXISTS pickup_locations (id SERIAL PRIMARY KEY, name TEXT NOT NULL, address TEXT, instructions TEXT, active BOOLEAN DEFAULT TRUE, latitude NUMERIC(10, 8), longitude NUMERIC(11, 8), created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP);`;
 
     await sql`CREATE TABLE IF NOT EXISTS weekly_availability_rules (id SERIAL PRIMARY KEY, pickup_location_id INTEGER REFERENCES pickup_locations(id) ON DELETE CASCADE, weekday INTEGER NOT NULL, start_time TIME NOT NULL, end_time TIME NOT NULL, slot_duration_minutes INTEGER DEFAULT 30, max_pickups_per_slot INTEGER DEFAULT 1, active BOOLEAN DEFAULT TRUE);`;
+
+    await sql`ALTER TABLE pickup_locations ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;`;
 
     await sql`CREATE TABLE IF NOT EXISTS availability_overrides (id SERIAL PRIMARY KEY, pickup_location_id INTEGER REFERENCES pickup_locations(id) ON DELETE CASCADE, start_at TIMESTAMP WITH TIME ZONE NOT NULL, end_at TIMESTAMP WITH TIME ZONE NOT NULL, override_type TEXT NOT NULL, custom_hours_json JSONB, reason TEXT, active BOOLEAN DEFAULT TRUE);`;
 
@@ -295,6 +302,8 @@ export async function GET() {
     // it does nothing to a table that already exists (which is the case for
     // any store that's already taken orders). Patch existing installs too.
     await sql`ALTER TABLE orders ALTER COLUMN pickup_slot_at DROP NOT NULL;`;
+    await sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount_amount NUMERIC(10, 2) NOT NULL DEFAULT 0;`;
+    await sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS promo_code TEXT;`;
 
     await sql`CREATE TABLE IF NOT EXISTS order_items (id SERIAL PRIMARY KEY, order_id INTEGER REFERENCES orders(id) ON DELETE CASCADE, product_id TEXT, variant_id TEXT, snapshot_product_name TEXT NOT NULL, snapshot_variant_label TEXT, snapshot_unit_price NUMERIC(10, 2) NOT NULL, quantity INTEGER NOT NULL);`;
 
@@ -309,6 +318,12 @@ export async function GET() {
         attempted_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
     `;
+
+    await sql`CREATE TABLE IF NOT EXISTS guides (id SERIAL PRIMARY KEY, title TEXT NOT NULL, slug TEXT UNIQUE NOT NULL, body TEXT NOT NULL, display_order INTEGER DEFAULT 0, active BOOLEAN DEFAULT TRUE, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP);`;
+    await sql`CREATE TABLE IF NOT EXISTS faqs (id SERIAL PRIMARY KEY, title TEXT NOT NULL, slug TEXT UNIQUE NOT NULL, body TEXT NOT NULL, display_order INTEGER DEFAULT 0, active BOOLEAN DEFAULT TRUE, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP);`;
+    await sql`CREATE TABLE IF NOT EXISTS promo_popups (id SERIAL PRIMARY KEY, name TEXT NOT NULL, heading TEXT NOT NULL, body_text TEXT, button_text TEXT NOT NULL, button_url TEXT NOT NULL, image_url TEXT, delay_seconds INTEGER NOT NULL DEFAULT 3, active BOOLEAN NOT NULL DEFAULT TRUE, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP);`;
+    await sql`CREATE TABLE IF NOT EXISTS discount_codes (id SERIAL PRIMARY KEY, code TEXT UNIQUE NOT NULL, description TEXT, discount_type TEXT NOT NULL, discount_value NUMERIC(10, 2), free_product_id TEXT REFERENCES products(id) ON DELETE SET NULL, free_variant_id TEXT REFERENCES product_variants(id) ON DELETE SET NULL, valid_from TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP, valid_until TIMESTAMP WITH TIME ZONE, max_uses INTEGER, active BOOLEAN NOT NULL DEFAULT TRUE, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP);`;
+    await sql`CREATE TABLE IF NOT EXISTS auto_discounts (id SERIAL PRIMARY KEY, name TEXT NOT NULL, description TEXT, trigger_type TEXT NOT NULL, trigger_spend_amount NUMERIC(10, 2), trigger_product_id TEXT REFERENCES products(id) ON DELETE CASCADE, trigger_variant_id TEXT REFERENCES product_variants(id) ON DELETE CASCADE, effect_type TEXT NOT NULL, effect_value NUMERIC(10, 2), effect_free_product_id TEXT REFERENCES products(id) ON DELETE SET NULL, effect_free_variant_id TEXT REFERENCES product_variants(id) ON DELETE SET NULL, priority INTEGER NOT NULL DEFAULT 0, active BOOLEAN NOT NULL DEFAULT TRUE, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP);`;
 
     // --- Fix mistyped variant-reference columns on discount_codes / auto_discounts ---
     // discount_codes.free_variant_id, auto_discounts.trigger_variant_id, and
@@ -329,45 +344,53 @@ export async function GET() {
     // already there — both safe to run every time this endpoint is hit.
     const discountCodesExists = await sql`SELECT to_regclass('public.discount_codes') AS reg`;
     if (discountCodesExists[0]?.reg) {
+      for (const column of ["free_product_id", "free_variant_id"]) {
+        try {
+          await sql.query(`ALTER TABLE discount_codes ALTER COLUMN ${column} TYPE TEXT USING ${column}::text`);
+        } catch (e: any) {
+          console.warn(`Seed: could not convert discount_codes.${column} to TEXT:`, e?.message || e);
+        }
+      }
       try {
-        await sql`ALTER TABLE discount_codes ALTER COLUMN free_variant_id TYPE TEXT USING free_variant_id::text`;
+        await sql`ALTER TABLE discount_codes ADD CONSTRAINT discount_codes_free_product_id_fkey FOREIGN KEY (free_product_id) REFERENCES products(id) ON DELETE SET NULL`;
       } catch (e: any) {
-        console.warn("Seed: could not convert discount_codes.free_variant_id to TEXT:", e?.message || e);
+        if (!/already exists/i.test(e?.message || "")) console.warn("Seed: could not add FK on discount_codes.free_product_id:", e?.message || e);
       }
       try {
         await sql`ALTER TABLE discount_codes ADD CONSTRAINT discount_codes_free_variant_id_fkey FOREIGN KEY (free_variant_id) REFERENCES product_variants(id) ON DELETE SET NULL`;
       } catch (e: any) {
-        if (!/already exists/i.test(e?.message || "")) {
-          console.warn("Seed: could not add FK on discount_codes.free_variant_id:", e?.message || e);
-        }
+        if (!/already exists/i.test(e?.message || "")) console.warn("Seed: could not add FK on discount_codes.free_variant_id:", e?.message || e);
       }
     }
 
     const autoDiscountsExists = await sql`SELECT to_regclass('public.auto_discounts') AS reg`;
     if (autoDiscountsExists[0]?.reg) {
-      try {
-        await sql`ALTER TABLE auto_discounts ALTER COLUMN trigger_variant_id TYPE TEXT USING trigger_variant_id::text`;
-      } catch (e: any) {
-        console.warn("Seed: could not convert auto_discounts.trigger_variant_id to TEXT:", e?.message || e);
+      for (const column of ["trigger_product_id", "trigger_variant_id", "effect_free_product_id", "effect_free_variant_id"]) {
+        try {
+          await sql.query(`ALTER TABLE auto_discounts ALTER COLUMN ${column} TYPE TEXT USING ${column}::text`);
+        } catch (e: any) {
+          console.warn(`Seed: could not convert auto_discounts.${column} to TEXT:`, e?.message || e);
+        }
       }
       try {
-        await sql`ALTER TABLE auto_discounts ALTER COLUMN effect_free_variant_id TYPE TEXT USING effect_free_variant_id::text`;
+        await sql`ALTER TABLE auto_discounts ADD CONSTRAINT auto_discounts_trigger_product_id_fkey FOREIGN KEY (trigger_product_id) REFERENCES products(id) ON DELETE CASCADE`;
       } catch (e: any) {
-        console.warn("Seed: could not convert auto_discounts.effect_free_variant_id to TEXT:", e?.message || e);
+        if (!/already exists/i.test(e?.message || "")) console.warn("Seed: could not add FK on auto_discounts.trigger_product_id:", e?.message || e);
       }
       try {
         await sql`ALTER TABLE auto_discounts ADD CONSTRAINT auto_discounts_trigger_variant_id_fkey FOREIGN KEY (trigger_variant_id) REFERENCES product_variants(id) ON DELETE CASCADE`;
       } catch (e: any) {
-        if (!/already exists/i.test(e?.message || "")) {
-          console.warn("Seed: could not add FK on auto_discounts.trigger_variant_id:", e?.message || e);
-        }
+        if (!/already exists/i.test(e?.message || "")) console.warn("Seed: could not add FK on auto_discounts.trigger_variant_id:", e?.message || e);
+      }
+      try {
+        await sql`ALTER TABLE auto_discounts ADD CONSTRAINT auto_discounts_effect_free_product_id_fkey FOREIGN KEY (effect_free_product_id) REFERENCES products(id) ON DELETE SET NULL`;
+      } catch (e: any) {
+        if (!/already exists/i.test(e?.message || "")) console.warn("Seed: could not add FK on auto_discounts.effect_free_product_id:", e?.message || e);
       }
       try {
         await sql`ALTER TABLE auto_discounts ADD CONSTRAINT auto_discounts_effect_free_variant_id_fkey FOREIGN KEY (effect_free_variant_id) REFERENCES product_variants(id) ON DELETE SET NULL`;
       } catch (e: any) {
-        if (!/already exists/i.test(e?.message || "")) {
-          console.warn("Seed: could not add FK on auto_discounts.effect_free_variant_id:", e?.message || e);
-        }
+        if (!/already exists/i.test(e?.message || "")) console.warn("Seed: could not add FK on auto_discounts.effect_free_variant_id:", e?.message || e);
       }
     }
 
