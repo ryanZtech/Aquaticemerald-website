@@ -1,4 +1,5 @@
 import { neon, Pool, neonConfig } from '@neondatabase/serverless';
+import ws from 'ws';
 
 const databaseUrl = process.env.DATABASE_URL;
 
@@ -13,10 +14,7 @@ export const sql = databaseUrl ? neon(databaseUrl) : null;
 // `WebSocket`, which `Pool`/`Client` need for their real, interactive
 // Postgres session. Wire in the `ws` package so `pool.connect()` works here.
 if (databaseUrl && typeof WebSocket === 'undefined') {
-  // Lazy require so this has no effect (and no dependency needed) in
-  // environments that already provide a global WebSocket.
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  neonConfig.webSocketConstructor = require('ws');
+  neonConfig.webSocketConstructor = ws as unknown as typeof WebSocket;
 }
 
 // A real, interactive-session client for the rare cases that need an actual

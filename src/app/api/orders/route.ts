@@ -32,6 +32,7 @@ async function findFreeVariant(
       FROM product_variants v
       JOIN products p ON p.id = v.product_id
       WHERE v.id = ${preferredVariantId} AND v.product_id = ${productId}
+        AND v.active = TRUE AND p.active = TRUE
       LIMIT 1
     `;
     if (rows.length > 0 && rows[0].stock_level !== "none") {
@@ -44,6 +45,7 @@ async function findFreeVariant(
     FROM product_variants v
     JOIN products p ON p.id = v.product_id
     WHERE v.product_id = ${productId} AND v.stock_level != 'none'
+      AND v.active = TRUE AND p.active = TRUE
     ORDER BY v.price ASC
     LIMIT 1
   `;
@@ -297,9 +299,20 @@ export async function POST(request: NextRequest) {
       console.error("Failed to evaluate auto-discounts:", e);
     }
 
+    // Enforce the $5 minimum order server-side (the cart page only
+    // enforces this in the browser, which a direct API call bypasses).
+    // Provisional check with the auto-discount; re-checked against the
+    // final total inside the transaction once the promo code is applied.
+    if (Math.max(0, subtotal - autoDiscountAmount) < 5) {
+      return NextResponse.json({ error: "Minimum order is $5.00. Please add more items." }, { status: 400 });
+    }
+
     const pickupLocationId = pickup_location_id ? Number(pickup_location_id) : null;
     const slotStart = pickup_slot_at || null;
-    const isCustomLocation = !pickupLocationId || (cleanNotes && cleanNotes.includes('Custom location'));
+    const isCustomLocation = !pickupLocationId || !Number.isInteger(pickupLocationId) || pickupLocationId < 1;
+    if (!isCustomLocation && !slotStart) {
+      return NextResponse.json({ error: "Please choose a pickup date and time." }, { status: 400 });
+    }
 
     // If custom location, resolve it to the 'Custom' pickup_location entry in DB
     let resolvedLocationId: number | null = pickupLocationId;
@@ -399,7 +412,10 @@ export async function POST(request: NextRequest) {
 
           if (withinUsageLimit) {
             if (discount.discount_type === "percentage") {
-              discountAmount += subtotal * (Number(discount.discount_value) / 100);
+              const pct = Math.max(0, Math.min(100, Number(discount.discount_value) || 0));
+              discountAmount += Math.min(subtotal, (subtotal * pct) / 100);
+            } else if (discount.discount_type === "fixed_amount") {
+              discountAmount += Math.min(subtotal, Math.max(0, Number(discount.discount_value) || 0));
             } else if (discount.discount_type === "free_item" && discount.free_product_id) {
               const variant = await findFreeVariant(discount.free_product_id, discount.free_variant_id);
               if (variant) {
@@ -421,6 +437,10 @@ export async function POST(request: NextRequest) {
       }
 
       const total = Math.max(0, subtotal - discountAmount);
+      if (total < 5) {
+        await client.query("ROLLBACK");
+        return NextResponse.json({ error: "Minimum order is $5.00. Please add more items." }, { status: 400 });
+      }
       const finalItems: OrderLineItem[] = [...verifiedCart];
       if (autoFreeItem) finalItems.push(autoFreeItem);
       // Don't give the same free item away twice if both a promo code and

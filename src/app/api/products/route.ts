@@ -133,13 +133,41 @@ export async function POST(request: NextRequest) {
     const categoryId = formData.get("categoryId") as string;
     const shortDescription = formData.get("shortDescription") as string;
     const fullDescription = formData.get("fullDescription") as string;
-    const variants = JSON.parse(formData.get("variants") as string);
-    const attributes = JSON.parse(
-      (formData.get("attributes") as string) || "{}",
-    );
-    const productImages = JSON.parse(
-      (formData.get("productImages") as string) || "[]",
-    );
+    if (!name || !String(name).trim()) {
+      return NextResponse.json({ error: "Product name is required" }, { status: 400 });
+    }
+    if (!slug || !String(slug).trim()) {
+      return NextResponse.json({ error: "Product slug is required" }, { status: 400 });
+    }
+    const catId = parseInt(String(categoryId));
+    if (!Number.isInteger(catId) || catId < 1) {
+      return NextResponse.json({ error: "Valid categoryId is required" }, { status: 400 });
+    }
+    let variants: any[];
+    let attributes: Record<string, unknown>;
+    let productImages: any[];
+    try {
+      variants = JSON.parse(formData.get("variants") as string);
+      attributes = JSON.parse((formData.get("attributes") as string) || "{}");
+      productImages = JSON.parse((formData.get("productImages") as string) || "[]");
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON in variants, attributes, or productImages" }, { status: 400 });
+    }
+    if (!Array.isArray(variants) || variants.length === 0) {
+      return NextResponse.json({ error: "At least one variant is required" }, { status: 400 });
+    }
+    if (!Array.isArray(productImages)) {
+      return NextResponse.json({ error: "Invalid productImages" }, { status: 400 });
+    }
+    for (const v of variants) {
+      const price = Number(v?.price);
+      if (!v?.label || !String(v.label).trim()) {
+        return NextResponse.json({ error: "Each variant needs a label" }, { status: 400 });
+      }
+      if (!Number.isFinite(price) || price < 0 || price > 1000000) {
+        return NextResponse.json({ error: `Invalid price for variant "${v?.label || "?"}"` }, { status: 400 });
+      }
+    }
     const newImages = formData.getAll("newImages") as File[];
 
     const productId = `prod_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -167,8 +195,7 @@ export async function POST(request: NextRequest) {
     }
 
     await sql`
-      INSERT INTO products (id, name, slug, short_description, full_description, category_id, active)
-      VALUES (${productId}, ${name}, ${slug}, ${shortDescription}, ${fullDescription}, ${parseInt(categoryId)}, TRUE)
+      INSERT INTO products (id, name, slug, short_description, full_description, category_id, active)        VALUES (${productId}, ${name}, ${slug}, ${shortDescription}, ${fullDescription}, ${catId}, TRUE)
     `;
 
     for (const variant of variants) {
@@ -240,8 +267,14 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ success: true, productId });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error creating product:", error);
+    if (error?.message?.includes("duplicate key")) {
+      return NextResponse.json(
+        { error: "A product with this slug already exists" },
+        { status: 400 },
+      );
+    }
     return NextResponse.json(
       { error: "Failed to create product" },
       { status: 500 },

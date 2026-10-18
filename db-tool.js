@@ -56,11 +56,13 @@ const POSITIONAL_ARGS = ARGS.filter((a) => a !== "--dry-run");
 function loadDatabaseUrl() {
   if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
 
-  const envPath = ".env.local";
-  if (!existsSync(envPath)) {
+  // This project keeps its credentials in `.env` (Next.js also loads
+  // `.env.local` when present) — try both before giving up.
+  const envPath = ["./.env.local", "./.env"].find((p) => existsSync(p));
+  if (!envPath) {
     throw new Error(
-      `DATABASE_URL is not set and ${envPath} was not found in the current directory.\n` +
-        `Run this script from the folder that contains .env.local (your project root).`,
+      `DATABASE_URL is not set and neither .env.local nor .env was found in the current directory.\n` +
+        `Run this script from the folder that contains your env file (your project root).`,
     );
   }
 

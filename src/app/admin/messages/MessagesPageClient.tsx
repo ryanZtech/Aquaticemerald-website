@@ -53,6 +53,7 @@ export default function MessagesPageClient() {
 
   const formatDate = (iso: string) => {
     const d = new Date(iso);
+    if (isNaN(d.getTime())) return "Unknown date";
     return d.toLocaleString(undefined, {
       year: "numeric",
       month: "short",

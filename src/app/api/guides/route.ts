@@ -31,6 +31,16 @@ export async function POST(request: NextRequest) {
   try {
     const { title, slug, body, display_order, active } = await request.json();
 
+    if (!title || !String(title).trim()) {
+      return NextResponse.json({ error: "Title is required" }, { status: 400 });
+    }
+    if (!slug || !String(slug).trim()) {
+      return NextResponse.json({ error: "Slug is required" }, { status: 400 });
+    }
+    if (!body || !String(body).trim()) {
+      return NextResponse.json({ error: "Body is required" }, { status: 400 });
+    }
+
     const result = await sql`
       INSERT INTO guides (title, slug, body, display_order, active)
       VALUES (${title}, ${slug}, ${body}, ${display_order ?? 0}, ${active ?? true})
@@ -38,8 +48,11 @@ export async function POST(request: NextRequest) {
     `;
 
     return NextResponse.json(result[0], { status: 201 });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error creating guide:", error);
+    if (error?.message?.includes("duplicate key")) {
+      return NextResponse.json({ error: "A guide with this slug already exists" }, { status: 400 });
+    }
     return NextResponse.json({ error: "Failed to create guide" }, { status: 500 });
   }
 }

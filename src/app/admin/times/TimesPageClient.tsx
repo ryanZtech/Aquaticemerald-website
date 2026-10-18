@@ -104,42 +104,60 @@ export default function TimesPageClient() {
   const handleBulkDelete = async () => {
     if (!confirm(`Are you sure you want to delete ${selectedRuleIds.size} rules?`)) return;
 
-    try {
-      await Promise.all(
-        Array.from(selectedRuleIds).map(async (id) => {
-          await fetch(`/api/times/${id}`, { method: "DELETE" });
-        })
-      );
+    // fetch() only rejects on network failure — a 401/404/500 still
+    // resolves, so each response's ok flag must be checked or a total
+    // failure (e.g. expired admin session) would still toast success.
+    const results = await Promise.all(
+      Array.from(selectedRuleIds).map(async (id) => {
+        try {
+          const res = await fetch(`/api/times/${id}`, { method: "DELETE" });
+          return res.ok;
+        } catch (error) {
+          console.error(`Bulk delete failed for rule ${id}:`, error);
+          return false;
+        }
+      })
+    );
+    const failed = results.filter((ok) => !ok).length;
+    if (failed === 0) {
       toast.success("Bulk delete successful");
-      setSelectedRuleIds(new Set());
-      fetchRules();
-    } catch (error) {
-      console.error("Bulk delete failed:", error);
+    } else if (failed < results.length) {
+      toast.error(`${failed} of ${results.length} deletes failed`);
+    } else {
       toast.error("Failed to bulk delete rules");
     }
+    setSelectedRuleIds(new Set());
+    fetchRules();
   };
 
   const handleBulkToggleActive = async (active: boolean) => {
-    try {
-      await Promise.all(
-        Array.from(selectedRuleIds).map(async (id) => {
-          const rule = rules.find((r) => r.id === id);
-          if (rule) {
-            await fetch(`/api/times/${id}`, {
-              method: "PUT",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ ...rule, active }),
-            });
-          }
-        })
-      );
+    const results = await Promise.all(
+      Array.from(selectedRuleIds).map(async (id) => {
+        const rule = rules.find((r) => r.id === id);
+        if (!rule) return true;
+        try {
+          const res = await fetch(`/api/times/${id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ...rule, active }),
+          });
+          return res.ok;
+        } catch (error) {
+          console.error(`Bulk toggle failed for rule ${id}:`, error);
+          return false;
+        }
+      })
+    );
+    const failed = results.filter((ok) => !ok).length;
+    if (failed === 0) {
       toast.success(`Bulk ${active ? "enable" : "disable"} successful`);
-      setSelectedRuleIds(new Set());
-      fetchRules();
-    } catch (error) {
-      console.error("Bulk toggle failed:", error);
+    } else if (failed < results.length) {
+      toast.error(`${failed} of ${results.length} updates failed`);
+    } else {
       toast.error(`Failed to bulk ${active ? "enable" : "disable"} rules`);
     }
+    setSelectedRuleIds(new Set());
+    fetchRules();
   };
 
   const handleEdit = (rule: TimeRule) => {
@@ -176,6 +194,14 @@ export default function TimesPageClient() {
   };
 
   const handleSave = async () => {
+    if (formData.weekdays.length === 0) {
+      toast.error("Select at least one day");
+      return;
+    }
+    if (formData.start_time >= formData.end_time) {
+      toast.error("End time must be after start time");
+      return;
+    }
     try {
       if (editingRule) {
         const url = `/api/times/${editingRule.id}`;

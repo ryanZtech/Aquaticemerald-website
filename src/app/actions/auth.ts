@@ -49,6 +49,10 @@ export async function loginAdmin(formData: FormData) {
     }
   }
 
+  if (!password || typeof password !== "string") {
+    return { error: "Invalid password" };
+  }
+
   try {
     // 2. Verify Password
     const isMatch = compareSync(password, expectedHash);

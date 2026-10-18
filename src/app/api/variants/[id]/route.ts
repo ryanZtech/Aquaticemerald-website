@@ -22,14 +22,18 @@ export async function PUT(
     const body = await request.json();
     const { stock_level } = body;
 
-    const rawLevel = String(stock_level || "").toLowerCase();
-    if (!(STOCK_LEVELS as string[]).includes(rawLevel)) {
+    // Accept the same legacy spellings ("med", "very-low", ...) that
+    // normalizeStockLevel handles everywhere else — the old strict check
+    // rejected them here while the rest of the app accepted them.
+    const level = normalizeStockLevel(stock_level);
+    const rawLower = String(stock_level || "").toLowerCase().trim();
+    const LEGACY_ALIASES = ["med", "verylow", "very-low", "veryhigh", "very-high"];
+    if (!(STOCK_LEVELS as string[]).includes(rawLower) && !LEGACY_ALIASES.includes(rawLower)) {
       return NextResponse.json(
         { error: "Invalid stock level" },
         { status: 400 },
       );
     }
-    const level = normalizeStockLevel(rawLevel);
 
     const result = await sql`
       UPDATE product_variants

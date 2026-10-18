@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/app/components/ui/table";
 import { Button } from "@/app/components/ui/button";
 import { Copy, Check, X, Trash2, ChevronDown, ChevronRight, Phone, Mail } from "lucide-react";
@@ -132,7 +132,9 @@ export default function OrdersPageClient() {
   };
 
   const handleTogglePicked = async (order: Order) => {
-    const newStatus = order.status === "picked_up" ? "pending" : "picked_up";
+    // Toggling from anywhere else (e.g. a cancelled order in the finished
+    // list) must land on "pending", never resurrect as "picked_up".
+    const newStatus = order.status === "pending" ? "picked_up" : "pending";
     try {
       const res = await fetch(`/api/orders/${order.id}`, {
         method: "PUT",
@@ -202,8 +204,11 @@ export default function OrdersPageClient() {
 
   if (loading) return <div className="flex items-center justify-center h-40">Loading orders...</div>;
 
-  const pending = orders.filter(o => o.status !== "picked_up");
-  const picked = orders.filter(o => o.status === "picked_up");
+  // Only genuinely actionable orders belong in the main queue. The old
+  // `!== "picked_up"` filter also swept cancelled/finalised/completed
+  // orders into the "to do" list, burying real work.
+  const pending = orders.filter(o => o.status === "pending");
+  const finished = orders.filter(o => o.status !== "pending");
 
   return (
     <div className="space-y-6">
@@ -312,7 +317,7 @@ export default function OrdersPageClient() {
               </TableRow>
             ) : (
               pending.map((o) => (
-                <>
+                <Fragment key={o.id}>
                   <TableRow
                     key={o.id}
                     className="cursor-pointer hover:bg-muted/30 transition-colors"
@@ -381,7 +386,7 @@ export default function OrdersPageClient() {
                       </TableCell>
                     </TableRow>
                   )}
-                </>
+                </Fragment>
               ))
             )}
           </TableBody>
@@ -390,7 +395,7 @@ export default function OrdersPageClient() {
 
       <div>
         <button className="text-sm text-muted-foreground underline" onClick={() => setShowPickedUp((s) => !s)}>
-          {showPickedUp ? "Hide" : "Show"} picked up orders ({picked.length})
+          {showPickedUp ? "Hide" : "Show"} finished orders ({finished.length})
         </button>
         {showPickedUp && (
           <div className="mt-4 bg-card rounded-2xl border border-border overflow-hidden">
@@ -409,13 +414,13 @@ export default function OrdersPageClient() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {picked.length === 0 ? (
+                {finished.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-12 text-muted-foreground font-light">No picked up orders</TableCell>
+                    <TableCell colSpan={9} className="text-center py-12 text-muted-foreground font-light">No finished orders</TableCell>
                   </TableRow>
                 ) : (
-                  picked.map((o) => (
-                    <>
+                  finished.map((o) => (
+                    <Fragment key={o.id}>
                       <TableRow
                         key={o.id}
                         className="cursor-pointer hover:bg-muted/30 transition-colors"
@@ -441,7 +446,13 @@ export default function OrdersPageClient() {
                         <TableCell>${Number(o.total).toFixed(2)}{o.promo_code && (<span className="ml-1.5 text-[10px] font-normal text-emerald-600 dark:text-emerald-400 align-middle">{o.promo_code}</span>)}</TableCell>
                         <TableCell>{o.pickup_slot_at ? formatPickupTime(o.pickup_slot_at) : "—"}</TableCell>
                         <TableCell>
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                            o.status === "cancelled"
+                              ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
+                              : o.status === "picked_up"
+                                ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400"
+                                : "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400"
+                          }`}>
                             {o.status}
                           </span>
                         </TableCell>
@@ -466,7 +477,7 @@ export default function OrdersPageClient() {
                           </TableCell>
                         </TableRow>
                       )}
-                    </>
+                    </Fragment>
                   ))
                 )}
               </TableBody>

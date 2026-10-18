@@ -18,17 +18,29 @@ export async function PUT(
     const body = await request.json();
     const { name, slug, description, imageUrl, iconName, parentId, sortOrder, active } = body;
 
-    await sql`
+    if (!name || !String(name).trim() || !slug || !String(slug).trim()) {
+      return NextResponse.json({ error: "Name and slug are required" }, { status: 400 });
+    }
+
+    const result = await sql`
       UPDATE categories
       SET name = ${name}, slug = ${slug}, description = ${description || null},
           image_url = ${imageUrl || null}, icon_name = ${iconName || 'package'}, parent_id = ${parentId || null},
           sort_order = ${sortOrder || 0}, active = ${active !== false}
       WHERE id = ${parseInt(id)}
+      RETURNING id
     `;
 
+    if (result.length === 0) {
+      return NextResponse.json({ error: "Category not found" }, { status: 404 });
+    }
+
     return NextResponse.json({ success: true });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error updating category:", error);
+    if (error?.message?.includes("duplicate key")) {
+      return NextResponse.json({ error: "A category with this slug already exists" }, { status: 400 });
+    }
     return NextResponse.json({ error: "Failed to update category" }, { status: 500 });
   }
 }
@@ -47,7 +59,7 @@ export async function DELETE(
   try {
     const { id } = await params;
 
-    const products = await sql`SELECT COUNT(*) as count FROM products WHERE category_id = ${parseInt(id)}`;
+    const products = await sql`SELECT COUNT(*)::int as count FROM products WHERE category_id = ${parseInt(id)}`;
     if (products[0].count > 0) {
       return NextResponse.json(
         { error: "Cannot delete category with products" },
@@ -55,10 +67,24 @@ export async function DELETE(
       );
     }
 
-    await sql`DELETE FROM categories WHERE id = ${parseInt(id)}`;
+    const children = await sql`SELECT COUNT(*)::int as count FROM categories WHERE parent_id = ${parseInt(id)}`;
+    if (children[0].count > 0) {
+      return NextResponse.json(
+        { error: "Cannot delete category with subcategories" },
+        { status: 400 }
+      );
+    }
+
+    const result = await sql`DELETE FROM categories WHERE id = ${parseInt(id)} RETURNING id`;
+    if (result.length === 0) {
+      return NextResponse.json({ error: "Category not found" }, { status: 404 });
+    }
     return NextResponse.json({ success: true });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error deleting category:", error);
+    if (error?.code === "23503") {
+      return NextResponse.json({ error: "Cannot delete this category because other records still reference it." }, { status: 400 });
+    }
     return NextResponse.json({ error: "Failed to delete category" }, { status: 500 });
   }
 }

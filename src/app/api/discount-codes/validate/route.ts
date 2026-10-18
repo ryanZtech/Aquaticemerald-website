@@ -76,6 +76,12 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Invalid discount configuration" }, { status: 500 });
       }
       discountAmount = Math.min(cartTotal, cartTotal * (percentage / 100));
+    } else if (discount.discount_type === "fixed_amount") {
+      const amount = Number(discount.discount_value);
+      if (!Number.isFinite(amount) || amount < 0) {
+        return NextResponse.json({ error: "Invalid discount configuration" }, { status: 500 });
+      }
+      discountAmount = Math.min(cartTotal, amount);
     } else if (discount.discount_type === "free_item") {
       freeItem = {
         productId: discount.free_product_id,

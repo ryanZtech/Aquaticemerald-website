@@ -44,6 +44,10 @@ export async function PUT(
     const { id } = await params;
     const { title, slug, body, display_order, active } = await request.json();
 
+    if (!title || !String(title).trim() || !slug || !String(slug).trim() || !body || !String(body).trim()) {
+      return NextResponse.json({ error: "Title, slug, and body are required" }, { status: 400 });
+    }
+
     const result = await sql`
       UPDATE faqs
       SET title = ${title}, slug = ${slug}, body = ${body},
@@ -58,8 +62,11 @@ export async function PUT(
     }
 
     return NextResponse.json(result[0]);
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error updating FAQ:", error);
+    if (error?.message?.includes("duplicate key")) {
+      return NextResponse.json({ error: "An FAQ with this slug already exists" }, { status: 400 });
+    }
     return NextResponse.json({ error: "Failed to update FAQ" }, { status: 500 });
   }
 }

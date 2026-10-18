@@ -63,11 +63,13 @@ const SETTINGS_KEY_BY_LEVEL = {
 function loadDatabaseUrl() {
   if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
 
-  const envPath = ".env.local";
-  if (!existsSync(envPath)) {
+  // This project keeps its credentials in `.env` (Next.js also loads
+  // `.env.local` when present) — try both before giving up.
+  const envPath = ["./.env.local", "./.env"].find((p) => existsSync(p));
+  if (!envPath) {
     throw new Error(
-      `DATABASE_URL is not set and ${envPath} was not found in the current directory.\n` +
-        `Run this script from the folder that contains .env.local (your project root).`,
+      `DATABASE_URL is not set and neither .env.local nor .env was found in the current directory.\n` +
+        `Run this script from the folder that contains your env file (your project root).`,
     );
   }
 
@@ -179,10 +181,20 @@ async function main() {
   const constraintName = "product_variants_stock_level_check";
   const valuesList = NEW_LEVELS.map((l) => `'${l}'`).join(", ");
   if (!DRY_RUN) {
-    await sql.query(
-      `ALTER TABLE product_variants ADD CONSTRAINT ${constraintName} CHECK (stock_level IN (${valuesList}))`,
-    );
-    console.log(`  Added constraint "${constraintName}".`);
+    // Idempotent: a re-run after a successful migration must not throw
+    // "already exists" here (which would abort before step 5's seeding).
+    try {
+      await sql.query(
+        `ALTER TABLE product_variants ADD CONSTRAINT ${constraintName} CHECK (stock_level IN (${valuesList}))`,
+      );
+      console.log(`  Added constraint "${constraintName}".`);
+    } catch (err) {
+      if (/already exists/i.test(err?.message || "")) {
+        console.log(`  Constraint "${constraintName}" already exists — skipped.`);
+      } else {
+        throw err;
+      }
+    }
   } else {
     console.log(`  (dry-run) Would add: CHECK (stock_level IN (${valuesList}))`);
   }

@@ -44,9 +44,38 @@ export async function PUT(
     const { id } = await params;
     const { pickup_location_id, weekday, start_time, end_time, slot_duration_minutes, max_pickups_per_slot, active } = await request.json();
 
+    // Same validation as POST /api/times — an unchecked update here would
+    // 500 at the DB (or store a nonsense rule the checkout then chokes on).
+    const locId = Number(pickup_location_id);
+    const wd = Number(weekday);
+    if (!Number.isInteger(locId) || locId < 1) {
+      return NextResponse.json({ error: "Valid pickup_location_id is required" }, { status: 400 });
+    }
+    if (!Number.isInteger(wd) || wd < 0 || wd > 6) {
+      return NextResponse.json({ error: "weekday must be an integer 0-6" }, { status: 400 });
+    }
+    const TIME_RE = /^([01]\d|2[0-3]):([0-5]\d)(:([0-5]\d))?$/;
+    if (typeof start_time !== "string" || !TIME_RE.test(start_time)) {
+      return NextResponse.json({ error: "start_time must be HH:MM(:SS)" }, { status: 400 });
+    }
+    if (typeof end_time !== "string" || !TIME_RE.test(end_time)) {
+      return NextResponse.json({ error: "end_time must be HH:MM(:SS)" }, { status: 400 });
+    }
+    if (start_time >= end_time) {
+      return NextResponse.json({ error: "end_time must be after start_time" }, { status: 400 });
+    }
+    const slotMin = slot_duration_minutes == null ? 15 : Number(slot_duration_minutes);
+    const maxPick = max_pickups_per_slot == null ? 1 : Number(max_pickups_per_slot);
+    if (!Number.isFinite(slotMin) || slotMin < 1 || slotMin > 1440) {
+      return NextResponse.json({ error: "slot_duration_minutes must be 1-1440" }, { status: 400 });
+    }
+    if (!Number.isInteger(maxPick) || maxPick < 1 || maxPick > 1000) {
+      return NextResponse.json({ error: "max_pickups_per_slot must be an integer 1-1000" }, { status: 400 });
+    }
+
     const result = await sql`
       UPDATE weekly_availability_rules
-      SET pickup_location_id = ${pickup_location_id}, weekday = ${weekday}, start_time = ${start_time}, end_time = ${end_time}, slot_duration_minutes = ${slot_duration_minutes}, max_pickups_per_slot = ${max_pickups_per_slot}, active = ${active}
+      SET pickup_location_id = ${locId}, weekday = ${wd}, start_time = ${start_time}, end_time = ${end_time}, slot_duration_minutes = ${slotMin}, max_pickups_per_slot = ${maxPick}, active = ${active}
       WHERE id = ${parseInt(id)}
       RETURNING *
     `;

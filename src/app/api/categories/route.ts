@@ -50,6 +50,13 @@ export async function POST(request: NextRequest) {
       active,
     } = body;
 
+    if (!name || !String(name).trim()) {
+      return NextResponse.json({ error: "Name is required" }, { status: 400 });
+    }
+    if (!slug || !String(slug).trim()) {
+      return NextResponse.json({ error: "Slug is required" }, { status: 400 });
+    }
+
     const result = await sql`
       INSERT INTO categories (name, slug, description, image_url, icon_name, parent_id, sort_order, active)
       VALUES (${name}, ${slug}, ${description || null}, ${imageUrl || null}, ${iconName || "package"}, ${parentId || null}, ${sortOrder || 0}, ${active !== false})
@@ -57,8 +64,14 @@ export async function POST(request: NextRequest) {
     `;
 
     return NextResponse.json(result[0]);
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error creating category:", error);
+    if (error?.message?.includes("duplicate key")) {
+      return NextResponse.json(
+        { error: "A category with this slug already exists" },
+        { status: 400 },
+      );
+    }
     return NextResponse.json(
       { error: "Failed to create category" },
       { status: 500 },

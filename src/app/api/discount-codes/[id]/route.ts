@@ -29,6 +29,19 @@ export async function PUT(
       active
     } = body;
 
+    // Same allowed set as POST — must match the
+    // discount_codes_discount_type_check constraint, otherwise the UPDATE
+    // fails at the DB with a 500.
+    if (!["percentage", "free_item"].includes(discount_type)) {
+      return NextResponse.json({ error: "discount_type must be one of: percentage, free_item" }, { status: 400 });
+    }
+    if (discount_type === "percentage") {
+      const pct = Number(discount_value);
+      if (!Number.isFinite(pct) || pct <= 0 || pct > 100) {
+        return NextResponse.json({ error: "percentage discount_value must be > 0 and <= 100" }, { status: 400 });
+      }
+    }
+
     const result = await sql`
       UPDATE discount_codes
       SET 

@@ -91,13 +91,20 @@ export default function ProductsPageClient() {
         if (arr) productsData = arr as any;
       }
 
-      productsData = productsData.map((p: any) => ({
-        ...p,
-        variants:
-          typeof p.variants === "string"
-            ? JSON.parse(p.variants)
-            : p.variants || [],
-      }));
+      productsData = productsData.map((p: any) => {
+        let variants: unknown[] = [];
+        if (Array.isArray(p.variants)) {
+          variants = p.variants;
+        } else if (typeof p.variants === "string") {
+          try {
+            const parsed = JSON.parse(p.variants);
+            variants = Array.isArray(parsed) ? parsed : [];
+          } catch {
+            variants = [];
+          }
+        }
+        return { ...p, variants };
+      });
 
       setProducts(productsData);
       setFilteredProducts(productsData);
@@ -157,7 +164,8 @@ export default function ProductsPageClient() {
         setDetailProduct(null);
         fetchProducts();
       } else {
-        toast.error("Failed to delete product");
+        const err = await response.json().catch(() => ({}));
+        toast.error(err.error || "Failed to delete product");
       }
     } catch (error) {
       console.error("Error deleting product:", error);
@@ -214,7 +222,8 @@ export default function ProductsPageClient() {
         fetchProducts();
         setEditingStockVariantId(null);
       } else {
-        toast.error("Failed to update stock level");
+        const err = await response.json().catch(() => ({}));
+        toast.error(err.error || "Failed to update stock level");
       }
     } catch (error) {
       console.error("Error updating stock level:", error);

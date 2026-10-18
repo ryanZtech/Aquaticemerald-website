@@ -54,6 +54,33 @@ export async function POST(request: NextRequest) {
       active
     } = body;
 
+    if (!name || !String(name).trim()) {
+      return NextResponse.json({ error: "Name is required" }, { status: 400 });
+    }
+    const ALLOWED_TRIGGERS = ["spend_amount", "item_in_cart", "both"];
+    const ALLOWED_EFFECTS = ["fixed_amount", "percentage", "free_item"];
+    if (!ALLOWED_TRIGGERS.includes(trigger_type)) {
+      return NextResponse.json({ error: `trigger_type must be one of: ${ALLOWED_TRIGGERS.join(", ")}` }, { status: 400 });
+    }
+    if (!ALLOWED_EFFECTS.includes(effect_type)) {
+      return NextResponse.json({ error: `effect_type must be one of: ${ALLOWED_EFFECTS.join(", ")}` }, { status: 400 });
+    }
+    if ((trigger_type === "spend_amount" || trigger_type === "both") && !(Number(trigger_spend_amount) > 0)) {
+      return NextResponse.json({ error: "trigger_spend_amount must be > 0" }, { status: 400 });
+    }
+    if ((trigger_type === "item_in_cart" || trigger_type === "both") && !trigger_product_id) {
+      return NextResponse.json({ error: "trigger_product_id is required" }, { status: 400 });
+    }
+    if (effect_type === "percentage" && !(Number(effect_value) > 0 && Number(effect_value) <= 100)) {
+      return NextResponse.json({ error: "effect_value percentage must be > 0 and <= 100" }, { status: 400 });
+    }
+    if (effect_type === "fixed_amount" && !(Number(effect_value) > 0)) {
+      return NextResponse.json({ error: "effect_value amount must be > 0" }, { status: 400 });
+    }
+    if (effect_type === "free_item" && !effect_free_product_id) {
+      return NextResponse.json({ error: "effect_free_product_id is required" }, { status: 400 });
+    }
+
     const result = await sql`
       INSERT INTO auto_discounts (
         name, description, trigger_type, trigger_spend_amount,

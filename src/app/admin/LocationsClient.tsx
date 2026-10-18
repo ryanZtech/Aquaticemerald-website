@@ -57,6 +57,10 @@ export default function LocationsClient() {
   };
 
   const save = async () => {
+    if (!name.trim()) {
+      toast.error("Name is required");
+      return;
+    }
     try {
       if (editing) {
         const res = await fetch(`/api/locations/${editing.id}`, {
@@ -64,7 +68,10 @@ export default function LocationsClient() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ name, detail, active }),
         });
-        if (!res.ok) throw new Error("Failed");
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || "Failed");
+        }
         toast.success("Updated");
       } else {
         const res = await fetch("/api/locations", {
@@ -72,15 +79,18 @@ export default function LocationsClient() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ name, detail, active }),
         });
-        if (!res.ok) throw new Error("Failed");
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || "Failed");
+        }
         toast.success("Created");
       }
       fetchLocations();
       setEditing(null);
       setShowEditDialog(false);
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      toast.error("Failed to save");
+      toast.error(e?.message || "Failed to save");
     }
   };
 
@@ -96,12 +106,15 @@ export default function LocationsClient() {
     if (!confirm("Delete this location?")) return;
     try {
       const res = await fetch(`/api/locations/${loc.id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Failed");
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Failed");
+      }
       toast.success("Deleted");
       fetchLocations();
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      toast.error("Failed to delete");
+      toast.error(e?.message || "Failed to delete");
     }
   };
 
