@@ -529,17 +529,17 @@ export default function CheckoutClient({
         us on WhatsApp to confirm.
       </p>
 
-      <div className="bg-emerald-600/10 border border-emerald-600/20 text-emerald-800 dark:text-emerald-300 rounded-2xl p-4 mb-8 text-center">
-        <p className="text-xs uppercase tracking-widest font-semibold mb-1">
-          Your Unique Order Reference
+      <div className="bg-primary/10 border border-primary/20 text-primary rounded-2xl p-4 mb-8 text-center">
+        <p className="text-sm font-semibold mb-1">
+          Your order reference
         </p>
         <p className="font-mono text-lg font-bold tracking-wider">{orderId}</p>
       </div>
 
       <div className="space-y-6">
         <div className="bg-card border border-border rounded-2xl p-5 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-4">
-            Order Summary
+          <p className="text-sm font-semibold mb-4">
+            Order summary
           </p>
           <div className="space-y-2 mb-4">
             {cart.map((item) => (
@@ -566,21 +566,21 @@ export default function CheckoutClient({
               this never appeared anywhere in checkout at all). */}
           {autoDiscount && (
             <div className="mb-4 pb-4 border-b border-border">
-              <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg px-3 py-2">
-                <p className="text-xs font-semibold text-green-700 dark:text-green-400">
+              <div className="bg-primary/10 border border-primary/25 rounded-lg px-3 py-2">
+                <p className="text-xs font-semibold text-primary">
                   {autoDiscount.name}
                 </p>
                 {autoDiscount.description && (
-                  <p className="text-xs text-green-600 dark:text-green-500 mt-0.5">
+                  <p className="text-xs text-muted-foreground mt-0.5">
                     {autoDiscount.description}
                   </p>
                 )}
                 {autoDiscount.free_item ? (
-                  <p className="text-xs text-green-600 dark:text-green-500 mt-1 font-medium">
+                  <p className="text-xs text-primary mt-1 font-medium">
                     Includes free: {autoDiscount.free_item.productName}
                   </p>
                 ) : autoDiscount.discount_amount > 0 ? (
-                  <p className="text-xs text-green-600 dark:text-green-500 mt-1 font-medium">
+                  <p className="text-xs text-primary mt-1 font-medium">
                     ${autoDiscount.discount_amount.toFixed(2)} off
                   </p>
                 ) : null}
@@ -618,18 +618,18 @@ export default function CheckoutClient({
             </div>
           ) : (
             <div className="mb-4 pb-4 border-b border-border">
-              <div className="flex items-center justify-between bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg px-3 py-2">
+              <div className="flex items-center justify-between bg-primary/10 border border-primary/25 rounded-lg px-3 py-2">
                 <div>
-                  <p className="text-xs font-semibold text-green-700 dark:text-green-400">
+                  <p className="text-xs font-semibold text-primary">
                     {appliedPromo.code} applied
                   </p>
                   {appliedPromo.description && (
-                    <p className="text-xs text-green-600 dark:text-green-500 mt-0.5">
+                    <p className="text-xs text-muted-foreground mt-0.5">
                       {appliedPromo.description}
                     </p>
                   )}
                   {appliedPromo.free_item && (
-                    <p className="text-xs text-green-600 dark:text-green-500 mt-1 font-medium">
+                    <p className="text-xs text-primary mt-1 font-medium">
                       Includes free: {appliedPromo.free_item.productName}
                     </p>
                   )}
@@ -650,7 +650,7 @@ export default function CheckoutClient({
               <span>${subtotal.toFixed(2)}</span>
             </div>
             {discountAmount > 0 && (
-              <div className="flex justify-between text-sm text-green-600 dark:text-green-400">
+              <div className="flex justify-between text-sm text-primary">
                 <span>
                   Discount
                   {autoDiscountAmount > 0 && promoDiscountAmount > 0 ? " (auto + promo)" : autoDiscountAmount > 0 ? " (auto)" : ""}
@@ -666,8 +666,8 @@ export default function CheckoutClient({
         </div>
 
         <div className="bg-card border border-border rounded-2xl p-5 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-4">
-            Your Details
+          <p className="text-sm font-semibold mb-4">
+            Your details
           </p>
           <div className="space-y-4">
             <div>
@@ -726,8 +726,8 @@ export default function CheckoutClient({
         </div>
 
         <div className="bg-card border border-border rounded-2xl p-5 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-4 flex items-center gap-2">
-            <MapPin className="w-3.5 h-3.5" /> Pickup Location
+          <p className="text-sm font-semibold mb-4 flex items-center gap-2">
+            <MapPin className="w-3.5 h-3.5" /> Pickup location
           </p>
           <div className="space-y-2">
             {locations.map((loc) => (
@@ -784,8 +784,8 @@ export default function CheckoutClient({
         {!isCustomLocation && (
           <>
         <div className="bg-card border border-border rounded-2xl p-5 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-4 flex items-center gap-2">
-            <Calendar className="w-3.5 h-3.5" /> Pickup Date
+          <p className="text-sm font-semibold mb-4 flex items-center gap-2">
+            <Calendar className="w-3.5 h-3.5" /> Pickup date
           </p>
           <div className="flex gap-2 flex-wrap mb-5">
             {availableMonths.map((m) => (
@@ -849,8 +849,8 @@ export default function CheckoutClient({
             <p className="text-sm font-semibold text-red-600 dark:text-red-400 mb-3">
               We only take cash at pickups
             </p>
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1 flex items-center gap-2">
-              <Clock className="w-3.5 h-3.5" /> Pickup Time
+            <p className="text-sm font-semibold mb-1 flex items-center gap-2">
+              <Clock className="w-3.5 h-3.5" /> Pickup time
             </p>
             <p className="text-xs text-muted-foreground mb-4 font-light">
               {getDowLabel()}
@@ -909,7 +909,7 @@ export default function CheckoutClient({
             disabled={!canConfirm || saving}
             className={`w-full py-5 rounded-full font-semibold text-sm tracking-wide transition-all duration-300 flex items-center justify-center gap-3 ${
               canConfirm && !saving
-                ? "bg-emerald-600 hover:bg-emerald-500 text-white hover:shadow-xl hover:shadow-emerald-600/30 hover:-translate-y-0.5 cursor-pointer"
+                ? "bg-primary hover:opacity-90 text-primary-foreground hover:shadow-xl hover:shadow-primary/30 hover:-translate-y-0.5 cursor-pointer"
                 : "bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed"
             } ${saving ? "opacity-75" : ""}`}
           >

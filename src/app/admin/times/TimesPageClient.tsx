@@ -289,7 +289,7 @@ export default function TimesPageClient() {
               <Button
                 variant="ghost"
                 onClick={() => handleBulkToggleActive(true)}
-                className="text-green-600 hover:text-green-700 cursor-pointer"
+                className="text-primary hover:opacity-80 cursor-pointer"
               >
                 <CheckCircle2 className="w-4 h-4 mr-1" /> Enable Selected
               </Button>
@@ -363,7 +363,7 @@ export default function TimesPageClient() {
                     <span
                       className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                         rule.active
-                          ? "bg-green-100 text-green-800"
+                          ? "bg-primary/15 text-primary"
                           : "bg-gray-100 text-gray-800"
                       }`}
                     >

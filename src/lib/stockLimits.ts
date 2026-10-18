@@ -75,7 +75,7 @@ export const STOCK_LEVEL_BADGE_CLASSES: Record<StockLevel, string> = {
   low: "bg-amber-500/10 text-amber-600",
   medium: "bg-yellow-500/10 text-yellow-700",
   high: "bg-lime-500/10 text-lime-700",
-  very_high: "bg-emerald-500/10 text-emerald-600",
+  very_high: "bg-primary/10 text-primary",
 };
 
 export function normalizeStockLevel(level?: string | null): StockLevel {

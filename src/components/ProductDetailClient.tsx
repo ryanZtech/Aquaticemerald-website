@@ -311,9 +311,6 @@ export default function ProductDetailClient({
 
         {}
         <div className="flex flex-col">
-          <p className="text-xs text-primary tracking-widest mb-2.5 capitalize font-semibold">
-            {product.category}
-          </p>
           <h1 className="font-serif text-3xl sm:text-4xl font-medium mb-4 leading-snug">
             {product.name}
           </h1>
@@ -468,7 +465,7 @@ export default function ProductDetailClient({
                     !matchedVariant || maxQty <= 0
                       ? "bg-muted text-muted-foreground cursor-not-allowed"
                       : added
-                        ? "bg-emerald-600 text-white scale-[0.99] shadow-lg shadow-emerald-600/20"
+                        ? "bg-primary text-primary-foreground scale-[0.99] shadow-lg shadow-primary/20"
                         : "bg-primary text-primary-foreground hover:opacity-90 hover:shadow-xl hover:shadow-primary/30 hover:-translate-y-0.5"
                   }`}
               >

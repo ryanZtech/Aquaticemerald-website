@@ -66,7 +66,7 @@ export async function GET() {
 
   try {
     const rows = await sql`
-      SELECT o.id, o.customer_name, o.customer_email, o.customer_phone, o.pickup_location_id, pl.name as pickup_location_name, o.pickup_slot_at, o.status, o.subtotal, o.discount_amount, o.promo_code, o.total, o.created_at,
+      SELECT o.id, o.customer_name, o.customer_email, o.customer_phone, o.pickup_location_id, pl.name as pickup_location_name, pl.address as pickup_location_detail, o.pickup_slot_at, o.status, o.subtotal, o.discount_amount, o.promo_code, o.total, o.created_at,
         coalesce(
           json_agg(
             json_build_object(
@@ -83,7 +83,7 @@ export async function GET() {
       FROM orders o
       LEFT JOIN order_items oi ON oi.order_id = o.id
       LEFT JOIN pickup_locations pl ON pl.id = o.pickup_location_id
-      GROUP BY o.id, pl.name
+      GROUP BY o.id, pl.name, pl.address
       ORDER BY o.created_at DESC
     `;
 

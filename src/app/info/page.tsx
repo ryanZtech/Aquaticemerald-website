@@ -48,9 +48,6 @@ export default async function InfoPage() {
     <div className="pt-24 pb-20 px-4 max-w-4xl mx-auto min-h-screen">
       {}
       <div className="mb-12">
-        <p className="text-xs font-semibold tracking-[0.35em] text-primary uppercase mb-3 animate-pulse">
-          About Us
-        </p>
         <h1 className="font-serif text-4xl sm:text-5xl font-medium mb-5">
           Aquatic Emerald
         </h1>

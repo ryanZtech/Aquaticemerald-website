@@ -58,8 +58,8 @@ export default function ContactForm() {
   if (status === "success") {
     return (
       <div className="bg-card border border-border rounded-2xl p-8 shadow-sm text-center">
-        <div className="w-12 h-12 rounded-full bg-emerald-100 dark:bg-emerald-950/40 flex items-center justify-center mx-auto mb-4">
-          <CheckCircle2 className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
+        <div className="w-12 h-12 rounded-full bg-primary/15 flex items-center justify-center mx-auto mb-4">
+          <CheckCircle2 className="w-6 h-6 text-primary" />
         </div>
         <h3 className="font-serif text-xl font-medium mb-2">Message sent</h3>
         <p className="text-muted-foreground text-sm">

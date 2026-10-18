@@ -8,7 +8,6 @@ export default async function FaqPage() {
   return (
     <div className="pt-24 pb-20 px-4 max-w-4xl mx-auto min-h-screen">
       <div className="mb-12">
-        <p className="text-xs font-semibold tracking-[0.35em] text-primary uppercase mb-3">Help</p>
         <h1 className="font-serif text-4xl sm:text-5xl font-medium mb-5">FAQ</h1>
         <p className="text-muted-foreground text-lg leading-relaxed max-w-2xl font-light">
           Answers to common questions about our products and ordering process.

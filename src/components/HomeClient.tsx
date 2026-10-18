@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { Product } from "@/lib/staticData";
 import {
-  ChevronDown,
   ChevronRight,
   Sprout,
   MapPin,
@@ -48,13 +47,10 @@ export default function HomeClient({ products, settings }: HomeClientProps) {
           transition={{ duration: 0.9, ease: "easeOut" }}
           className="relative z-10 text-center px-4 max-w-3xl mx-auto"
         >
-          <p className="text-xs font-semibold tracking-[0.35em] text-emerald-400 uppercase mb-5">
-            Premium Freshwater Botanicals, Hills District, Sydney
-          </p>
           <h1 className="font-serif text-[clamp(3rem,10vw,6rem)] font-light text-white leading-[1.05] mb-6">
             Aquatic
             <br />
-            <em className="not-italic text-emerald-400 font-semibold">
+            <em className="not-italic text-primary font-semibold">
               Emerald
             </em>
           </h1>
@@ -64,22 +60,16 @@ export default function HomeClient({ products, settings }: HomeClientProps) {
           </p>
           <Link
             href="/products"
-            className="inline-block px-8 py-4 bg-emerald-500 hover:bg-emerald-400 text-white rounded-full text-sm font-semibold tracking-wide transition-all duration-300 hover:shadow-[0_0_40px_rgba(52,211,153,0.5)] hover:-translate-y-0.5"
+            className="inline-block px-8 py-4 bg-primary hover:opacity-90 text-primary-foreground rounded-full text-sm font-semibold tracking-wide transition-all duration-300 hover:shadow-[0_0_40px_rgba(16,185,129,0.5)] hover:-translate-y-0.5"
           >
             Shop the Collection
           </Link>
         </motion.div>
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce opacity-50">
-          <ChevronDown className="w-6 h-6 text-white" />
-        </div>
       </section>
 
       {}
       <section className="py-24 px-4 max-w-7xl mx-auto">
         <div className="text-center mb-14">
-          <p className="text-xs font-semibold tracking-[0.35em] text-primary uppercase mb-3">
-            Featured Collection
-          </p>
           <h2 className="font-serif text-4xl sm:text-5xl font-medium">
             Current Availability
           </h2>
@@ -147,7 +137,7 @@ export default function HomeClient({ products, settings }: HomeClientProps) {
             <h2 className="font-serif text-3xl sm:text-5xl text-white font-light leading-tight mb-3">
               Build your
               <br />
-              <em className="not-italic text-emerald-400 font-semibold">
+              <em className="not-italic text-primary font-semibold">
                 living
               </em>{" "}
               world
@@ -162,34 +152,27 @@ export default function HomeClient({ products, settings }: HomeClientProps) {
 
       {}
       <section className="py-24 px-4 max-w-7xl mx-auto">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-10">
           {[
             {
               Icon: Sprout,
               title: "Home-Grown Quality",
-              desc: "Every plant, shrimp and snail is propagated from thriving personal tanks, ensuring healthy, pest-free specimens adapted to local water conditions.",
+              desc: "Every plant, shrimp and snail is propagated from thriving personal tanks: healthy, pest-free specimens adapted to local water conditions.",
             },
             {
               Icon: MapPin,
               title: "Convenient Pickup",
-              desc: "Three pickup locations across the Hills District. Choose a 30-minute window that fits your schedule — weekdays, Saturdays, and Sundays.",
+              desc: "Three pickup locations across the Hills District: choose a 30-minute window that fits your schedule, weekdays, Saturdays, and Sundays.",
             },
             {
               Icon: MessageCircle,
               title: "WhatsApp Orders",
-              desc: "Simple, direct ordering via WhatsApp. Get real-time updates from a real person — not a bot. We confirm every order personally.",
+              desc: "Simple, direct ordering via WhatsApp: real-time updates from a real person, not a bot. We confirm every order personally.",
             },
           ].map((item) => (
-            <div
-              key={item.title}
-              className="text-center p-8 bg-card border border-border rounded-2xl hover:border-primary/30 transition-all duration-200 group"
-            >
-              <div className="flex justify-center mb-5">
-                <div className="w-14 h-14 bg-primary/10 rounded-2xl flex items-center justify-center group-hover:bg-primary/15 transition-colors">
-                  <item.Icon className="w-7 h-7 text-primary" />
-                </div>
-              </div>
-              <h3 className="font-serif font-medium text-lg mb-2">
+            <div key={item.title} className="text-left">
+              <h3 className="flex items-center gap-2.5 font-serif font-medium text-lg mb-2">
+                <item.Icon className="w-5 h-5 text-primary flex-shrink-0" />
                 {item.title}
               </h3>
               <p className="text-sm text-muted-foreground leading-relaxed font-light">

@@ -23,6 +23,7 @@ interface Order {
   customer_phone: string;
   pickup_location_id: number | null;
   pickup_location_name: string | null;
+  pickup_location_detail: string | null;
   pickup_slot_at: string | null;
   status: string;
   subtotal: number;
@@ -39,15 +40,32 @@ function OrderItemsDetail({
   discountAmount,
   promoCode,
   total,
+  pickupLocationName,
+  pickupLocationDetail,
+  pickupSlotAt,
+  formatPickupFull,
 }: {
   items: OrderItem[];
   subtotal: number;
   discountAmount: number | null;
   promoCode: string | null;
   total: number;
+  pickupLocationName: string | null;
+  pickupLocationDetail: string | null;
+  pickupSlotAt: string | null;
+  formatPickupFull: (dateStr: string) => string;
 }) {
   return (
-    <div className="px-4 pb-4 pt-1">
+    <div className="px-4 pb-4 pt-1 space-y-3">
+      <div className="bg-muted/40 rounded-xl border border-border/60 px-4 py-3 text-sm">
+        <div className="font-medium">{pickupLocationName || "Custom location"}</div>
+        {pickupLocationDetail && (
+          <div className="text-xs text-muted-foreground mt-0.5">{pickupLocationDetail}</div>
+        )}
+        <div className="text-xs text-muted-foreground mt-1">
+          {pickupSlotAt ? formatPickupFull(pickupSlotAt) : "Pickup time arranged via WhatsApp"}
+        </div>
+      </div>
       <div className="bg-muted/40 rounded-xl border border-border/60 overflow-hidden">
         <table className="w-full text-sm">
           <thead>
@@ -79,10 +97,10 @@ function OrderItemsDetail({
             </tr>
             {Boolean(discountAmount) && Number(discountAmount) > 0 && (
               <tr>
-                <td colSpan={4} className="px-4 py-1.5 text-right text-emerald-600 dark:text-emerald-400">
+                <td colSpan={4} className="px-4 py-1.5 text-right text-primary">
                   Discount{promoCode ? ` (${promoCode})` : ""}
                 </td>
-                <td className="px-4 py-1.5 text-right text-emerald-600 dark:text-emerald-400">
+                <td className="px-4 py-1.5 text-right text-primary">
                   -${Number(discountAmount).toFixed(2)}
                 </td>
               </tr>
@@ -173,13 +191,27 @@ export default function OrdersPageClient() {
 
   const formatPickupTime = (dateStr: string) => {
     const date = new Date(dateStr);
-    const datePart = date.toLocaleDateString("en-US", {
+    if (isNaN(date.getTime())) return "Invalid date";
+    const datePart = date.toLocaleDateString("en-AU", {
       weekday: "short",
-      month: "short",
       day: "numeric",
+      month: "short",
     });
-    const time = date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-    return `${datePart}, ${time}`;
+    const time = date.toLocaleTimeString("en-AU", { hour: "numeric", minute: "2-digit" });
+    return `${datePart} · ${time}`;
+  };
+
+  const formatPickupFull = (dateStr: string) => {
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return "Invalid date";
+    const datePart = date.toLocaleDateString("en-AU", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
+    const time = date.toLocaleTimeString("en-AU", { hour: "numeric", minute: "2-digit" });
+    return `${datePart} · ${time}`;
   };
 
   const copyMessage = (order: Order) => {
@@ -356,7 +388,7 @@ export default function OrdersPageClient() {
                         {o.items.map(i => `${i.quantity}× ${i.snapshot_product_name}`).join(", ")}
                       </div>
                     </TableCell>
-                    <TableCell className="font-medium">${Number(o.total).toFixed(2)}{o.promo_code && (<span className="ml-1.5 text-[10px] font-normal text-emerald-600 dark:text-emerald-400 align-middle">{o.promo_code}</span>)}</TableCell>
+                    <TableCell className="font-medium">${Number(o.total).toFixed(2)}{o.promo_code && (<span className="ml-1.5 text-[10px] font-normal text-primary align-middle">{o.promo_code}</span>)}</TableCell>
                     <TableCell>
                       <div>{o.pickup_location_name || "—"}</div>
                       <span className="text-xs text-muted-foreground">
@@ -371,7 +403,7 @@ export default function OrdersPageClient() {
                     <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                       <div className="flex justify-end gap-2">
                         <Button variant="ghost" size="icon" onClick={() => toggleCopy(o.id, () => copyMessage(o))} className="cursor-pointer">
-                          {copyState[o.id] ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                          {copyState[o.id] ? <Check className="w-4 h-4 text-primary" /> : <Copy className="w-4 h-4" />}
                         </Button>
                         <Button variant="ghost" size="icon" onClick={() => handleDeleteOrder(o)} className="cursor-pointer text-destructive hover:text-destructive">
                           <Trash2 className="w-4 h-4" />
@@ -382,7 +414,7 @@ export default function OrdersPageClient() {
                   {expandedOrders.has(o.id) && (
                     <TableRow key={`${o.id}-detail`} className="bg-muted/10 hover:bg-muted/10">
                       <TableCell colSpan={9} className="p-0">
-                        <OrderItemsDetail items={o.items} subtotal={o.subtotal} discountAmount={o.discount_amount} promoCode={o.promo_code} total={o.total} />
+                        <OrderItemsDetail items={o.items} subtotal={o.subtotal} discountAmount={o.discount_amount} promoCode={o.promo_code} total={o.total} pickupLocationName={o.pickup_location_name} pickupLocationDetail={o.pickup_location_detail} pickupSlotAt={o.pickup_slot_at} formatPickupFull={formatPickupFull} />
                       </TableCell>
                     </TableRow>
                   )}
@@ -426,7 +458,16 @@ export default function OrdersPageClient() {
                         className="cursor-pointer hover:bg-muted/30 transition-colors"
                         onClick={() => toggleExpand(o.id)}
                       >
-                        <TableCell />
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          <div className="checkbox-wrapper-30">
+                            <label className="checkbox">
+                              <input type="checkbox" checked={o.status === "picked_up"} onChange={() => handleTogglePicked(o)} title="Toggle picked up" />
+                              <svg viewBox="0 0 22 22">
+                                <use xlinkHref="#checkbox-30" />
+                              </svg>
+                            </label>
+                          </div>
+                        </TableCell>
                         <TableCell>
                           {expandedOrders.has(o.id)
                             ? <ChevronDown className="w-4 h-4 text-muted-foreground" />
@@ -443,14 +484,19 @@ export default function OrdersPageClient() {
                             {o.items.map(i => `${i.quantity}× ${i.snapshot_product_name}`).join(", ")}
                           </div>
                         </TableCell>
-                        <TableCell>${Number(o.total).toFixed(2)}{o.promo_code && (<span className="ml-1.5 text-[10px] font-normal text-emerald-600 dark:text-emerald-400 align-middle">{o.promo_code}</span>)}</TableCell>
-                        <TableCell>{o.pickup_slot_at ? formatPickupTime(o.pickup_slot_at) : "—"}</TableCell>
+                        <TableCell>${Number(o.total).toFixed(2)}{o.promo_code && (<span className="ml-1.5 text-[10px] font-normal text-primary align-middle">{o.promo_code}</span>)}</TableCell>
+                        <TableCell>
+                          <div>{o.pickup_location_name || "—"}</div>
+                          <span className="text-xs text-muted-foreground">
+                            {o.pickup_slot_at ? formatPickupTime(o.pickup_slot_at) : "—"}
+                          </span>
+                        </TableCell>
                         <TableCell>
                           <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                             o.status === "cancelled"
                               ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
                               : o.status === "picked_up"
-                                ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400"
+                                ? "bg-primary/15 text-primary"
                                 : "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400"
                           }`}>
                             {o.status}
@@ -459,7 +505,7 @@ export default function OrdersPageClient() {
                         <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                           <div className="flex justify-end gap-2">
                             <Button variant="ghost" size="icon" onClick={() => toggleCopy(o.id, () => copyMessage(o))} className="cursor-pointer">
-                              {copyState[o.id] ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                              {copyState[o.id] ? <Check className="w-4 h-4 text-primary" /> : <Copy className="w-4 h-4" />}
                             </Button>
                             <Button variant="ghost" size="icon" onClick={() => handleTogglePicked(o)} className="cursor-pointer" title="Move back to incomplete">
                               <X className="w-4 h-4" />
@@ -473,7 +519,7 @@ export default function OrdersPageClient() {
                       {expandedOrders.has(o.id) && (
                         <TableRow key={`${o.id}-detail`} className="bg-muted/10 hover:bg-muted/10">
                           <TableCell colSpan={9} className="p-0">
-                            <OrderItemsDetail items={o.items} subtotal={o.subtotal} discountAmount={o.discount_amount} promoCode={o.promo_code} total={o.total} />
+                            <OrderItemsDetail items={o.items} subtotal={o.subtotal} discountAmount={o.discount_amount} promoCode={o.promo_code} total={o.total} pickupLocationName={o.pickup_location_name} pickupLocationDetail={o.pickup_location_detail} pickupSlotAt={o.pickup_slot_at} formatPickupFull={formatPickupFull} />
                           </TableCell>
                         </TableRow>
                       )}

@@ -109,26 +109,26 @@ export default function CartPage() {
           <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
             {/* Auto-discount banner */}
             {autoDiscount && (
-              <div className="mb-6 p-4 bg-emerald-50 dark:bg-emerald-950/30 border-2 border-emerald-200 dark:border-emerald-800 rounded-xl">
+              <div className="mb-6 p-4 bg-primary/10 border-2 border-primary/25 rounded-xl">
                 <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <PartyPopper className="w-4 h-4 text-white" />
+                  <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <PartyPopper className="w-4 h-4 text-primary-foreground" />
                   </div>
                   <div className="flex-1">
-                    <p className="font-semibold text-emerald-900 dark:text-emerald-100 mb-1">
+                    <p className="font-semibold text-primary mb-1">
                       {autoDiscount.name}
                     </p>
                     {autoDiscount.description && (
-                      <p className="text-sm text-emerald-700 dark:text-emerald-300 mb-2">
+                      <p className="text-sm text-muted-foreground mb-2">
                         {autoDiscount.description}
                       </p>
                     )}
                     {autoDiscount.free_item ? (
-                      <p className="text-sm font-medium text-emerald-800 dark:text-emerald-200">
+                      <p className="text-sm font-medium text-primary">
                         Free: {autoDiscount.free_item.productName} ({autoDiscount.free_item.variantLabel})
                       </p>
                     ) : (
-                      <p className="text-sm font-medium text-emerald-800 dark:text-emerald-200">
+                      <p className="text-sm font-medium text-primary">
                         ${autoDiscount.discount_amount.toFixed(2)} off your order
                       </p>
                     )}
@@ -143,7 +143,7 @@ export default function CartPage() {
             </div>
             
             {autoDiscount && autoDiscount.discount_amount > 0 && (
-              <div className="flex justify-between text-sm text-emerald-600 dark:text-emerald-400 mb-3 font-medium">
+              <div className="flex justify-between text-sm text-primary mb-3 font-medium">
                 <span>Auto Discount</span>
                 <span>-${autoDiscount.discount_amount.toFixed(2)}</span>
               </div>
@@ -159,7 +159,7 @@ export default function CartPage() {
               className={`text-xs text-center mb-3 font-medium transition-all duration-200 ${
                 discountedTotal < 5 
                   ? "text-destructive" 
-                  : "text-emerald-600 dark:text-emerald-400"
+                  : "text-primary"
               }`}
             >
               {discountedTotal < 5 

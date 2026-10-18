@@ -166,7 +166,7 @@ export default function LocationsClient() {
                   </TableCell>
                   <TableCell>
                     <span
-                      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${loc.active ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"}`}
+                      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${loc.active ? "bg-primary/15 text-primary" : "bg-gray-100 text-gray-800"}`}
                     >
                       {loc.active ? "Active" : "Inactive"}
                     </span>

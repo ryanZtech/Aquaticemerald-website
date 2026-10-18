@@ -81,9 +81,6 @@ export default function ProductsClient({ products }: ProductsClientProps) {
     <div className="pt-24 pb-20 px-4 max-w-7xl mx-auto min-h-screen">
       <div className="mb-10 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-6">
         <div>
-          <p className="text-xs font-semibold tracking-[0.35em] text-primary uppercase mb-2">
-            Our Collection
-          </p>
           <h1 className="font-serif text-4xl sm:text-5xl font-medium">Shop</h1>
         </div>
 

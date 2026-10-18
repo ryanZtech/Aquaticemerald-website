@@ -189,7 +189,7 @@ export default function GuidesPageClient() {
                     <span
                       className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                         guide.active
-                          ? "bg-green-100 text-green-800"
+                          ? "bg-primary/15 text-primary"
                           : "bg-gray-100 text-gray-800"
                       }`}
                     >
