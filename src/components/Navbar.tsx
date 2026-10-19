@@ -137,7 +137,7 @@ export default function Navbar() {
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 6, scale: 0.97 }}
                   transition={{ duration: 0.15 }}
-                  className="absolute top-full left-1/2 -translate-x-1/2 mt-3 w-44 bg-card border border-border rounded-2xl shadow-2xl overflow-hidden"
+                  className="absolute top-full left-1/2 -translate-x-1/2 mt-3 w-44 bg-card border border-border rounded-2xl shadow-lg overflow-hidden"
                 >
                   <button
                     onClick={() => handleCategoryClick("all")}
@@ -276,9 +276,6 @@ export default function Navbar() {
             </Link>
 
             <div className="py-2 px-3">
-              <span className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-                Products
-              </span>
               <div className="grid grid-cols-2 gap-2">
                 <Link
                   href="/products"
@@ -322,7 +319,18 @@ export default function Navbar() {
                   : "text-foreground"
               }`}
             >
-              Info & Guides
+              Info
+            </Link>
+
+            <Link
+              href="/guides"
+              className={`block text-sm font-medium py-2 px-3 rounded-lg hover:bg-accent ${
+                pathname === "/guides"
+                  ? "text-primary bg-primary/5"
+                  : "text-foreground"
+              }`}
+            >
+              Guides
             </Link>
 
             <Link

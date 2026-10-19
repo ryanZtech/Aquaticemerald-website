@@ -1,4 +1,5 @@
 import { getFaqs } from "@/lib/dataService";
+import Accordion from "@/components/Accordion";
 
 export const revalidate = 60;
 
@@ -14,27 +15,13 @@ export default async function FaqPage() {
         </p>
       </div>
 
-      <div className="space-y-3">
-        {faqs.length === 0 ? (
-          <p className="text-muted-foreground text-sm font-light py-12 text-center">
-            No FAQs available yet.
-          </p>
-        ) : (
-          faqs.map((faq) => (
-            <details
-              key={faq.id}
-              className="group bg-card border border-border rounded-2xl overflow-hidden transition-all duration-200"
-            >
-              <summary className="flex items-center justify-between px-5 py-4 cursor-pointer list-none font-medium text-sm select-none hover:bg-accent transition-colors">
-                {faq.title}
-              </summary>
-              <div className="px-5 pb-5 text-sm text-muted-foreground leading-relaxed font-light">
-                {faq.body}
-              </div>
-            </details>
-          ))
-        )}
-      </div>
+      {faqs.length === 0 ? (
+        <p className="text-muted-foreground text-sm font-light py-12 text-center">
+          No FAQs available yet.
+        </p>
+      ) : (
+        <Accordion items={faqs.map((f) => ({ id: f.id, title: f.title, body: f.body }))} />
+      )}
     </div>
   );
 }

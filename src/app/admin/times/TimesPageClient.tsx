@@ -296,7 +296,7 @@ export default function TimesPageClient() {
               <Button
                 variant="ghost"
                 onClick={() => handleBulkToggleActive(false)}
-                className="text-yellow-600 hover:text-yellow-700 cursor-pointer"
+                className="text-muted-foreground hover:text-foreground hover:bg-accent cursor-pointer"
               >
                 <XCircle className="w-4 h-4 mr-1" /> Disable Selected
               </Button>
@@ -364,7 +364,7 @@ export default function TimesPageClient() {
                       className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                         rule.active
                           ? "bg-primary/15 text-primary"
-                          : "bg-gray-100 text-gray-800"
+                          : "bg-muted text-muted-foreground"
                       }`}
                     >
                       {rule.active ? "Active" : "Inactive"}

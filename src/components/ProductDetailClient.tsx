@@ -465,8 +465,8 @@ export default function ProductDetailClient({
                     !matchedVariant || maxQty <= 0
                       ? "bg-muted text-muted-foreground cursor-not-allowed"
                       : added
-                        ? "bg-primary text-primary-foreground scale-[0.99] shadow-lg shadow-primary/20"
-                        : "bg-primary text-primary-foreground hover:opacity-90 hover:shadow-xl hover:shadow-primary/30 hover:-translate-y-0.5"
+                        ? "bg-primary text-primary-foreground scale-[0.99]"
+                        : "bg-primary text-primary-foreground hover:opacity-90"
                   }`}
               >
                 {added ? (

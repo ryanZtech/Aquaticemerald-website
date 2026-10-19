@@ -43,6 +43,7 @@ function OrderItemsDetail({
   pickupLocationName,
   pickupLocationDetail,
   pickupSlotAt,
+  createdAt,
   formatPickupFull,
 }: {
   items: OrderItem[];
@@ -53,12 +54,16 @@ function OrderItemsDetail({
   pickupLocationName: string | null;
   pickupLocationDetail: string | null;
   pickupSlotAt: string | null;
+  createdAt: string;
   formatPickupFull: (dateStr: string) => string;
 }) {
   return (
     <div className="px-4 pb-4 pt-1 space-y-3">
       <div className="bg-muted/40 rounded-xl border border-border/60 px-4 py-3 text-sm">
         <div className="font-medium">{pickupLocationName || "Custom location"}</div>
+        <div className="text-xs text-muted-foreground mt-1">
+          Ordered {formatPickupFull(createdAt)}
+        </div>
         {pickupLocationDetail && (
           <div className="text-xs text-muted-foreground mt-0.5">{pickupLocationDetail}</div>
         )}
@@ -214,6 +219,24 @@ export default function OrdersPageClient() {
     return `${datePart} · ${time}`;
   };
 
+  const formatOrderTime = (dateStr: string) => {
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return "Invalid date";
+    const datePart = date.toLocaleDateString("en-AU", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+    const time = date.toLocaleTimeString("en-AU", { hour: "numeric", minute: "2-digit" });
+    return `${datePart} · ${time}`;
+  };
+
+  const statusBadgeClass = (status: string) => {
+    if (status === "cancelled") return "bg-destructive/10 text-destructive";
+    if (status === "picked_up") return "bg-primary/15 text-primary";
+    return "bg-secondary text-secondary-foreground";
+  };
+
   const copyMessage = (order: Order) => {
     const itemsText = order.items.map(i => `${i.quantity}× ${i.snapshot_product_name}`).join(", ");
     const pickupAt = order.pickup_slot_at ? formatPickupTime(order.pickup_slot_at) : "N/A";
@@ -292,7 +315,7 @@ export default function OrdersPageClient() {
         .checkbox-wrapper-30 .checkbox input:checked + svg {
           --dashArray: 16 93;
           --dashOffset: 109;
-          stroke: #16a34a;
+          stroke: var(--primary);
         }
         .checkbox-wrapper-30 .checkbox svg {
           fill: none;
@@ -345,7 +368,7 @@ export default function OrdersPageClient() {
           <TableBody>
             {pending.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center py-12 text-muted-foreground font-light">No orders</TableCell>
+                <TableCell colSpan={10} className="text-center py-12 text-muted-foreground font-light">No orders</TableCell>
               </TableRow>
             ) : (
               pending.map((o) => (
@@ -371,6 +394,9 @@ export default function OrdersPageClient() {
                         : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
                     </TableCell>
                     <TableCell className="font-medium">#{o.id}</TableCell>
+                    <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
+                      {formatOrderTime(o.created_at)}
+                    </TableCell>
                     <TableCell>
                       <div className="font-medium">{o.customer_name}</div>
                       <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
@@ -396,7 +422,7 @@ export default function OrdersPageClient() {
                       </span>
                     </TableCell>
                     <TableCell>
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusBadgeClass(o.status)}`}>
                         {o.status}
                       </span>
                     </TableCell>
@@ -413,8 +439,8 @@ export default function OrdersPageClient() {
                   </TableRow>
                   {expandedOrders.has(o.id) && (
                     <TableRow key={`${o.id}-detail`} className="bg-muted/10 hover:bg-muted/10">
-                      <TableCell colSpan={9} className="p-0">
-                        <OrderItemsDetail items={o.items} subtotal={o.subtotal} discountAmount={o.discount_amount} promoCode={o.promo_code} total={o.total} pickupLocationName={o.pickup_location_name} pickupLocationDetail={o.pickup_location_detail} pickupSlotAt={o.pickup_slot_at} formatPickupFull={formatPickupFull} />
+                      <TableCell colSpan={10} className="p-0">
+                        <OrderItemsDetail items={o.items} subtotal={o.subtotal} discountAmount={o.discount_amount} promoCode={o.promo_code} total={o.total} pickupLocationName={o.pickup_location_name} pickupLocationDetail={o.pickup_location_detail} pickupSlotAt={o.pickup_slot_at} createdAt={o.created_at} formatPickupFull={formatPickupFull} />
                       </TableCell>
                     </TableRow>
                   )}
@@ -437,6 +463,7 @@ export default function OrdersPageClient() {
                   <TableHead className="w-[40px]" />
                   <TableHead className="w-[40px]" />
                   <TableHead>Order</TableHead>
+                  <TableHead>Placed</TableHead>
                   <TableHead>Customer</TableHead>
                   <TableHead>Items</TableHead>
                   <TableHead>Total</TableHead>
@@ -448,7 +475,7 @@ export default function OrdersPageClient() {
               <TableBody>
                 {finished.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-12 text-muted-foreground font-light">No finished orders</TableCell>
+                    <TableCell colSpan={10} className="text-center py-12 text-muted-foreground font-light">No finished orders</TableCell>
                   </TableRow>
                 ) : (
                   finished.map((o) => (
@@ -474,6 +501,9 @@ export default function OrdersPageClient() {
                             : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
                         </TableCell>
                         <TableCell className="font-medium">#{o.id}</TableCell>
+                    <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
+                      {formatOrderTime(o.created_at)}
+                    </TableCell>
                         <TableCell>
                           <div>{o.customer_name}</div>
                           <div className="text-xs text-muted-foreground">{o.customer_email}</div>
@@ -492,13 +522,7 @@ export default function OrdersPageClient() {
                           </span>
                         </TableCell>
                         <TableCell>
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                            o.status === "cancelled"
-                              ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400"
-                              : o.status === "picked_up"
-                                ? "bg-primary/15 text-primary"
-                                : "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400"
-                          }`}>
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusBadgeClass(o.status)}`}>
                             {o.status}
                           </span>
                         </TableCell>
@@ -518,8 +542,8 @@ export default function OrdersPageClient() {
                       </TableRow>
                       {expandedOrders.has(o.id) && (
                         <TableRow key={`${o.id}-detail`} className="bg-muted/10 hover:bg-muted/10">
-                          <TableCell colSpan={9} className="p-0">
-                            <OrderItemsDetail items={o.items} subtotal={o.subtotal} discountAmount={o.discount_amount} promoCode={o.promo_code} total={o.total} pickupLocationName={o.pickup_location_name} pickupLocationDetail={o.pickup_location_detail} pickupSlotAt={o.pickup_slot_at} formatPickupFull={formatPickupFull} />
+                          <TableCell colSpan={10} className="p-0">
+                            <OrderItemsDetail items={o.items} subtotal={o.subtotal} discountAmount={o.discount_amount} promoCode={o.promo_code} total={o.total} pickupLocationName={o.pickup_location_name} pickupLocationDetail={o.pickup_location_detail} pickupSlotAt={o.pickup_slot_at} createdAt={o.created_at} formatPickupFull={formatPickupFull} />
                           </TableCell>
                         </TableRow>
                       )}

@@ -1,17 +1,17 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Button } from "@/app/components/ui/button";
+import { useState, useEffect, useRef } from "react";
 import { Input } from "@/app/components/ui/input";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-  CardFooter,
-} from "@/app/components/ui/card";
-import { MessageSquare, Mail, Save, ShieldCheck, Loader2, Boxes } from "lucide-react";
+  Settings,
+  MessageSquare,
+  Mail,
+  Boxes,
+  Package,
+  Check,
+  Loader2,
+  AlertCircle,
+} from "lucide-react";
 import { toast } from "sonner";
 import {
   STOCK_LEVELS,
@@ -31,9 +31,60 @@ const LEVEL_DESCRIPTIONS: Record<StockLevel, string> = {
   very_high: "Max quantity a customer can order for a very-high-stock variant.",
 };
 
+type SaveState = "idle" | "saving" | "saved" | "error";
+
+function SectionHeader({
+  Icon,
+  title,
+  description,
+}: {
+  Icon: typeof Boxes;
+  title: string;
+  description?: string;
+}) {
+  return (
+    <div className="flex items-center gap-3">
+      <div className="w-9 h-9 rounded-xl bg-card border border-border flex items-center justify-center">
+        <Icon className="w-4 h-4 text-primary" />
+      </div>
+      <div>
+        <h2 className="text-base font-medium">{title}</h2>
+        {description && (
+          <p className="text-xs text-muted-foreground font-light">{description}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SettingRow({
+  Icon,
+  title,
+  description,
+  children,
+}: {
+  Icon: typeof MessageSquare;
+  title: string;
+  description: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-center gap-4 bg-card border border-border rounded-2xl px-4 py-3.5 hover:border-primary/30 transition-colors">
+      <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+        <Icon className="w-4 h-4 text-primary" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="font-medium text-sm">{title}</div>
+        <div className="text-xs text-muted-foreground font-light">{description}</div>
+      </div>
+      <div className="flex-shrink-0">{children}</div>
+    </div>
+  );
+}
+
 export default function AdminSettingsPage() {
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [saveState, setSaveState] = useState<SaveState>("idle");
 
   const [whatsapp, setWhatsapp] = useState("");
   const [email, setEmail] = useState("");
@@ -79,10 +130,8 @@ export default function AdminSettingsPage() {
     loadSettings();
   }, []);
 
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaving(true);
-
+  const saveSettings = async () => {
+    setSaveState("saving");
     try {
       const stockLimitPayload: Record<string, string> = {};
       STOCK_LEVELS.forEach((level) => {
@@ -104,17 +153,30 @@ export default function AdminSettingsPage() {
       });
 
       if (response.ok) {
-        toast.success("Settings saved successfully");
+        setSaveState("saved");
       } else {
+        setSaveState("error");
         toast.error("Failed to save settings");
       }
     } catch (error) {
       console.error("Error saving settings:", error);
+      setSaveState("error");
       toast.error("An error occurred while saving settings");
-    } finally {
-      setSaving(false);
     }
   };
+
+  // Autosave: every change is written shortly after you stop typing.
+  const skipFirstChange = useRef(true);
+  useEffect(() => {
+    if (loading) return;
+    if (skipFirstChange.current) {
+      skipFirstChange.current = false;
+      return;
+    }
+    const timer = setTimeout(saveSettings, 800);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [whatsapp, email, maxQtyByLevel, loading]);
 
   if (loading) {
     return (
@@ -128,123 +190,114 @@ export default function AdminSettingsPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-2xl">
-      <div>
-        <h1 className="font-serif text-3xl font-medium">Store Settings</h1>
-        <p className="text-muted-foreground text-sm">
-          Global configurations for your shop
-        </p>
+    <div className="space-y-8 max-w-3xl">
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-11 h-11 rounded-2xl bg-card border border-border flex items-center justify-center">
+            <Settings className="w-5 h-5 text-primary" />
+          </div>
+          <div>
+            <h1 className="font-serif text-3xl font-medium leading-tight">
+              Store Settings
+            </h1>
+            <p className="text-muted-foreground text-sm">
+              Global configurations for your shop — changes save automatically
+            </p>
+          </div>
+        </div>
+
+        <div
+          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+            saveState === "saving"
+              ? "bg-secondary text-secondary-foreground"
+              : saveState === "error"
+                ? "bg-destructive/10 text-destructive"
+                : "bg-primary/15 text-primary"
+          }`}
+        >
+          {saveState === "saving" ? (
+            <>
+              <Loader2 className="w-3.5 h-3.5 animate-spin" /> Saving…
+            </>
+          ) : saveState === "error" ? (
+            <>
+              <AlertCircle className="w-3.5 h-3.5" /> Save failed
+            </>
+          ) : (
+            <>
+              <Check className="w-3.5 h-3.5" /> All changes saved
+            </>
+          )}
+        </div>
       </div>
 
-      <form onSubmit={handleSave} className="space-y-6">
-        <Card className="border-border/60">
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <ShieldCheck className="w-5 h-5 text-primary" />
-              <CardTitle className="text-lg">Contact & Communication</CardTitle>
-            </div>
-            <CardDescription>
-              Configure the seller coordinates used for WhatsApp messaging and
-              order receipt notifications.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="space-y-2">
-              <label className="text-sm font-medium flex items-center gap-1.5">
-                <MessageSquare className="w-4 h-4 text-muted-foreground" />
-                Seller WhatsApp Number
-              </label>
-              <div className="flex gap-2">
-                <span className="inline-flex items-center px-3 rounded-md border border-input bg-muted text-muted-foreground text-sm">
-                  +
-                </span>
-                <Input
-                  value={whatsapp}
-                  onChange={(e) => setWhatsapp(e.target.value)}
-                  placeholder="61400000000"
-                  className="flex-1"
-                  required
-                />
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Used for the &quot;Message on WhatsApp&quot; button after checkout.
-                Include country code without &quot;+&quot; or spaces.
-              </p>
-            </div>
+      <div className="space-y-3">
+        <SectionHeader
+          Icon={MessageSquare}
+          title="Contact & Communication"
+          description="Where order messages and receipts are sent"
+        />
+        <SettingRow
+          Icon={MessageSquare}
+          title="Seller WhatsApp Number"
+          description='Used for the "Message on WhatsApp" button after checkout. Include country code without "+" or spaces.'
+        >
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center px-2.5 h-9 rounded-l-md border border-input bg-muted text-muted-foreground text-sm">
+              +
+            </span>
+            <Input
+              value={whatsapp}
+              onChange={(e) => setWhatsapp(e.target.value)}
+              placeholder="61400000000"
+              className="w-44 rounded-l-none"
+            />
+          </div>
+        </SettingRow>
+        <SettingRow
+          Icon={Mail}
+          title="Seller Email Address"
+          description="Order confirmation receipts are carbon-copied to this address automatically."
+        >
+          <Input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="seller@example.com"
+            className="w-56"
+          />
+        </SettingRow>
+      </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium flex items-center gap-1.5">
-                <Mail className="w-4 h-4 text-muted-foreground" />
-                Seller Email Address
-              </label>
-              <Input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="seller@example.com"
-                required
-              />
-              <p className="text-xs text-muted-foreground">
-                Order confirmation receipts will be carbon-copied to this
-                address automatically.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-border/60">
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <Boxes className="w-5 h-5 text-primary" />
-              <CardTitle className="text-lg">Stock Ordering Limits</CardTitle>
-            </div>
-            <CardDescription>
-              Set the maximum quantity a customer can order of a single product
-              based on its current stock level. Stock level is set manually per
-              variant and is no longer affected by orders.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            {STOCK_LEVELS.map((level) => (
-              <div key={level} className="space-y-2">
-                <label className="text-sm font-medium">
-                  {STOCK_LEVEL_LABELS[level]}
-                </label>
-                <Input
-                  type="number"
-                  min="0"
-                  value={maxQtyByLevel[level]}
-                  onChange={(e) =>
-                    setMaxQtyByLevel((prev) => ({
-                      ...prev,
-                      [level]: e.target.value,
-                    }))
-                  }
-                  disabled={level === "none"}
-                  className="max-w-[160px]"
-                />
-                <p className="text-xs text-muted-foreground">
-                  {LEVEL_DESCRIPTIONS[level]}
-                </p>
-              </div>
-            ))}
-          </CardContent>
-          <CardFooter className="bg-muted/30 border-t flex justify-end p-4">
-            <Button type="submit" disabled={saving} className="gap-2">
-              {saving ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Save className="w-4 h-4" /> Save Settings
-                </>
-              )}
-            </Button>
-          </CardFooter>
-        </Card>
-      </form>
+      <div className="space-y-3">
+        <SectionHeader
+          Icon={Boxes}
+          title="Stock Ordering Limits"
+          description="Maximum quantity a customer can order of a variant, based on its manually-set stock level"
+        />
+        {STOCK_LEVELS.map((level) => (
+          <SettingRow
+            key={level}
+            Icon={Package}
+            title={`${STOCK_LEVEL_LABELS[level]} stock`}
+            description={LEVEL_DESCRIPTIONS[level]}
+          >
+            <Input
+              type="number"
+              min="0"
+              value={maxQtyByLevel[level]}
+              onChange={(e) =>
+                setMaxQtyByLevel((prev) => ({
+                  ...prev,
+                  [level]: e.target.value,
+                }))
+              }
+              disabled={level === "none"}
+              className="w-20 text-center"
+            />
+          </SettingRow>
+        ))}
+      </div>
     </div>
   );
 }

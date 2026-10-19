@@ -1,14 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/app/components/ui/table";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 import { Textarea } from "@/app/components/ui/textarea";
@@ -19,7 +11,8 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/app/components/ui/dialog";
-import { Plus, Edit, Trash2 } from "lucide-react";
+import { Plus, Edit, Trash2, GripVertical } from "lucide-react";
+import { Reorder, useDragControls } from "motion/react";
 import { toast } from "sonner";
 
 interface Faq {
@@ -33,6 +26,82 @@ interface Faq {
   updated_at: string;
 }
 
+function SortableFaqRow({
+  faq,
+  onDrop,
+  onEdit,
+  onDelete,
+}: {
+  faq: Faq;
+  onDrop: () => void;
+  onEdit: (faq: Faq) => void;
+  onDelete: (faq: Faq) => void;
+}) {
+  const controls = useDragControls();
+
+  return (
+    <Reorder.Item
+      value={faq}
+      dragListener={false}
+      dragControls={controls}
+      onDragEnd={onDrop}
+      whileDrag={{
+        scale: 1.015,
+        boxShadow: "0 12px 28px rgba(13, 31, 16, 0.14)",
+        zIndex: 30,
+      }}
+      className="flex items-center gap-3 bg-card border border-border rounded-2xl px-3 py-3 list-none cursor-default"
+    >
+      <button
+        type="button"
+        onPointerDown={(e) => controls.start(e)}
+        className="w-6 h-9 flex items-center justify-center text-muted-foreground hover:text-primary active:text-primary transition-colors cursor-grab active:cursor-grabbing touch-none flex-shrink-0"
+        aria-label={`Reorder ${faq.title}`}
+      >
+        <GripVertical className="w-4 h-4" />
+      </button>
+
+      <div className="flex-1 min-w-0">
+        <div className="font-medium text-sm truncate">{faq.title}</div>
+        <code className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+          {faq.slug}
+        </code>
+      </div>
+
+      <div className="w-28 flex-shrink-0">
+        <span
+          className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+            faq.active
+              ? "bg-primary/15 text-primary"
+              : "bg-muted text-muted-foreground"
+          }`}
+        >
+          {faq.active ? "Active" : "Inactive"}
+        </span>
+      </div>
+
+      <div className="w-20 flex justify-end gap-1 flex-shrink-0">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10"
+          onClick={() => onEdit(faq)}
+        >
+          <Edit className="w-4 h-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+          onClick={() => onDelete(faq)}
+        >
+          <Trash2 className="w-4 h-4" />
+        </Button>
+      </div>
+    </Reorder.Item>
+  );
+}
+
 export default function FaqPageClient() {
   const [faqs, setFaqs] = useState<Faq[]>([]);
   const [loading, setLoading] = useState(true);
@@ -42,7 +111,6 @@ export default function FaqPageClient() {
     title: "",
     slug: "",
     body: "",
-    display_order: 0,
     active: true,
   });
 
@@ -63,11 +131,46 @@ export default function FaqPageClient() {
     fetchFaqs();
   }, []);
 
-  const handleDelete = async (id: number, title: string) => {
-    if (!confirm(`Are you sure you want to delete "${title}"?`)) return;
+  // After a drag settles, write the new running order to display_order so the
+  // public FAQ page renders in exactly the order shown here.
+  const persistOrder = async (list: Faq[]) => {
+    const updates = list
+      .map((faq, index) => ({ faq, order: index }))
+      .filter(({ faq, order }) => faq.display_order !== order);
+    if (updates.length === 0) return;
+
+    setFaqs(list.map((faq, index) => ({ ...faq, display_order: index })));
+    try {
+      await Promise.all(
+        updates.map(({ faq, order }) =>
+          fetch(`/api/faqs/${faq.id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              title: faq.title,
+              slug: faq.slug,
+              body: faq.body,
+              display_order: order,
+              active: faq.active,
+            }),
+          }).then((res) => {
+            if (!res.ok) throw new Error("Failed to save order");
+          }),
+        ),
+      );
+      toast.success("Order saved");
+    } catch (error) {
+      console.error("Error saving FAQ order:", error);
+      toast.error("Failed to save order");
+      fetchFaqs();
+    }
+  };
+
+  const handleDelete = async (faq: Faq) => {
+    if (!confirm(`Are you sure you want to delete "${faq.title}"?`)) return;
 
     try {
-      const response = await fetch(`/api/faqs/${id}`, { method: "DELETE" });
+      const response = await fetch(`/api/faqs/${faq.id}`, { method: "DELETE" });
 
       if (response.ok) {
         toast.success("FAQ deleted successfully");
@@ -88,7 +191,6 @@ export default function FaqPageClient() {
       title: faq.title,
       slug: faq.slug,
       body: faq.body,
-      display_order: faq.display_order,
       active: faq.active,
     });
     setDialogOpen(true);
@@ -96,7 +198,7 @@ export default function FaqPageClient() {
 
   const handleCreate = () => {
     setEditingFaq(null);
-    setFormData({ title: "", slug: "", body: "", display_order: 0, active: true });
+    setFormData({ title: "", slug: "", body: "", active: true });
     setDialogOpen(true);
   };
 
@@ -113,7 +215,12 @@ export default function FaqPageClient() {
       const response = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          ...formData,
+          // Display order is managed by dragging now: keep an edited item
+          // where it is, and append brand-new ones at the end.
+          display_order: editingFaq ? editingFaq.display_order : faqs.length,
+        }),
       });
 
       if (response.ok) {
@@ -150,76 +257,46 @@ export default function FaqPageClient() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-serif text-3xl font-medium">FAQ</h1>
-          <p className="text-muted-foreground text-sm">Manage your frequently asked questions</p>
+          <p className="text-muted-foreground text-sm">
+            Manage your frequently asked questions — drag a row to change the
+            order they appear in.
+          </p>
         </div>
         <Button className="gap-2" onClick={handleCreate}>
           <Plus className="w-4 h-4" /> New FAQ
         </Button>
       </div>
 
-      <div className="bg-card rounded-2xl border border-border overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-muted/50">
-              <TableHead>Question</TableHead>
-              <TableHead>Slug</TableHead>
-              <TableHead>Display Order</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {faqs.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={5} className="text-center py-12 text-muted-foreground font-light">
-                  No FAQs found. Create your first FAQ!
-                </TableCell>
-              </TableRow>
-            ) : (
-              faqs.map((faq) => (
-                <TableRow key={faq.id}>
-                  <TableCell className="font-medium">{faq.title}</TableCell>
-                  <TableCell>
-                    <code className="text-xs bg-muted px-2 py-1 rounded">{faq.slug}</code>
-                  </TableCell>
-                  <TableCell>{faq.display_order}</TableCell>
-                  <TableCell>
-                    <span
-                      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                        faq.active
-                          ? "bg-primary/15 text-primary"
-                          : "bg-gray-100 text-gray-800"
-                      }`}
-                    >
-                      {faq.active ? "Active" : "Inactive"}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => handleEdit(faq)}
-                      >
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-destructive hover:text-destructive"
-                        onClick={() => handleDelete(faq.id, faq.title)}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+      {faqs.length === 0 ? (
+        <div className="bg-card rounded-2xl border border-border py-12 text-center text-muted-foreground font-light">
+          No FAQs found. Create your first FAQ!
+        </div>
+      ) : (
+        <div>
+          <div className="flex items-center gap-3 px-3 pb-2 text-xs font-medium text-muted-foreground">
+            <span className="w-6" />
+            <span className="flex-1">Question</span>
+            <span className="w-28">Status</span>
+            <span className="w-20 text-right">Actions</span>
+          </div>
+          <Reorder.Group
+            axis="y"
+            values={faqs}
+            onReorder={setFaqs}
+            className="space-y-2"
+          >
+            {faqs.map((faq) => (
+              <SortableFaqRow
+                key={faq.id}
+                faq={faq}
+                onDrop={() => persistOrder(faqs)}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
+              />
+            ))}
+          </Reorder.Group>
+        </div>
+      )}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-2xl">
@@ -248,16 +325,6 @@ export default function FaqPageClient() {
                 value={formData.slug}
                 onChange={(e) => setFormData((prev) => ({ ...prev, slug: e.target.value }))}
                 placeholder="faq-slug"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium mb-1 block">Display Order</label>
-              <Input
-                type="number"
-                value={formData.display_order}
-                onChange={(e) =>
-                  setFormData((prev) => ({ ...prev, display_order: parseInt(e.target.value) || 0 }))
-                }
               />
             </div>
             <div>

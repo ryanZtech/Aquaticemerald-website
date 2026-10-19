@@ -60,7 +60,7 @@ export default function HomeClient({ products, settings }: HomeClientProps) {
           </p>
           <Link
             href="/products"
-            className="inline-block px-8 py-4 bg-primary hover:opacity-90 text-primary-foreground rounded-full text-sm font-semibold tracking-wide transition-all duration-300 hover:shadow-[0_0_40px_rgba(16,185,129,0.5)] hover:-translate-y-0.5"
+            className="inline-block px-8 py-4 bg-primary hover:opacity-90 text-primary-foreground rounded-full text-sm font-semibold tracking-wide transition-opacity duration-200"
           >
             Shop the Collection
           </Link>
@@ -79,7 +79,7 @@ export default function HomeClient({ products, settings }: HomeClientProps) {
             <Link
               key={p.id}
               href={`/products/${p.slug}`}
-              className="group text-left bg-card border border-border rounded-2xl overflow-hidden hover:shadow-2xl hover:shadow-primary/10 hover:-translate-y-1.5 transition-all duration-300 flex flex-col"
+              className="group text-left bg-card border border-border rounded-2xl overflow-hidden transition-colors flex flex-col"
             >
               <div className="relative h-52 overflow-hidden bg-muted flex-shrink-0">
                 {p.img ? (

@@ -522,7 +522,7 @@ export default function ProductFormDialog({
                         type="button"
                         variant="ghost"
                         size="icon"
-                        className="h-7 w-7 text-red-400"
+                        className="h-7 w-7 text-destructive"
                         onClick={() => removeProductImage(index)}
                       >
                         <Trash2 className="w-4 h-4" />

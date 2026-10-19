@@ -50,20 +50,20 @@ export default async function ContactPage() {
       </div>
 
       {}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-12">
+      <div className="grid grid-cols-3 gap-3 mb-12">
         {contactMethods.map(({ label, description, href, Icon }) => (
           <a
             key={label}
             href={href}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-4 bg-card border border-border rounded-2xl p-5 shadow-sm hover:border-primary/40 transition-all duration-200"
+            className="flex flex-col items-center gap-1.5 bg-card border border-border rounded-2xl px-2 py-4 shadow-sm hover:border-primary/50 hover:bg-primary/5 transition-colors duration-200 text-center"
           >
-            <div className="w-11 h-11 rounded-full bg-secondary flex items-center justify-center text-primary flex-shrink-0">
-              <Icon className="w-5 h-5" />
+            <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-primary flex-shrink-0">
+              <Icon className="w-4 h-4" />
             </div>
-            <div className="min-w-0">
-              <h3 className="font-medium text-sm mb-0.5">{label}</h3>
+            <div className="min-w-0 w-full">
+              <h3 className="font-medium text-sm">{label}</h3>
               <p className="text-xs text-muted-foreground font-light truncate">
                 {description}
               </p>

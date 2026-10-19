@@ -909,8 +909,8 @@ export default function CheckoutClient({
             disabled={!canConfirm || saving}
             className={`w-full py-5 rounded-full font-semibold text-sm tracking-wide transition-all duration-300 flex items-center justify-center gap-3 ${
               canConfirm && !saving
-                ? "bg-primary hover:opacity-90 text-primary-foreground hover:shadow-xl hover:shadow-primary/30 hover:-translate-y-0.5 cursor-pointer"
-                : "bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed"
+                ? "bg-primary hover:opacity-90 text-primary-foreground cursor-pointer"
+                : "bg-muted text-muted-foreground cursor-not-allowed"
             } ${saving ? "opacity-75" : ""}`}
           >
             {saving ? (

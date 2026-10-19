@@ -112,7 +112,7 @@ export default function ProductsClient({ products }: ProductsClientProps) {
           className={`px-5 py-2.5 rounded-full text-sm font-medium transition-all duration-200 cursor-pointer flex items-center gap-2
             ${
               activeCategory === "all"
-                ? "bg-primary text-primary-foreground shadow-sm shadow-primary/25"
+                ? "bg-primary text-primary-foreground"
                 : "bg-secondary text-secondary-foreground hover:bg-accent"
             }`}
         >
@@ -129,7 +129,7 @@ export default function ProductsClient({ products }: ProductsClientProps) {
               className={`px-5 py-2.5 rounded-full text-sm font-medium transition-all duration-200 cursor-pointer flex items-center gap-2
                 ${
                   activeCategory === c.slug
-                    ? "bg-primary text-primary-foreground shadow-sm shadow-primary/25"
+                    ? "bg-primary text-primary-foreground"
                     : "bg-secondary text-secondary-foreground hover:bg-accent"
                 }`}
             >
@@ -169,7 +169,7 @@ export default function ProductsClient({ products }: ProductsClientProps) {
             >
               <Link
                 href={`/products/${p.slug}`}
-                className="group text-left bg-card border border-border rounded-2xl overflow-hidden hover:shadow-2xl hover:shadow-primary/10 hover:-translate-y-1.5 transition-all duration-300 flex flex-col w-full"
+                className="group text-left bg-card border border-border rounded-2xl overflow-hidden transition-colors flex flex-col w-full"
               >
                 <div className="relative h-52 overflow-hidden bg-muted flex-shrink-0">
                   {p.img ? (
@@ -193,22 +193,6 @@ export default function ProductsClient({ products }: ProductsClientProps) {
                   <div className="absolute top-3 left-3 bg-black/50 backdrop-blur-sm text-white text-[10px] font-semibold tracking-widest uppercase px-2.5 py-1 rounded-full">
                     {p.category}
                   </div>
-                  {p.variants.length > 0 && (
-                    <div className="absolute top-3 right-3 bg-black/50 backdrop-blur-sm text-white text-[9px] px-2 py-0.5 rounded-full font-light">
-                      {(() => {
-                        const stockLevels = p.variants.map(
-                          (v) => v.stock_level || "none",
-                        );
-                        const allSame = stockLevels.every(
-                          (s) => s === stockLevels[0],
-                        );
-                        const stockLabel = allSame
-                          ? STOCK_LEVEL_LABELS[normalizeStockLevel(stockLevels[0])]
-                          : "Mixed";
-                        return `Stock: ${stockLabel}`;
-                      })()}
-                    </div>
-                  )}
                 </div>
                 <div className="p-5 flex-grow flex flex-col">
                   <h3 className="font-serif font-medium text-base mb-2">
@@ -219,11 +203,24 @@ export default function ProductsClient({ products }: ProductsClientProps) {
                   </p>
                   <div className="mt-auto">
                     {p.variants.length > 0 ? (
-                      <p className="text-primary font-semibold text-sm">
-                        {p.variants.length > 1
-                          ? `$${Math.min(...p.variants.map((v) => v.price)).toFixed(2)} – $${Math.max(...p.variants.map((v) => v.price)).toFixed(2)}`
-                          : `$${p.variants[0].price.toFixed(2)}`}
-                      </p>
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-primary font-semibold text-sm">
+                          {p.variants.length > 1
+                            ? `$${Math.min(...p.variants.map((v) => v.price)).toFixed(2)} – $${Math.max(...p.variants.map((v) => v.price)).toFixed(2)}`
+                            : `$${p.variants[0].price.toFixed(2)}`}
+                        </p>
+                        <span className="text-xs text-muted-foreground font-normal">
+                          {(() => {
+                            const levels = p.variants.map((v) =>
+                              normalizeStockLevel(v.stock_level),
+                            );
+                            if (levels.every((l) => l === "none")) return "Out of stock";
+                            if (levels.every((l) => l === levels[0]))
+                              return STOCK_LEVEL_LABELS[levels[0]];
+                            return "In stock";
+                          })()}
+                        </span>
+                      </div>
                     ) : (
                       <p className="text-muted-foreground text-sm font-light">
                         Coming Soon

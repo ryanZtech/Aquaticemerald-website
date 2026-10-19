@@ -74,9 +74,6 @@ export default function Footer({ whatsapp }: FooterProps) {
         <div className="flex flex-row gap-10 sm:gap-16">
           {}
           <nav className="flex flex-col items-start text-left gap-2">
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
-              Explore
-            </span>
             <div className="flex flex-col gap-2">
               {EXPLORE_LINKS.map((link) => (
                 <Link
@@ -92,9 +89,6 @@ export default function Footer({ whatsapp }: FooterProps) {
 
           {}
           <div className="flex flex-col items-start text-left gap-3">
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
-              Follow &amp; Message
-            </span>
             <div className="flex items-center gap-3">
               {socialLinks.map(({ href, label, Icon }) => (
                 <a

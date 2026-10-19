@@ -1,4 +1,5 @@
 import { getGuides } from "@/lib/dataService";
+import Accordion from "@/components/Accordion";
 
 export const revalidate = 60;
 
@@ -12,16 +13,13 @@ export default async function GuidesPage() {
         <p className="text-muted-foreground text-lg leading-relaxed max-w-2xl font-light">Detailed care guides and species information for aquarium hobbyists.</p>
       </div>
 
-      <div className="space-y-3">
-        {guides.map((g) => (
-          <details key={g.id} className="group bg-card border border-border rounded-2xl overflow-hidden transition-all duration-200">
-            <summary className="flex items-center justify-between px-5 py-4 cursor-pointer list-none font-medium text-sm select-none hover:bg-accent transition-colors">
-              {g.title}
-            </summary>
-            <div className="px-5 pb-5 text-sm text-muted-foreground leading-relaxed font-light">{g.body}</div>
-          </details>
-        ))}
-      </div>
+      {guides.length === 0 ? (
+        <p className="text-muted-foreground text-sm font-light py-12 text-center">
+          No care guides available yet.
+        </p>
+      ) : (
+        <Accordion items={guides.map((g) => ({ id: g.id, title: g.title, body: g.body }))} />
+      )}
     </div>
   );
 }

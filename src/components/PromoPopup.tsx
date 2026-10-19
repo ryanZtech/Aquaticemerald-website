@@ -164,7 +164,7 @@ export default function PromoPopup() {
                     <Link
                       href={buttonUrl}
                       onClick={handleDismiss}
-                      className="inline-block px-8 py-4 bg-primary text-primary-foreground rounded-full font-semibold text-center hover:opacity-90 hover:shadow-xl hover:shadow-primary/30 transition-all duration-200"
+                      className="inline-block px-8 py-4 bg-primary text-primary-foreground rounded-full font-semibold text-center hover:opacity-90 transition-opacity duration-200"
                     >
                       {popup.button_text}
                     </Link>

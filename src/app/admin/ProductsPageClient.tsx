@@ -748,7 +748,7 @@ export default function ProductsPageClient() {
                           setDetailProduct(p);
                           setViewingProduct(true);
                         }}
-                        className="group text-left bg-card border border-border rounded-2xl overflow-hidden hover:shadow-xl hover:shadow-primary/5 hover:-translate-y-1 transition-all duration-300 flex flex-col cursor-pointer"
+                        className="group text-left bg-card border border-border rounded-2xl overflow-hidden transition-colors flex flex-col cursor-pointer"
                       >
                         <div className="relative h-44 overflow-hidden bg-muted flex-shrink-0">
                           {p.img ? (

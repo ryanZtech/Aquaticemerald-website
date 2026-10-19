@@ -11,23 +11,24 @@
   --card-foreground: #0d1f10;
   --popover: #ffffff;
   --popover-foreground: #0d1f10;
-  --primary: #10b981;
+  /* Darkened brand green: white-on-green is now 5.6:1 (was 2.2:1). */
+  --primary: #047857;
   --primary-foreground: #ffffff;
   --secondary: #e2ede4;
-  --secondary-foreground: #10b981;
+  --secondary-foreground: #047857;
   --muted: #dce8dd;
   --muted-foreground: #5a7a60;
   --accent: #e4efe6;
   --accent-foreground: #0d1f10;
   --destructive: #d4183d;
   --destructive-foreground: #ffffff;
-  --border: rgba(16, 185, 129, 0.15);
+  --border: rgba(4, 120, 87, 0.18);
   --input: transparent;
   --input-background: #e8f0e9;
   --switch-background: #b5d4bc;
   --font-weight-medium: 500;
   --font-weight-normal: 400;
-  --ring: rgba(16, 185, 129, 0.4);
+  --ring: rgba(4, 120, 87, 0.4);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -36,12 +37,12 @@
   --radius: 0.625rem;
   --sidebar: #e8f0e9;
   --sidebar-foreground: #0d1f10;
-  --sidebar-primary: #10b981;
+  --sidebar-primary: #047857;
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: #dce8dd;
   --sidebar-accent-foreground: #0d1f10;
-  --sidebar-border: rgba(16, 185, 129, 0.15);
-  --sidebar-ring: rgba(16, 185, 129, 0.4);
+  --sidebar-border: rgba(4, 120, 87, 0.18);
+  --sidebar-ring: rgba(4, 120, 87, 0.4);
 }
 
 .dark {
@@ -51,19 +52,21 @@
   --card-foreground: #ddeee0;
   --popover: #0d1a0e;
   --popover-foreground: #ddeee0;
-  --primary: #10b981;
+  /* Slightly lighter than the light-mode green so accent text keeps 4.4:1
+     on dark surfaces while white-on-green stays 4.5:1. */
+  --primary: #04875f;
   --primary-foreground: #ffffff;
   --secondary: #132615;
-  --secondary-foreground: #10b981;
+  --secondary-foreground: #34d399;
   --muted: #112211;
   --muted-foreground: #7aab81;
   --accent: #1a3a1c;
   --accent-foreground: #ddeee0;
   --destructive: oklch(0.396 0.141 25.723);
   --destructive-foreground: oklch(0.637 0.237 25.331);
-  --border: rgba(16, 185, 129, 0.14);
-  --input: rgba(16, 185, 129, 0.08);
-  --ring: rgba(16, 185, 129, 0.4);
+  --border: rgba(52, 211, 153, 0.14);
+  --input: rgba(52, 211, 153, 0.08);
+  --ring: rgba(4, 135, 95, 0.5);
   --font-weight-medium: 500;
   --font-weight-normal: 400;
   --chart-1: oklch(0.488 0.243 264.376);
@@ -73,12 +76,12 @@
   --chart-5: oklch(0.645 0.246 16.439);
   --sidebar: #0d1a0e;
   --sidebar-foreground: #ddeee0;
-  --sidebar-primary: #10b981;
+  --sidebar-primary: #04875f;
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: #1a3a1c;
   --sidebar-accent-foreground: #ddeee0;
-  --sidebar-border: rgba(16, 185, 129, 0.14);
-  --sidebar-ring: rgba(16, 185, 129, 0.4);
+  --sidebar-border: rgba(52, 211, 153, 0.14);
+  --sidebar-ring: rgba(4, 135, 95, 0.5);
 }
 
 @theme inline {

@@ -60,7 +60,7 @@ export function buildCustomerHtml(opts: {
         <table border="0" cellpadding="0" cellspacing="0" width="100%">
           <tr>
             <td align="left" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 15px; color: #0d1f10; line-height: 1.4;">
-              <strong style="color: #10b981;">${i.qty || 0}&times;</strong> ${escapeHtml(i.name)} <span style="color: #5a7a60; font-size: 14px;">(${escapeHtml(i.variantLabel)})</span>
+              <strong style="color: #047857;">${i.qty || 0}&times;</strong> ${escapeHtml(i.name)} <span style="color: #5a7a60; font-size: 14px;">(${escapeHtml(i.variantLabel)})</span>
             </td>
             <td align="right" valign="top" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 15px; font-weight: bold; color: #0d1f10; padding-left: 10px;">
               $${Number((i.price || 0) * (i.qty || 0)).toFixed(2)}
@@ -129,7 +129,7 @@ export function buildCustomerHtml(opts: {
   <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f0f5f0; table-layout: fixed;">
     <tr>
       <td align="center" style="padding: 40px 10px 40px 10px;">
-        <table border="0" cellpadding="0" cellspacing="0" width="600" class="email-container" style="background-color: #ffffff; border-radius: 0 0 10px 10px; border: 1px solid rgba(16, 185, 129, 0.15); box-shadow: 0 4px 12px rgba(13, 31, 16, 0.03); overflow: hidden;">
+        <table border="0" cellpadding="0" cellspacing="0" width="600" class="email-container" style="background-color: #ffffff; border-radius: 0 0 10px 10px; border: 1px solid rgba(4, 120, 87, 0.15); box-shadow: 0 4px 12px rgba(13, 31, 16, 0.03); overflow: hidden;">
           
           <tr>
             <td align="center" style="background-color: #ffffff; padding: 35px 40px 25px 40px; border-bottom: 1px solid #e2ede4;">
@@ -152,7 +152,7 @@ export function buildCustomerHtml(opts: {
             <td style="padding: 40px 40px 20px 40px;">
               <table border="0" cellpadding="0" cellspacing="0" width="100%">
                 <tr>
-                  <td align="left" style="font-family: Georgia, 'Times New Roman', Times, serif; font-size: 24px; font-weight: bold; color: #10b981; line-height: 1.2; padding-bottom: 12px;">
+                  <td align="left" style="font-family: Georgia, 'Times New Roman', Times, serif; font-size: 24px; font-weight: bold; color: #047857; line-height: 1.2; padding-bottom: 12px;">
                     Thank you for your order, ${customer_name}!
                   </td>
                 </tr>
@@ -172,7 +172,7 @@ export function buildCustomerHtml(opts: {
                   <td style="padding: 24px;">
                     <table border="0" cellpadding="0" cellspacing="0" width="100%">
                       <tr>
-                        <td colspan="2" style="font-family: Georgia, 'Times New Roman', Times, serif; font-size: 18px; color: #10b981; font-weight: bold; padding-bottom: 16px; border-bottom: 1px solid rgba(16, 185, 129, 0.1);">
+                        <td colspan="2" style="font-family: Georgia, 'Times New Roman', Times, serif; font-size: 18px; color: #047857; font-weight: bold; padding-bottom: 16px; border-bottom: 1px solid rgba(4, 120, 87, 0.1);">
                           Order &amp; Pickup Overview
                         </td>
                       </tr>
@@ -212,7 +212,7 @@ export function buildCustomerHtml(opts: {
                         </td>
                         <td valign="top" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #0d1f10; padding-top: 8px;">
                           <strong>${formattedPickupDate}</strong><br>
-                          <span style="color: #10b981; font-size: 13px; font-weight: bold;">${formattedPickupTime}</span>
+                          <span style="color: #047857; font-size: 13px; font-weight: bold;">${formattedPickupTime}</span>
                         </td>
                       </tr>
 
@@ -227,7 +227,7 @@ export function buildCustomerHtml(opts: {
             <td style="padding: 20px 40px 10px 40px;">
               <table border="0" cellpadding="0" cellspacing="0" width="100%">
                 <tr>
-                  <td style="font-family: Georgia, 'Times New Roman', Times, serif; font-size: 18px; color: #10b981; font-weight: bold; padding-bottom: 12px; border-bottom: 2px solid #e2ede4;">
+                  <td style="font-family: Georgia, 'Times New Roman', Times, serif; font-size: 18px; color: #047857; font-weight: bold; padding-bottom: 12px; border-bottom: 2px solid #e2ede4;">
                     Items In Your Order
                   </td>
                 </tr>
@@ -246,10 +246,10 @@ export function buildCustomerHtml(opts: {
                         </td>
                       </tr>
                       <tr>
-                        <td align="right" style="font-family: Georgia, 'Times New Roman', Times, serif; font-size: 18px; color: #10b981; font-weight: bold; padding-top: 8px;">
+                        <td align="right" style="font-family: Georgia, 'Times New Roman', Times, serif; font-size: 18px; color: #047857; font-weight: bold; padding-top: 8px;">
                           Total Paid:
                         </td>
-                        <td align="right" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 18px; color: #10b981; font-weight: bold; padding-top: 8px;">
+                        <td align="right" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 18px; color: #047857; font-weight: bold; padding-top: 8px;">
                           $${Number(total).toFixed(2)}
                         </td>
                       </tr>
@@ -271,8 +271,8 @@ export function buildCustomerHtml(opts: {
                     </p>
                     <table border="0" cellpadding="0" cellspacing="0" style="margin: 0 auto;">
                       <tr>
-                        <td align="center" bgcolor="#10b981" style="border-radius: 6px;">
-                          <a href="${sellerWaLink}" target="_blank" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 15px; font-weight: bold; color: #ffffff; text-decoration: none; display: inline-block; padding: 12px 30px; border-radius: 6px; border: 1px solid #10b981; letter-spacing: 0.3px;">
+                        <td align="center" bgcolor="#047857" style="border-radius: 6px;">
+                          <a href="${sellerWaLink}" target="_blank" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 15px; font-weight: bold; color: #ffffff; text-decoration: none; display: inline-block; padding: 12px 30px; border-radius: 6px; border: 1px solid #047857; letter-spacing: 0.3px;">
                             Reply on WhatsApp
                           </a>
                         </td>
@@ -285,8 +285,8 @@ export function buildCustomerHtml(opts: {
           </tr>
 
           <tr>
-            <td align="center" style="background-color: #e8f0e9; padding: 30px 40px; text-align: center; border-top: 1px solid rgba(16, 185, 129, 0.15);">
-              <p style="margin: 0 0 10px 0; font-family: Georgia, 'Times New Roman', Times, serif; font-size: 16px; font-weight: bold; color: #10b981;">
+            <td align="center" style="background-color: #e8f0e9; padding: 30px 40px; text-align: center; border-top: 1px solid rgba(4, 120, 87, 0.15);">
+              <p style="margin: 0 0 10px 0; font-family: Georgia, 'Times New Roman', Times, serif; font-size: 16px; font-weight: bold; color: #047857;">
                 Aquatic Emerald
               </p>
               <p style="margin: 0 0 20px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 12px; color: #5a7a60; line-height: 1.6;">
@@ -350,7 +350,7 @@ export function buildSellerHtml(opts: {
         <table border="0" cellpadding="0" cellspacing="0" width="100%">
           <tr>
             <td align="left" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #0d1f10;">
-              <strong style="color: #10b981;">${i.qty || 0}&times;</strong> ${escapeHtml(i.name)} <span style="color: #5a7a60; font-size: 13px;">(${escapeHtml(i.variantLabel)})</span>
+              <strong style="color: #047857;">${i.qty || 0}&times;</strong> ${escapeHtml(i.name)} <span style="color: #5a7a60; font-size: 13px;">(${escapeHtml(i.variantLabel)})</span>
             </td>
             <td align="right" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; font-weight: bold; color: #0d1f10;">
               $${Number((i.price || 0) * (i.qty || 0)).toFixed(2)}
@@ -411,7 +411,7 @@ export function buildSellerHtml(opts: {
   <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f0f5f0; table-layout: fixed;">
     <tr>
       <td align="center" style="padding: 40px 10px 40px 10px;">
-        <table border="0" cellpadding="0" cellspacing="0" width="600" class="email-container" style="background-color: #ffffff; border-radius: 0 0 10px 10px; border: 1px solid rgba(16, 185, 129, 0.15); box-shadow: 0 4px 12px rgba(13, 31, 16, 0.03); overflow: hidden;">
+        <table border="0" cellpadding="0" cellspacing="0" width="600" class="email-container" style="background-color: #ffffff; border-radius: 0 0 10px 10px; border: 1px solid rgba(4, 120, 87, 0.15); box-shadow: 0 4px 12px rgba(13, 31, 16, 0.03); overflow: hidden;">
           
           <tr>
             <td align="center" style="background-color: #ffffff; padding: 30px 40px 20px 40px; border-bottom: 1px solid #e2ede4;">
@@ -432,7 +432,7 @@ export function buildSellerHtml(opts: {
             <td style="padding: 35px 40px 15px 40px;">
               <table border="0" cellpadding="0" cellspacing="0" width="100%">
                 <tr>
-                  <td align="left" style="font-family: Georgia, 'Times New Roman', Times, serif; font-size: 22px; font-weight: bold; color: #10b981; line-height: 1.2; padding-bottom: 8px;">
+                  <td align="left" style="font-family: Georgia, 'Times New Roman', Times, serif; font-size: 22px; font-weight: bold; color: #047857; line-height: 1.2; padding-bottom: 8px;">
                     Hey! A new order has been placed
                   </td>
                 </tr>
@@ -450,13 +450,13 @@ export function buildSellerHtml(opts: {
               <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #e4efe6; border-radius: 8px; border: 1px solid #dce8dd; text-align: center;">
                 <tr>
                   <td style="padding: 20px;">
-                    <p style="margin: 0 0 12px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #10b981; font-weight: bold;">
+                    <p style="margin: 0 0 12px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #047857; font-weight: bold;">
                       Need to coordinate or confirm the pickup details?
                     </p>
                     <table border="0" cellpadding="0" cellspacing="0" style="margin: 0 auto;">
                       <tr>
-                        <td align="center" bgcolor="#10b981" style="border-radius: 6px;">
-                          <a href="${customerWaLink}" target="_blank" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; font-weight: bold; color: #ffffff; text-decoration: none; display: inline-block; padding: 10px 24px; border-radius: 6px; border: 1px solid #10b981; letter-spacing: 0.3px;">
+                        <td align="center" bgcolor="#047857" style="border-radius: 6px;">
+                          <a href="${customerWaLink}" target="_blank" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; font-weight: bold; color: #ffffff; text-decoration: none; display: inline-block; padding: 10px 24px; border-radius: 6px; border: 1px solid #047857; letter-spacing: 0.3px;">
                             Chat with ${customer_name} on WhatsApp
                           </a>
                         </td>
@@ -475,7 +475,7 @@ export function buildSellerHtml(opts: {
                   <td style="padding: 20px;">
                     <table border="0" cellpadding="0" cellspacing="0" width="100%">
                       <tr>
-                        <td colspan="2" style="font-family: Georgia, 'Times New Roman', Times, serif; font-size: 16px; color: #10b981; font-weight: bold; padding-bottom: 12px; border-bottom: 1px solid rgba(16, 185, 129, 0.1);">
+                        <td colspan="2" style="font-family: Georgia, 'Times New Roman', Times, serif; font-size: 16px; color: #047857; font-weight: bold; padding-bottom: 12px; border-bottom: 1px solid rgba(4, 120, 87, 0.1);">
                           Customer &amp; Logistics Overview
                         </td>
                       </tr>
@@ -494,7 +494,7 @@ export function buildSellerHtml(opts: {
                           Phone Number
                         </td>
                         <td valign="top" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 13px; color: #0d1f10; padding-top: 6px; padding-bottom: 6px;">
-                          <a href="tel:${customer_phone}" style="color: #10b981; text-decoration: underline; font-weight: bold;">${customer_phone}</a>
+                          <a href="tel:${customer_phone}" style="color: #047857; text-decoration: underline; font-weight: bold;">${customer_phone}</a>
                         </td>
                       </tr>
 
@@ -503,7 +503,7 @@ export function buildSellerHtml(opts: {
                           Email Address
                         </td>
                         <td valign="top" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 13px; color: #0d1f10; padding-top: 6px; padding-bottom: 6px;">
-                          <a href="mailto:${customer_email}" style="color: #10b981; text-decoration: none;">${customer_email}</a>
+                          <a href="mailto:${customer_email}" style="color: #047857; text-decoration: none;">${customer_email}</a>
                         </td>
                       </tr>
 
@@ -520,7 +520,7 @@ export function buildSellerHtml(opts: {
                         <td valign="top" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 12px; font-weight: bold; color: #5a7a60; text-transform: uppercase; letter-spacing: 0.5px; padding-top: 6px; padding-bottom: 6px;">
                           Scheduled Time
                         </td>
-                        <td valign="top" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 13px; color: #10b981; padding-top: 6px; padding-bottom: 6px; font-weight: bold;">
+                        <td valign="top" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 13px; color: #047857; padding-top: 6px; padding-bottom: 6px; font-weight: bold;">
                           ${formattedPickupDate} at ${formattedPickupTime}
                         </td>
                       </tr>
@@ -544,7 +544,7 @@ export function buildSellerHtml(opts: {
             <td style="padding: 10px 40px 30px 40px;">
               <table border="0" cellpadding="0" cellspacing="0" width="100%">
                 <tr>
-                  <td style="font-family: Georgia, 'Times New Roman', Times, serif; font-size: 16px; color: #10b981; font-weight: bold; padding-bottom: 10px; border-bottom: 2px solid #e2ede4;">
+                  <td style="font-family: Georgia, 'Times New Roman', Times, serif; font-size: 16px; color: #047857; font-weight: bold; padding-bottom: 10px; border-bottom: 2px solid #e2ede4;">
                     Items Purchased
                   </td>
                 </tr>
@@ -563,10 +563,10 @@ export function buildSellerHtml(opts: {
                         </td>
                       </tr>
                       <tr>
-                        <td style="font-family: Georgia, 'Times New Roman', Times, serif; font-size: 15px; color: #10b981; font-weight: bold; padding-top: 6px;">
+                        <td style="font-family: Georgia, 'Times New Roman', Times, serif; font-size: 15px; color: #047857; font-weight: bold; padding-top: 6px;">
                           Total Captured:
                         </td>
-                        <td style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 15px; color: #10b981; font-weight: bold; padding-top: 6px;">
+                        <td style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 15px; color: #047857; font-weight: bold; padding-top: 6px;">
                           $${Number(total).toFixed(2)}
                         </td>
                       </tr>
@@ -578,8 +578,8 @@ export function buildSellerHtml(opts: {
           </tr>
 
           <tr>
-            <td align="center" style="background-color: #e8f0e9; padding: 25px 40px; text-align: center; border-top: 1px solid rgba(16, 185, 129, 0.15);">
-              <p style="margin: 0 0 5px 0; font-family: Georgia, 'Times New Roman', Times, serif; font-size: 14px; font-weight: bold; color: #10b981;">
+            <td align="center" style="background-color: #e8f0e9; padding: 25px 40px; text-align: center; border-top: 1px solid rgba(4, 120, 87, 0.15);">
+              <p style="margin: 0 0 5px 0; font-family: Georgia, 'Times New Roman', Times, serif; font-size: 14px; font-weight: bold; color: #047857;">
                 Aquatic Emerald — Admin Dashboard
               </p>
               <p style="margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 11px; color: #7aab81;">

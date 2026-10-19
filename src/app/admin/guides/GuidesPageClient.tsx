@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/app/components/ui/table";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 import { Textarea } from "@/app/components/ui/textarea";
@@ -12,7 +11,8 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/app/components/ui/dialog";
-import { Plus, Edit, Trash2 } from "lucide-react";
+import { Plus, Edit, Trash2, GripVertical } from "lucide-react";
+import { Reorder, useDragControls } from "motion/react";
 import { toast } from "sonner";
 
 interface Guide {
@@ -26,6 +26,82 @@ interface Guide {
   updated_at: string;
 }
 
+function SortableGuideRow({
+  guide,
+  onDrop,
+  onEdit,
+  onDelete,
+}: {
+  guide: Guide;
+  onDrop: () => void;
+  onEdit: (guide: Guide) => void;
+  onDelete: (guide: Guide) => void;
+}) {
+  const controls = useDragControls();
+
+  return (
+    <Reorder.Item
+      value={guide}
+      dragListener={false}
+      dragControls={controls}
+      onDragEnd={onDrop}
+      whileDrag={{
+        scale: 1.015,
+        boxShadow: "0 12px 28px rgba(13, 31, 16, 0.14)",
+        zIndex: 30,
+      }}
+      className="flex items-center gap-3 bg-card border border-border rounded-2xl px-3 py-3 list-none cursor-default"
+    >
+      <button
+        type="button"
+        onPointerDown={(e) => controls.start(e)}
+        className="w-6 h-9 flex items-center justify-center text-muted-foreground hover:text-primary active:text-primary transition-colors cursor-grab active:cursor-grabbing touch-none flex-shrink-0"
+        aria-label={`Reorder ${guide.title}`}
+      >
+        <GripVertical className="w-4 h-4" />
+      </button>
+
+      <div className="flex-1 min-w-0">
+        <div className="font-medium text-sm truncate">{guide.title}</div>
+        <code className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+          {guide.slug}
+        </code>
+      </div>
+
+      <div className="w-28 flex-shrink-0">
+        <span
+          className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+            guide.active
+              ? "bg-primary/15 text-primary"
+              : "bg-muted text-muted-foreground"
+          }`}
+        >
+          {guide.active ? "Active" : "Inactive"}
+        </span>
+      </div>
+
+      <div className="w-20 flex justify-end gap-1 flex-shrink-0">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10"
+          onClick={() => onEdit(guide)}
+        >
+          <Edit className="w-4 h-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+          onClick={() => onDelete(guide)}
+        >
+          <Trash2 className="w-4 h-4" />
+        </Button>
+      </div>
+    </Reorder.Item>
+  );
+}
+
 export default function GuidesPageClient() {
   const [guides, setGuides] = useState<Guide[]>([]);
   const [loading, setLoading] = useState(true);
@@ -35,7 +111,6 @@ export default function GuidesPageClient() {
     title: "",
     slug: "",
     body: "",
-    display_order: 0,
     active: true,
   });
 
@@ -56,11 +131,46 @@ export default function GuidesPageClient() {
     fetchGuides();
   }, []);
 
-  const handleDelete = async (id: number, title: string) => {
-    if (!confirm(`Are you sure you want to delete "${title}"?`)) return;
+  // After a drag settles, write the new running order to display_order so the
+  // public Care Guides page renders in exactly the order shown here.
+  const persistOrder = async (list: Guide[]) => {
+    const updates = list
+      .map((guide, index) => ({ guide, order: index }))
+      .filter(({ guide, order }) => guide.display_order !== order);
+    if (updates.length === 0) return;
+
+    setGuides(list.map((guide, index) => ({ ...guide, display_order: index })));
+    try {
+      await Promise.all(
+        updates.map(({ guide, order }) =>
+          fetch(`/api/guides/${guide.id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              title: guide.title,
+              slug: guide.slug,
+              body: guide.body,
+              display_order: order,
+              active: guide.active,
+            }),
+          }).then((res) => {
+            if (!res.ok) throw new Error("Failed to save order");
+          }),
+        ),
+      );
+      toast.success("Order saved");
+    } catch (error) {
+      console.error("Error saving guide order:", error);
+      toast.error("Failed to save order");
+      fetchGuides();
+    }
+  };
+
+  const handleDelete = async (guide: Guide) => {
+    if (!confirm(`Are you sure you want to delete "${guide.title}"?`)) return;
 
     try {
-      const response = await fetch(`/api/guides/${id}`, {
+      const response = await fetch(`/api/guides/${guide.id}`, {
         method: "DELETE",
       });
 
@@ -83,7 +193,6 @@ export default function GuidesPageClient() {
       title: guide.title,
       slug: guide.slug,
       body: guide.body,
-      display_order: guide.display_order,
       active: guide.active,
     });
     setDialogOpen(true);
@@ -95,7 +204,6 @@ export default function GuidesPageClient() {
       title: "",
       slug: "",
       body: "",
-      display_order: 0,
       active: true,
     });
     setDialogOpen(true);
@@ -114,7 +222,12 @@ export default function GuidesPageClient() {
       const response = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          ...formData,
+          // Display order is managed by dragging now: keep an edited guide
+          // where it is, and append brand-new ones at the end.
+          display_order: editingGuide ? editingGuide.display_order : guides.length,
+        }),
       });
 
       if (response.ok) {
@@ -152,76 +265,46 @@ export default function GuidesPageClient() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-serif text-3xl font-medium">Care Guides</h1>
-          <p className="text-muted-foreground text-sm">Manage your aquarium care guides</p>
+          <p className="text-muted-foreground text-sm">
+            Manage your aquarium care guides — drag a row to change the order
+            they appear in.
+          </p>
         </div>
         <Button className="gap-2" onClick={handleCreate}>
           <Plus className="w-4 h-4" /> New Guide
         </Button>
       </div>
 
-      <div className="bg-card rounded-2xl border border-border overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-muted/50">
-              <TableHead>Title</TableHead>
-              <TableHead>Slug</TableHead>
-              <TableHead>Display Order</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {guides.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={5} className="text-center py-12 text-muted-foreground font-light">
-                  No guides found. Create your first guide!
-                </TableCell>
-              </TableRow>
-            ) : (
-              guides.map((guide) => (
-                <TableRow key={guide.id}>
-                  <TableCell className="font-medium">{guide.title}</TableCell>
-                  <TableCell>
-                    <code className="text-xs bg-muted px-2 py-1 rounded">{guide.slug}</code>
-                  </TableCell>
-                  <TableCell>{guide.display_order}</TableCell>
-                  <TableCell>
-                    <span
-                      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                        guide.active
-                          ? "bg-primary/15 text-primary"
-                          : "bg-gray-100 text-gray-800"
-                      }`}
-                    >
-                      {guide.active ? "Active" : "Inactive"}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => handleEdit(guide)}
-                      >
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-destructive hover:text-destructive"
-                        onClick={() => handleDelete(guide.id, guide.title)}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+      {guides.length === 0 ? (
+        <div className="bg-card rounded-2xl border border-border py-12 text-center text-muted-foreground font-light">
+          No guides found. Create your first guide!
+        </div>
+      ) : (
+        <div>
+          <div className="flex items-center gap-3 px-3 pb-2 text-xs font-medium text-muted-foreground">
+            <span className="w-6" />
+            <span className="flex-1">Title</span>
+            <span className="w-28">Status</span>
+            <span className="w-20 text-right">Actions</span>
+          </div>
+          <Reorder.Group
+            axis="y"
+            values={guides}
+            onReorder={setGuides}
+            className="space-y-2"
+          >
+            {guides.map((guide) => (
+              <SortableGuideRow
+                key={guide.id}
+                guide={guide}
+                onDrop={() => persistOrder(guides)}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
+              />
+            ))}
+          </Reorder.Group>
+        </div>
+      )}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-2xl">
@@ -250,14 +333,6 @@ export default function GuidesPageClient() {
                 value={formData.slug}
                 onChange={(e) => setFormData((prev) => ({ ...prev, slug: e.target.value }))}
                 placeholder="guide-slug"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium mb-1 block">Display Order</label>
-              <Input
-                type="number"
-                value={formData.display_order}
-                onChange={(e) => setFormData((prev) => ({ ...prev, display_order: parseInt(e.target.value) || 0 }))}
               />
             </div>
             <div>

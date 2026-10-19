@@ -36,7 +36,7 @@ export default function CartPage() {
           </p>
           <Link
             href="/products"
-            className="inline-block px-6 py-3 bg-primary text-primary-foreground rounded-full text-sm font-medium hover:opacity-90 hover:shadow-lg transition cursor-pointer"
+            className="inline-block px-6 py-3 bg-primary text-primary-foreground rounded-full text-sm font-medium hover:opacity-90 transition cursor-pointer"
           >
             Browse Products
           </Link>
@@ -177,7 +177,7 @@ export default function CartPage() {
               className={`block w-full py-4 text-center rounded-full font-semibold text-sm tracking-wide transition-all duration-200 ${
                 discountedTotal < 5
                   ? "bg-muted text-muted-foreground cursor-not-allowed opacity-60 pointer-events-none"
-                  : "bg-primary text-primary-foreground hover:opacity-90 hover:shadow-xl hover:shadow-primary/30 cursor-pointer"
+                  : "bg-primary text-primary-foreground hover:opacity-90 cursor-pointer"
               }`}
             >
               Proceed to Pickup Confirmation
