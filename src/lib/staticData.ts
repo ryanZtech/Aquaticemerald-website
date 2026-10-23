@@ -13,6 +13,17 @@ export interface ProductImage {
   is_primary: boolean;
 }
 
+// One line of a value pack's contents, flattened with the referenced
+// variant's current info for display ("2× Java Fern — 1 medium plant").
+export interface ValuePackItem {
+  variant_id: string;
+  quantity: number;
+  product_name: string;
+  product_slug: string;
+  variant_label: string;
+  stock_level?: string;
+}
+
 export type Category = "plants" | "shrimp" | "snails" | "fish";
 export type AllCategory = "all" | Category;
 
@@ -30,6 +41,9 @@ export interface Product {
   img: string;
   images?: ProductImage[];
   variantOptions?: string[];
+  valuePack?: boolean;
+  valuePackSyncStock?: boolean;
+  packItems?: ValuePackItem[];
 }
 
 export interface CartItem {

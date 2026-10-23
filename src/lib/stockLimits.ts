@@ -105,6 +105,27 @@ export function parseStockLimitSettings(
   return result;
 }
 
+/**
+ * Lowest stock level across the given levels ("none" < "single" < ... <
+ * "very_high"). Used by value packs: a pack whose "keep stock at the
+ * lowest" setting is on derives its level from its items — if one item is
+ * low stock the pack is low stock, if one is out of stock the pack is out
+ * of stock. An empty list derives to "none" (nothing to assemble);
+ * unknown/blank levels normalize to "none", dragging the pack down — the
+ * safe direction to be wrong in.
+ */
+export function deriveStockLevel(
+  levels: Array<string | null | undefined>,
+): StockLevel {
+  if (levels.length === 0) return "none";
+  let lowestIndex = STOCK_LEVELS.length - 1;
+  for (const level of levels) {
+    const idx = STOCK_LEVELS.indexOf(normalizeStockLevel(level));
+    if (idx < lowestIndex) lowestIndex = idx;
+  }
+  return STOCK_LEVELS[lowestIndex];
+}
+
 export function maxQtyForLevel(
   level: string | null | undefined,
   limits: Record<StockLevel, number>,

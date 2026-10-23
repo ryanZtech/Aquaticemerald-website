@@ -311,6 +311,16 @@ export async function GET() {
 
     await sql`CREATE TABLE IF NOT EXISTS store_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);`;
 
+    // --- Value packs ---
+    // A value pack is a product with value_pack = TRUE: its own variant holds
+    // the pack price, value_pack_items lists the component variants, and
+    // value_pack_sync_stock makes the pack's stock_level follow the lowest
+    // stock level among its items (see src/lib/valuePack.ts). Both columns
+    // default FALSE so existing rows behave exactly as before.
+    await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS value_pack BOOLEAN DEFAULT FALSE;`;
+    await sql`ALTER TABLE products ADD COLUMN IF NOT EXISTS value_pack_sync_stock BOOLEAN DEFAULT FALSE;`;
+    await sql`CREATE TABLE IF NOT EXISTS value_pack_items (id SERIAL PRIMARY KEY, pack_product_id TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE, item_variant_id TEXT NOT NULL REFERENCES product_variants(id) ON DELETE CASCADE, quantity INTEGER NOT NULL DEFAULT 1, sort_order INTEGER DEFAULT 0, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP);`;
+
     await sql`
       CREATE TABLE IF NOT EXISTS login_attempts (
         id SERIAL PRIMARY KEY,

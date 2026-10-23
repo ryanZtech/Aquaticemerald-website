@@ -11,8 +11,15 @@ import {
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 import { Label } from "@/app/components/ui/label";
+import { Switch } from "@/app/components/ui/switch";
 import { Textarea } from "@/app/components/ui/textarea";
-import { STOCK_LEVELS, STOCK_LEVEL_LABELS } from "@/lib/stockLimits";
+import {
+  STOCK_LEVELS,
+  STOCK_LEVEL_LABELS,
+  STOCK_LEVEL_BADGE_CLASSES,
+  deriveStockLevel,
+  normalizeStockLevel,
+} from "@/lib/stockLimits";
 import {
   Select,
   SelectContent,
@@ -35,6 +42,28 @@ interface VariantOption {
   name: string;
   values: string[];
   valuesInput?: string;
+}
+
+interface CatalogVariant {
+  id: string;
+  label: string;
+  price: number | string;
+  stock_level?: string;
+}
+
+interface CatalogProduct {
+  id: string;
+  name: string;
+  value_pack?: boolean;
+  variants: CatalogVariant[];
+}
+
+interface PackItemRow {
+  variantId: string;
+  quantity: number;
+  productName: string;
+  variantLabel: string;
+  stockLevel: string;
 }
 
 interface ProductFormDialogProps {
@@ -73,9 +102,19 @@ export default function ProductFormDialog({
   const [avgSize, setAvgSize] = useState("");
   const [origin, setOrigin] = useState("");
 
+  // --- Value pack state ---
+  const [isValuePack, setIsValuePack] = useState(false);
+  const [packSyncStock, setPackSyncStock] = useState(true);
+  const [packItems, setPackItems] = useState<PackItemRow[]>([]);
+  const [catalog, setCatalog] = useState<CatalogProduct[]>([]);
+  const [addProductId, setAddProductId] = useState("");
+  const [addVariantId, setAddVariantId] = useState("");
+  const [addQty, setAddQty] = useState(1);
+
   useEffect(() => {
     if (open) {
       fetchCategories();
+      fetchCatalog();
       if (editingProduct) {
         loadProductData();
       } else {
@@ -83,6 +122,16 @@ export default function ProductFormDialog({
       }
     }
   }, [open, editingProduct]);
+
+  const fetchCatalog = async () => {
+    try {
+      const response = await fetch("/api/products");
+      const data = await response.json();
+      setCatalog(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error("Error fetching product catalog:", error);
+    }
+  };
 
   const fetchCategories = async () => {
     try {
@@ -130,7 +179,33 @@ export default function ProductFormDialog({
       });
 
       setVariants(loadedVariants);
-      
+
+      // --- Value pack ---
+      const packFlag = data.value_pack === true || data.value_pack === "t";
+      if (packFlag) {
+        // A pack has exactly one variant holding its price — keep only the
+        // first (preserving its id so the DB row is updated, not recreated).
+        setVariants(
+          loadedVariants.length > 0
+            ? [loadedVariants[0]]
+            : [{ id: "pack", label: "Value Pack", price: 0, stock_level: "none" }],
+        );
+      }
+      setIsValuePack(packFlag);
+      setPackSyncStock(
+        data.value_pack_sync_stock === true || data.value_pack_sync_stock === "t",
+      );
+      const rawPackItems = Array.isArray(data.pack_items) ? data.pack_items : [];
+      setPackItems(
+        rawPackItems.map((item: any) => ({
+          variantId: String(item.variant_id || item.variantId || ""),
+          quantity: Math.max(1, parseInt(String(item.quantity), 10) || 1),
+          productName: String(item.product_name || "Unknown product"),
+          variantLabel: String(item.variant_label || ""),
+          stockLevel: String(item.stock_level || "none"),
+        })),
+      );
+
       setCareLevel(data.attributes?.["Care Level"] || "");
       setLight(data.attributes?.["Light"] || "");
       setAvgSize(data.attributes?.["Average Size"] || "");
@@ -181,6 +256,12 @@ export default function ProductFormDialog({
     setLight("");
     setAvgSize("");
     setOrigin("");
+    setIsValuePack(false);
+    setPackSyncStock(true);
+    setPackItems([]);
+    setAddProductId("");
+    setAddVariantId("");
+    setAddQty(1);
   };
 
   const generateSlug = (text: string) => {
@@ -319,6 +400,65 @@ export default function ProductFormDialog({
     setVariants(variants.filter((v) => v.id !== id));
   };
 
+  // --- Value pack handlers ---
+
+  // Packs have a single price point, so switching to pack mode collapses the
+  // variant list to one "Value Pack" variant (keeping the first variant's id
+  // when editing, so the existing DB row is updated rather than recreated).
+  const enterPackMode = () => {
+    setIsValuePack(true);
+    setVariantOptions([]);
+    setVariants((prev) => {
+      const first = prev[0];
+      return [
+        {
+          id: first?.id || "pack",
+          label: "Value Pack",
+          price: first?.price || 0,
+          stock_level: first?.stock_level || "none",
+        },
+      ];
+    });
+  };
+
+  const exitPackMode = () => {
+    setIsValuePack(false);
+  };
+
+  const addPackItem = () => {
+    if (!addProductId || !addVariantId) {
+      toast.error("Pick a product and variant to add");
+      return;
+    }
+    if (packItems.some((item) => item.variantId === addVariantId)) {
+      toast.error("That variant is already in the pack");
+      return;
+    }
+    const product = catalog.find((p) => p.id === addProductId);
+    const variant = product?.variants.find((v) => v.id === addVariantId);
+    if (!product || !variant) {
+      toast.error("Could not find that variant");
+      return;
+    }
+    setPackItems((prev) => [
+      ...prev,
+      {
+        variantId: variant.id,
+        quantity: Math.min(99, Math.max(1, addQty || 1)),
+        productName: product.name,
+        variantLabel: variant.label,
+        stockLevel: variant.stock_level || "none",
+      },
+    ]);
+    setAddProductId("");
+    setAddVariantId("");
+    setAddQty(1);
+  };
+
+  const removePackItem = (variantId: string) => {
+    setPackItems((prev) => prev.filter((item) => item.variantId !== variantId));
+  };
+
   const setPrimaryImage = (index: number) => {
     setProductImages(prev => prev.map((img, i) => ({
       ...img,
@@ -343,15 +483,27 @@ export default function ProductFormDialog({
       return;
     }
 
-    if (variants.length === 0) {
-      toast.error("Add at least one variant");
-      return;
-    }
-
-    for (const variant of variants) {
-      if (!variant.label || variant.price <= 0) {
-        toast.error("All variants must have a label and price");
+    if (isValuePack) {
+      if (packItems.length === 0) {
+        toast.error("Add at least one item to the value pack");
         return;
+      }
+      const packPrice = variants[0]?.price || 0;
+      if (packPrice <= 0) {
+        toast.error("Set a price for the value pack");
+        return;
+      }
+    } else {
+      if (variants.length === 0) {
+        toast.error("Add at least one variant");
+        return;
+      }
+
+      for (const variant of variants) {
+        if (!variant.label || variant.price <= 0) {
+          toast.error("All variants must have a label and price");
+          return;
+        }
       }
     }
 
@@ -375,6 +527,23 @@ export default function ProductFormDialog({
         if (variant.imageFile) {
           formData.append(`variantImage_${variant.id}`, variant.imageFile);
         }
+      }
+
+      formData.append("valuePack", isValuePack ? "true" : "false");
+      formData.append(
+        "valuePackSyncStock",
+        isValuePack && packSyncStock ? "true" : "false",
+      );
+      if (isValuePack) {
+        formData.append(
+          "valuePackItems",
+          JSON.stringify(
+            packItems.map((item) => ({
+              variantId: item.variantId,
+              quantity: item.quantity,
+            })),
+          ),
+        );
       }
 
       const attributesPayload: Record<string, string> = {
@@ -434,6 +603,24 @@ export default function ProductFormDialog({
           {}
           <div className="space-y-4">
             <h3 className="font-medium">Basic Information</h3>
+
+            <div className="flex items-center justify-between bg-primary/5 border border-primary/10 rounded-xl p-4">
+              <div>
+                <div className="font-medium text-sm">Value Pack</div>
+                <div className="text-xs text-muted-foreground font-light">
+                  Bundle several items at one price. Its stock can follow the
+                  lowest item automatically.
+                </div>
+              </div>
+              <Switch
+                checked={isValuePack}
+                onCheckedChange={(next) =>
+                  next ? enterPackMode() : exitPackMode()
+                }
+                aria-label="Value Pack"
+                className="flex-shrink-0"
+              />
+            </div>
             
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -553,6 +740,205 @@ export default function ProductFormDialog({
           </div>
 
           {}
+          {isValuePack && (
+          <div className="space-y-4 border-t pt-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-medium">Pack Contents</h3>
+              <span className="text-xs text-muted-foreground font-light">
+                {packItems.length} item{packItems.length !== 1 ? "s" : ""}
+              </span>
+            </div>
+
+            <div className="bg-primary/5 rounded-xl p-4 border border-primary/10 text-xs text-muted-foreground leading-relaxed">
+              Pick the products and variants that make up this pack. If the
+              stock setting below is on, the pack's stock level automatically
+              becomes the lowest stock level among these items.
+            </div>
+
+            {packItems.length > 0 && (
+              <div className="space-y-2">
+                {packItems.map((item) => (
+                  <div
+                    key={item.variantId}
+                    className="flex items-center gap-3 p-3 border rounded-lg"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium truncate">
+                        {item.productName}
+                      </div>
+                      <div className="text-xs text-muted-foreground truncate">
+                        {item.variantLabel}
+                      </div>
+                    </div>
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">
+                      ×{item.quantity}
+                    </span>
+                    <span
+                      className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full whitespace-nowrap ${
+                        STOCK_LEVEL_BADGE_CLASSES[
+                          normalizeStockLevel(item.stockLevel)
+                        ]
+                      }`}
+                    >
+                      {STOCK_LEVEL_LABELS[normalizeStockLevel(item.stockLevel)]}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => removePackItem(item.variantId)}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_80px_auto] gap-2 items-end p-3 border rounded-lg bg-muted/20">
+              <div className="space-y-1 min-w-0">
+                <Label className="text-xs">Product</Label>
+                <Select
+                  value={addProductId}
+                  onValueChange={(value) => {
+                    setAddProductId(value);
+                    setAddVariantId("");
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose product" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {catalog.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1 min-w-0">
+                <Label className="text-xs">Variant</Label>
+                <Select
+                  value={addVariantId}
+                  onValueChange={setAddVariantId}
+                  disabled={!addProductId}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose variant" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(catalog.find((p) => p.id === addProductId)?.variants || [])
+                      .filter((v) =>
+                        !packItems.some((item) => item.variantId === v.id),
+                      )
+                      .map((v) => (
+                        <SelectItem key={v.id} value={v.id}>
+                          {v.label}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Qty</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  max="99"
+                  value={addQty}
+                  onChange={(e) => setAddQty(parseInt(e.target.value, 10) || 1)}
+                />
+              </div>
+              <Button type="button" variant="outline" onClick={addPackItem}>
+                <Plus className="w-4 h-4 mr-1" /> Add
+              </Button>
+            </div>
+
+            {variants[0] && (
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="packPrice">Pack Price *</Label>
+                <Input
+                  id="packPrice"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="e.g., 25.00"
+                  value={variants[0].price || ""}
+                  onChange={(e) =>
+                    updateVariant(
+                      variants[0].id,
+                      "price",
+                      parseFloat(e.target.value) || 0,
+                    )
+                  }
+                />
+              </div>
+              {!packSyncStock && (
+                <div className="space-y-2">
+                  <Label>Stock Level</Label>
+                  <select
+                    aria-label="Pack Stock Level"
+                    value={variants[0].stock_level ?? "none"}
+                    onChange={(e) =>
+                      updateVariant(variants[0].id, "stock_level", e.target.value)
+                    }
+                    className="h-9 rounded-md border px-3 w-full"
+                  >
+                    {STOCK_LEVELS.map((level) => (
+                      <option key={level} value={level}>
+                        {STOCK_LEVEL_LABELS[level]}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+            )}
+
+            <div className="flex items-center justify-between bg-card border border-border rounded-xl p-4">
+              <div>
+                <div className="font-medium text-sm">
+                  Keep stock at the lowest product stock
+                </div>
+                <div className="text-xs text-muted-foreground font-light">
+                  If one item is low stock the pack is low stock; if one is out
+                  of stock the pack is out of stock.
+                </div>
+              </div>
+              <Switch
+                checked={packSyncStock}
+                onCheckedChange={setPackSyncStock}
+                aria-label="Keep stock at the lowest product stock"
+                className="flex-shrink-0"
+              />
+            </div>
+
+            {packSyncStock && (
+              <div className="text-xs text-muted-foreground font-light">
+                Pack stock will be:{" "}
+                <span
+                  className={`font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                    STOCK_LEVEL_BADGE_CLASSES[
+                      deriveStockLevel(packItems.map((i) => i.stockLevel))
+                    ]
+                  }`}
+                >
+                  {
+                    STOCK_LEVEL_LABELS[
+                      deriveStockLevel(packItems.map((i) => i.stockLevel))
+                    ]
+                  }
+                </span>
+              </div>
+            )}
+          </div>
+          )}
+
+          {}
+          {!isValuePack && (
+          <>
           <div className="space-y-4 border-t pt-4">
             <div className="bg-primary/5 rounded-xl p-4 border border-primary/10 text-xs text-muted-foreground leading-relaxed">
               <span className="font-semibold text-primary flex items-center gap-1.5 mb-1.5">
@@ -677,6 +1063,8 @@ export default function ProductFormDialog({
               </div>
             ))}
           </div>
+          </>
+          )}
 
           {}
           <div className="space-y-4 border-t pt-4">

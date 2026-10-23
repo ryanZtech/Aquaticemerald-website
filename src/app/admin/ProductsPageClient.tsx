@@ -6,6 +6,7 @@ import { Input } from "@/app/components/ui/input";
 import {
   STOCK_LEVELS,
   STOCK_LEVEL_LABELS,
+  STOCK_LEVEL_BADGE_CLASSES,
   normalizeStockLevel,
 } from "@/lib/stockLimits";
 import {
@@ -41,6 +42,16 @@ interface Product {
   short_description?: string;
   full_description?: string;
   attributes?: Record<string, string>;
+  value_pack?: boolean;
+  value_pack_sync_stock?: boolean;
+  pack_items?: Array<{
+    variant_id: string;
+    quantity: number;
+    product_name: string;
+    product_slug: string;
+    variant_label: string;
+    stock_level?: string;
+  }>;
   variants: Array<{
     id: string;
     label: string;
@@ -436,6 +447,11 @@ export default function ProductsPageClient() {
 
                       <h2 className="font-serif text-3xl font-semibold mb-3">
                         {detailProduct.name}
+                        {detailProduct.value_pack && (
+                          <span className="ml-3 align-middle inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/15 text-primary">
+                            Value Pack
+                          </span>
+                        )}
                       </h2>
                       <p className="text-xs text-muted-foreground mb-4">
                         Slug:{" "}
@@ -491,6 +507,54 @@ export default function ProductsPageClient() {
                           </div>
                         ))}
                       </div>
+
+                      {detailProduct.value_pack &&
+                        (detailProduct.pack_items?.length || 0) > 0 && (
+                          <div className="mb-6">
+                            <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                              Pack Contents
+                            </h4>
+                            <div className="border border-border/60 rounded-xl overflow-hidden bg-card text-xs divide-y divide-border/40">
+                              {detailProduct.pack_items!.map((item) => (
+                                <div
+                                  key={item.variant_id}
+                                  className="flex items-center gap-3 py-2.5 px-4"
+                                >
+                                  <div className="flex-1 min-w-0">
+                                    <div className="font-medium text-foreground truncate">
+                                      {item.product_name}
+                                    </div>
+                                    <div className="text-muted-foreground truncate">
+                                      {item.variant_label}
+                                    </div>
+                                  </div>
+                                  <div className="text-muted-foreground whitespace-nowrap">
+                                    ×{item.quantity}
+                                  </div>
+                                  <span
+                                    className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full whitespace-nowrap ${
+                                      STOCK_LEVEL_BADGE_CLASSES[
+                                        normalizeStockLevel(item.stock_level)
+                                      ]
+                                    }`}
+                                  >
+                                    {
+                                      STOCK_LEVEL_LABELS[
+                                        normalizeStockLevel(item.stock_level)
+                                      ]
+                                    }
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                            {detailProduct.value_pack_sync_stock && (
+                              <p className="text-[11px] text-muted-foreground font-light mt-2">
+                                Stock is kept at the lowest item level shown
+                                above.
+                              </p>
+                            )}
+                          </div>
+                        )}
 
                       <div className="mb-6">
                         <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">

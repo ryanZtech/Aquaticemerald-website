@@ -3,6 +3,14 @@ import { sql } from "@/lib/db";
 import { put, del } from "@vercel/blob";
 import { validateImageFile, safeImageKey } from "@/lib/fileValidation";
 import { normalizeStockLevel } from "@/lib/stockLimits";
+import {
+  normalizePackItems,
+  recomputePackProduct,
+  recomputeDependentPacks,
+  variantIdsForProduct,
+  packsUsingVariants,
+  type ValuePackItemInput,
+} from "@/lib/valuePack";
 
 export async function GET(
   request: NextRequest,
@@ -22,6 +30,7 @@ export async function GET(
       SELECT
         p.id, p.slug, p.name, p.category_id, c.slug as category, c.name as category_name,
         p.short_description, p.full_description,
+        p.value_pack, p.value_pack_sync_stock,
         i.image_url as img,
         coalesce((
           SELECT json_agg(
@@ -45,6 +54,23 @@ export async function GET(
         coalesce((
           SELECT json_agg(
             json_build_object(
+              'variant_id', vpi.item_variant_id,
+              'quantity', vpi.quantity,
+              'product_name', ip.name,
+              'product_slug', ip.slug,
+              'variant_label', iv.label,
+              'stock_level', iv.stock_level
+            )
+            ORDER BY vpi.sort_order, vpi.id
+          )
+          FROM value_pack_items vpi
+          JOIN product_variants iv ON iv.id = vpi.item_variant_id
+          JOIN products ip ON ip.id = iv.product_id
+          WHERE vpi.pack_product_id = p.id
+        ), '[]'::json) as pack_items,
+        coalesce((
+          SELECT json_agg(
+            json_build_object(
               'id', img.id,
               'image_url', img.image_url,
               'alt_text', img.alt_text,
@@ -59,7 +85,7 @@ export async function GET(
       LEFT JOIN categories c ON p.category_id = c.id
       LEFT JOIN images i ON p.id = i.product_id AND i.is_primary = TRUE
       WHERE p.id = ${id}
-      GROUP BY p.id, p.slug, p.name, p.category_id, c.slug, c.name, p.short_description, p.full_description, i.image_url
+      GROUP BY p.id, p.slug, p.name, p.category_id, c.slug, c.name, p.short_description, p.full_description, p.value_pack, p.value_pack_sync_stock, i.image_url
     `;
 
     if (rows.length === 0) {
@@ -120,10 +146,39 @@ export async function PUT(
     );
     const newImages = formData.getAll("newImages") as File[];
 
+    // --- Value pack fields ---
+    const valuePack = formData.get("valuePack") === "true";
+    const valuePackSyncStock = formData.get("valuePackSyncStock") === "true";
+    let packItems: ValuePackItemInput[] = [];
+    if (valuePack) {
+      let parsedItems: unknown = [];
+      try {
+        parsedItems = JSON.parse(
+          (formData.get("valuePackItems") as string) || "[]",
+        );
+      } catch {
+        return NextResponse.json(
+          { error: "Invalid JSON in valuePackItems" },
+          { status: 400 },
+        );
+      }
+      const ownVariantIds = variants.map((v: any) => `${id}-${v.id}`);
+      const normalized = normalizePackItems(parsedItems, ownVariantIds);
+      if (normalized.error || !normalized.items) {
+        return NextResponse.json(
+          { error: normalized.error || "Invalid pack items" },
+          { status: 400 },
+        );
+      }
+      packItems = normalized.items;
+    }
+
     await sql`
       UPDATE products
       SET name = ${name}, slug = ${slug}, category_id = ${parseInt(categoryId)},
           short_description = ${shortDescription}, full_description = ${fullDescription},
+          value_pack = ${valuePack},
+          value_pack_sync_stock = ${valuePack ? valuePackSyncStock : false},
           updated_at = CURRENT_TIMESTAMP
       WHERE id = ${id}
     `;
@@ -206,12 +261,46 @@ export async function PUT(
     }
 
     // Now remove any variant the admin actually deleted from the form (and,
-    // via cascade, its images) — but only those, not every variant.
+    // via cascade, its images) — but only those, not every variant. Capture
+    // which packs used them first so their stock can be recomputed below.
+    const removedVariantIds = (
+      await sql`
+        SELECT id FROM product_variants
+        WHERE product_id = ${id}
+          AND id != ALL(${submittedVariantIds.length > 0 ? submittedVariantIds : [null]})
+      `
+    ).map((r: any) => String(r.id));
+    const packsUsingRemoved = await packsUsingVariants(removedVariantIds, id);
     await sql`
       DELETE FROM product_variants
       WHERE product_id = ${id}
         AND id != ALL(${submittedVariantIds.length > 0 ? submittedVariantIds : [null]})
     `;
+
+    // --- Value pack items ---
+    // Replace the pack's contents wholesale with what the form submitted
+    // (rows pointing at deleted variants are already gone via cascade).
+    await sql`DELETE FROM value_pack_items WHERE pack_product_id = ${id}`;
+    if (valuePack) {
+      let sortOrder = 0;
+      for (const item of packItems) {
+        await sql`
+          INSERT INTO value_pack_items (pack_product_id, item_variant_id, quantity, sort_order)
+          VALUES (${id}, ${item.variantId}, ${item.quantity}, ${sortOrder})
+        `;
+        sortOrder++;
+      }
+    }
+
+    // Materialize derived stock for this pack, then any pack whose items
+    // changed because variants above were edited or removed.
+    if (valuePack) {
+      await recomputePackProduct(id);
+    }
+    await recomputeDependentPacks(submittedVariantIds);
+    for (const packId of packsUsingRemoved) {
+      await recomputePackProduct(packId);
+    }
 
     if (newImages.length > 0 || productImages.length > 0) {
       const existingImages: any[] =
@@ -338,7 +427,16 @@ export async function DELETE(
       }
     }
 
+    // Packs containing this product's variants need their stock recomputed
+    // after the cascade removes their items — capture them first.
+    const ownVariantIds = await variantIdsForProduct(id);
+    const dependentPacks = await packsUsingVariants(ownVariantIds, id);
+
     await sql`DELETE FROM products WHERE id = ${id}`;
+
+    for (const packId of dependentPacks) {
+      await recomputePackProduct(packId);
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

@@ -3,6 +3,11 @@ import { sql } from "@/lib/db";
 import { put } from "@vercel/blob";
 import { validateImageFile, safeImageKey } from "@/lib/fileValidation";
 import { normalizeStockLevel } from "@/lib/stockLimits";
+import {
+  normalizePackItems,
+  recomputePackProduct,
+  type ValuePackItemInput,
+} from "@/lib/valuePack";
 
 export async function GET(request: NextRequest) {
   if (!sql) {
@@ -21,6 +26,7 @@ export async function GET(request: NextRequest) {
       SELECT
         p.id, p.slug, p.name, c.slug as category, c.name as category_name,
         p.short_description, p.full_description,
+        p.value_pack, p.value_pack_sync_stock,
         i.image_url as img,
         coalesce((
           SELECT json_agg(
@@ -41,6 +47,23 @@ export async function GET(request: NextRequest) {
           FROM product_variants v
           WHERE v.product_id = p.id
         ), '[]'::json) as variants,
+        coalesce((
+          SELECT json_agg(
+            json_build_object(
+              'variant_id', vpi.item_variant_id,
+              'quantity', vpi.quantity,
+              'product_name', ip.name,
+              'product_slug', ip.slug,
+              'variant_label', iv.label,
+              'stock_level', iv.stock_level
+            )
+            ORDER BY vpi.sort_order, vpi.id
+          )
+          FROM value_pack_items vpi
+          JOIN product_variants iv ON iv.id = vpi.item_variant_id
+          JOIN products ip ON ip.id = iv.product_id
+          WHERE vpi.pack_product_id = p.id
+        ), '[]'::json) as pack_items,
         coalesce((
           SELECT json_agg(
             json_build_object(
@@ -78,7 +101,7 @@ export async function GET(request: NextRequest) {
       query += ` WHERE ${conditions.join(" AND ")}`;
     }
 
-    query += ` GROUP BY p.id, p.slug, p.name, c.slug, c.name, p.short_description, p.full_description, i.image_url ORDER BY p.name`;
+    query += ` GROUP BY p.id, p.slug, p.name, c.slug, c.name, p.short_description, p.full_description, p.value_pack, p.value_pack_sync_stock, i.image_url ORDER BY p.name`;
 
     const rows = await sql.query(query, params);
 
@@ -172,6 +195,36 @@ export async function POST(request: NextRequest) {
 
     const productId = `prod_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
+    // --- Value pack fields ---
+    const valuePack = formData.get("valuePack") === "true";
+    const valuePackSyncStock = formData.get("valuePackSyncStock") === "true";
+    let packItems: ValuePackItemInput[] = [];
+    if (valuePack) {
+      let parsedItems: unknown = [];
+      try {
+        parsedItems = JSON.parse(
+          (formData.get("valuePackItems") as string) || "[]",
+        );
+      } catch {
+        return NextResponse.json(
+          { error: "Invalid JSON in valuePackItems" },
+          { status: 400 },
+        );
+      }
+      // A pack can't contain its own variants — those ids don't exist yet,
+      // so derive what they WILL be (productId + '-' + form variant id) and
+      // check the submitted items against them.
+      const ownVariantIds = variants.map((v: any) => `${productId}-${v.id}`);
+      const normalized = normalizePackItems(parsedItems, ownVariantIds);
+      if (normalized.error || !normalized.items) {
+        return NextResponse.json(
+          { error: normalized.error || "Invalid pack items" },
+          { status: 400 },
+        );
+      }
+      packItems = normalized.items;
+    }
+
     const uploadedProductImages: Array<{
       image_url: string;
       alt_text: string;
@@ -195,7 +248,8 @@ export async function POST(request: NextRequest) {
     }
 
     await sql`
-      INSERT INTO products (id, name, slug, short_description, full_description, category_id, active)        VALUES (${productId}, ${name}, ${slug}, ${shortDescription}, ${fullDescription}, ${catId}, TRUE)
+      INSERT INTO products (id, name, slug, short_description, full_description, category_id, active, value_pack, value_pack_sync_stock)
+      VALUES (${productId}, ${name}, ${slug}, ${shortDescription}, ${fullDescription}, ${catId}, TRUE, ${valuePack}, ${valuePack ? valuePackSyncStock : false})
     `;
 
     for (const variant of variants) {
@@ -241,6 +295,19 @@ export async function POST(request: NextRequest) {
         INSERT INTO images (product_id, image_url, alt_text, is_primary)
         VALUES (${productId}, ${img.image_url}, ${img.alt_text || name}, ${img.is_primary})
       `;
+    }
+
+    if (valuePack) {
+      let sortOrder = 0;
+      for (const item of packItems) {
+        await sql`
+          INSERT INTO value_pack_items (pack_product_id, item_variant_id, quantity, sort_order)
+          VALUES (${productId}, ${item.variantId}, ${item.quantity}, ${sortOrder})
+        `;
+        sortOrder++;
+      }
+      // Materialize the derived stock level into the pack's own variant(s).
+      await recomputePackProduct(productId);
     }
 
     for (const [attrName, attrValue] of Object.entries(attributes)) {

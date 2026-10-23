@@ -333,6 +333,51 @@ export default function ProductDetailClient({
             ))}
           </div>
 
+          {product.valuePack && (product.packItems?.length || 0) > 0 && (
+            <div className="mb-8">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2.5">
+                What&apos;s in this pack
+              </p>
+              <div className="bg-secondary/40 rounded-2xl border border-border/40 divide-y divide-border/30">
+                {product.packItems!.map((item) => (
+                  <div
+                    key={item.variant_id}
+                    className="flex items-center gap-3 px-4 py-3"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">
+                        {item.product_name}
+                      </p>
+                      {item.variant_label && (
+                        <p className="text-xs text-muted-foreground font-light truncate">
+                          {item.variant_label}
+                        </p>
+                      )}
+                    </div>
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">
+                      ×{item.quantity}
+                    </span>
+                    <span
+                      className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full whitespace-nowrap ${
+                        STOCK_LEVEL_BADGE_CLASSES[
+                          normalizeStockLevel(item.stock_level)
+                        ]
+                      }`}
+                    >
+                      {STOCK_LEVEL_LABELS[normalizeStockLevel(item.stock_level)]}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              {product.valuePackSyncStock && (
+                <p className="text-xs text-muted-foreground font-light mt-2">
+                  Pack stock follows the lowest item — if one item is out of
+                  stock, the pack is out of stock.
+                </p>
+              )}
+            </div>
+          )}
+
           {product.variants.length === 0 ? (
             <div className="bg-muted/40 rounded-2xl p-8 text-center border border-border border-dashed">
               <HelpCircle className="w-8 h-8 text-muted-foreground mx-auto mb-3" />

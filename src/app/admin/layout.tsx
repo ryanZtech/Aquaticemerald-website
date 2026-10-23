@@ -119,7 +119,7 @@ export default async function AdminLayout({
       </aside>
 
       {}
-      <main className="flex-1 p-6 sm:p-10">{children}</main>
+      <main className="flex-1 min-w-0 p-6 sm:p-10">{children}</main>
     </div>
   );
 }

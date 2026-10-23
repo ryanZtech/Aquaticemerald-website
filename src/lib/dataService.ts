@@ -1,5 +1,10 @@
 import { sql } from "./db";
-import { Product, PickupLocation, PickupHour } from "./staticData";
+import {
+  Product,
+  PickupLocation,
+  PickupHour,
+  ValuePackItem,
+} from "./staticData";
 
 export interface Faq {
   id: number;
@@ -46,6 +51,17 @@ function mapDbProduct(row: any): Product {
     }
   }
 
+  let dbPackItems: ValuePackItem[] = [];
+  if (Array.isArray(row.pack_items)) {
+    dbPackItems = row.pack_items;
+  } else if (typeof row.pack_items === "string") {
+    try {
+      dbPackItems = JSON.parse(row.pack_items);
+    } catch {
+      dbPackItems = [];
+    }
+  }
+
   let dbVariantOptions: string[] = [];
   if (Array.isArray(row.variant_options)) {
     dbVariantOptions = row.variant_options.filter((value: unknown): value is string => typeof value === "string");
@@ -73,6 +89,9 @@ function mapDbProduct(row: any): Product {
     img: row.img || "",
     images: dbImages,
     variantOptions: dbVariantOptions,
+    valuePack: row.value_pack === true || row.value_pack === "t",
+    valuePackSyncStock: row.value_pack_sync_stock === true || row.value_pack_sync_stock === "t",
+    packItems: dbPackItems,
     variants: dbVariants.map((v: any) => ({
       id: v.id,
       label: v.label,
@@ -96,6 +115,7 @@ export async function getProducts(category?: string): Promise<Product[]> {
     const rows = await sql`
       SELECT
         p.id, p.slug, p.name, c.slug as category, p.full_description as description,
+        p.value_pack, p.value_pack_sync_stock,
         i.image_url as img,
         (SELECT value FROM product_attribute_values pav JOIN product_attributes pa ON pav.attribute_id = pa.id WHERE pav.product_id = p.id AND pa.name = 'Care Level' LIMIT 1) as care_level,
         (SELECT value FROM product_attribute_values pav JOIN product_attributes pa ON pav.attribute_id = pa.id WHERE pav.product_id = p.id AND pa.name = 'Light' LIMIT 1) as light,
@@ -124,6 +144,23 @@ export async function getProducts(category?: string): Promise<Product[]> {
         coalesce((
           SELECT json_agg(
             json_build_object(
+              'variant_id', vpi.item_variant_id,
+              'quantity', vpi.quantity,
+              'product_name', ip.name,
+              'product_slug', ip.slug,
+              'variant_label', iv.label,
+              'stock_level', iv.stock_level
+            )
+            ORDER BY vpi.sort_order, vpi.id
+          )
+          FROM value_pack_items vpi
+          JOIN product_variants iv ON iv.id = vpi.item_variant_id
+          JOIN products ip ON ip.id = iv.product_id
+          WHERE vpi.pack_product_id = p.id
+        ), '[]'::json) as pack_items,
+        coalesce((
+          SELECT json_agg(
+            json_build_object(
               'id', img.id,
               'image_url', img.image_url,
               'alt_text', img.alt_text,
@@ -140,7 +177,7 @@ export async function getProducts(category?: string): Promise<Product[]> {
       WHERE p.active = TRUE
         AND (c.id IS NULL OR c.active = TRUE)
         AND (${!category || category === "all" ? true : false} OR c.slug = ${category})
-      GROUP BY p.id, p.slug, p.name, c.slug, p.full_description, i.image_url
+      GROUP BY p.id, p.slug, p.name, c.slug, p.full_description, p.value_pack, p.value_pack_sync_stock, i.image_url
     `;
 
     const allProducts = rows.map(mapDbProduct);
@@ -161,6 +198,7 @@ export async function getProductBySlug(slug: string): Promise<Product | null> {
     const rows = await sql`
       SELECT
         p.id, p.slug, p.name, c.slug as category, p.full_description as description,
+        p.value_pack, p.value_pack_sync_stock,
         i.image_url as img,
         (SELECT value FROM product_attribute_values pav JOIN product_attributes pa ON pav.attribute_id = pa.id WHERE pav.product_id = p.id AND pa.name = 'Care Level' LIMIT 1) as care_level,
         (SELECT value FROM product_attribute_values pav JOIN product_attributes pa ON pav.attribute_id = pa.id WHERE pav.product_id = p.id AND pa.name = 'Light' LIMIT 1) as light,
@@ -189,6 +227,23 @@ export async function getProductBySlug(slug: string): Promise<Product | null> {
         coalesce((
           SELECT json_agg(
             json_build_object(
+              'variant_id', vpi.item_variant_id,
+              'quantity', vpi.quantity,
+              'product_name', ip.name,
+              'product_slug', ip.slug,
+              'variant_label', iv.label,
+              'stock_level', iv.stock_level
+            )
+            ORDER BY vpi.sort_order, vpi.id
+          )
+          FROM value_pack_items vpi
+          JOIN product_variants iv ON iv.id = vpi.item_variant_id
+          JOIN products ip ON ip.id = iv.product_id
+          WHERE vpi.pack_product_id = p.id
+        ), '[]'::json) as pack_items,
+        coalesce((
+          SELECT json_agg(
+            json_build_object(
               'id', img.id,
               'image_url', img.image_url,
               'alt_text', img.alt_text,
@@ -205,7 +260,7 @@ export async function getProductBySlug(slug: string): Promise<Product | null> {
       WHERE (p.slug = ${slug} OR p.id = ${slug})
         AND p.active = TRUE
         AND (c.id IS NULL OR c.active = TRUE)
-      GROUP BY p.id, p.slug, p.name, c.slug, p.full_description, i.image_url
+      GROUP BY p.id, p.slug, p.name, c.slug, p.full_description, p.value_pack, p.value_pack_sync_stock, i.image_url
       LIMIT 1
     `;
 

@@ -289,7 +289,7 @@ export default function LocationsClient() {
                 onChange={(e) => setDetail(e.target.value)}
               />
             </div>
-            <label className="flex items-center justify-between rounded-xl border border-border px-4 py-3 text-sm cursor-pointer hover:bg-accent transition-colors">
+            <div className="flex items-center justify-between rounded-xl border border-border px-4 py-3 text-sm">
               <span>
                 <span className="font-medium block">Visible at checkout</span>
                 <span className="text-xs text-muted-foreground font-light">
@@ -299,9 +299,9 @@ export default function LocationsClient() {
               <Switch
                 checked={active}
                 onCheckedChange={setActive}
-                className="cursor-pointer"
+                aria-label="Visible at checkout"
               />
-            </label>
+            </div>
           </div>
           <DialogFooter>
             <Button
