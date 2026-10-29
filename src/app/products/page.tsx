@@ -3,6 +3,7 @@ import { getProducts } from "@/lib/dataService";
 import ProductsClient from "@/components/ProductsClient";
 
 export const revalidate = 60;
+export const metadata = { title: "Aquarium Products", description: "Browse freshwater plants, shrimp and snails.", alternates: { canonical: "/products" } };
 
 export default async function ProductsPage() {
   const products = await getProducts();

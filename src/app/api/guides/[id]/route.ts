@@ -12,10 +12,11 @@ export async function GET(
 
   try {
     const { id } = await params;
+    const isAdmin = (await requireAdmin()) === null;
     const rows = await sql`
       SELECT id, title, slug, body, display_order, active, created_at, updated_at
       FROM guides
-      WHERE id = ${parseInt(id)}
+      WHERE id = ${parseInt(id)} AND (${isAdmin} OR active = TRUE)
     `;
 
     if (rows.length === 0) {

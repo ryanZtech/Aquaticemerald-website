@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
+import { requireAdmin } from "@/lib/adminAuth";
 
 export async function GET() {
   if (!sql) {
@@ -7,9 +8,11 @@ export async function GET() {
   }
 
   try {
+    const isAdmin = (await requireAdmin()) === null;
     const rows = await sql`
       SELECT id, title, slug, body, display_order, active, created_at, updated_at
       FROM faqs
+      WHERE ${isAdmin} OR active = TRUE
       ORDER BY display_order ASC, created_at DESC
     `;
     return NextResponse.json(rows);

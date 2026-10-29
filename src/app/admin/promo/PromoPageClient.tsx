@@ -63,6 +63,11 @@ interface Product {
   slug: string;
 }
 
+function toLocalDateTime(value: string | Date): string {
+  const date = new Date(value);
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+}
+
 export default function PromoPageClient() {
   const [activeTab, setActiveTab] = useState("codes");
 
@@ -77,7 +82,7 @@ export default function PromoPageClient() {
     discount_value: "",
     free_product_id: "",
     free_variant_id: "",
-    valid_from: new Date().toISOString().slice(0, 16),
+    valid_from: toLocalDateTime(new Date()),
     valid_until: "",
     max_uses: "",
     active: true,
@@ -142,6 +147,7 @@ export default function PromoPageClient() {
     try {
       const res = await fetch("/api/discount-codes");
       const data = await res.json();
+      if (!res.ok || !Array.isArray(data)) throw new Error("Failed to load discount codes");
       setDiscountCodes(data);
     } catch (error) {
       console.error("Error fetching discount codes:", error);
@@ -153,6 +159,7 @@ export default function PromoPageClient() {
     try {
       const res = await fetch("/api/auto-discounts");
       const data = await res.json();
+      if (!res.ok || !Array.isArray(data)) throw new Error("Failed to load auto discounts");
       setAutoDiscounts(data);
     } catch (error) {
       console.error("Error fetching auto discounts:", error);
@@ -164,6 +171,7 @@ export default function PromoPageClient() {
     try {
       const res = await fetch("/api/promo-popups/admin");
       const data = await res.json();
+      if (!res.ok || !Array.isArray(data)) throw new Error("Failed to load promo popups");
       setPromoPopups(data);
     } catch (error) {
       console.error("Error fetching promo popups:", error);
@@ -181,7 +189,7 @@ export default function PromoPageClient() {
       discount_value: "",
       free_product_id: "",
       free_variant_id: "",
-      valid_from: new Date().toISOString().slice(0, 16),
+      valid_from: toLocalDateTime(new Date()),
       valid_until: "",
       max_uses: "",
       active: true,
@@ -198,8 +206,8 @@ export default function PromoPageClient() {
       discount_value: code.discount_value?.toString() || "",
       free_product_id: code.free_product_id?.toString() || "",
       free_variant_id: code.free_variant_id || "",
-      valid_from: new Date(code.valid_from).toISOString().slice(0, 16),
-      valid_until: code.valid_until ? new Date(code.valid_until).toISOString().slice(0, 16) : "",
+      valid_from: toLocalDateTime(code.valid_from),
+      valid_until: code.valid_until ? toLocalDateTime(code.valid_until) : "",
       max_uses: code.max_uses?.toString() || "",
       active: code.active,
     });
@@ -213,6 +221,8 @@ export default function PromoPageClient() {
 
       const payload = {
         ...codeForm,
+        valid_from: new Date(codeForm.valid_from).toISOString(),
+        valid_until: codeForm.valid_until ? new Date(codeForm.valid_until).toISOString() : null,
         discount_value: codeForm.discount_value ? parseFloat(codeForm.discount_value) : null,
         free_product_id: codeForm.free_product_id || null,
         // free_variant_id is product_variants.id, a TEXT (slug-style) key —
@@ -262,7 +272,7 @@ export default function PromoPageClient() {
   };
 
   const copyPromoLink = (code: string) => {
-    const url = `${window.location.origin}?promo=${code}`;
+    const url = `${window.location.origin}/checkout?promo=${encodeURIComponent(code)}`;
     navigator.clipboard.writeText(url);
     toast.success("Promo link copied to clipboard!");
   };

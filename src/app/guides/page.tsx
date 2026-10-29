@@ -2,6 +2,7 @@ import { getGuides } from "@/lib/dataService";
 import Accordion from "@/components/Accordion";
 
 export const revalidate = 60;
+export const metadata = { title: "Care Guides", description: "Care guides for freshwater aquariums.", alternates: { canonical: "/guides" } };
 
 export default async function GuidesPage() {
   const guides = await getGuides();

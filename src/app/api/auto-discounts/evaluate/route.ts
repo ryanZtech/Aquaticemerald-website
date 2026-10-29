@@ -7,7 +7,12 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const body = await request.json().catch(() => ({}));
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
+    }
 
     // Public endpoint, untrusted body: coerce rather than trust. A
     // non-array cart or non-numeric total would otherwise throw mid-query.
@@ -34,29 +39,17 @@ export async function POST(request: NextRequest) {
         tp.name as trigger_product_name,
         fp.name as effect_free_product_name,
         fp.slug as effect_free_product_slug,
-        COALESCE(
-          ad.effect_free_variant_id::text,
-          (
-            SELECT v.id::text
-            FROM product_variants v
-            WHERE v.product_id::text = fp.id::text AND v.active = TRUE
-            ORDER BY v.price ASC
-            LIMIT 1
-          )
-        ) as resolved_free_variant_id,
-        COALESCE(
-          (SELECT v.label FROM product_variants v WHERE v.id::text = ad.effect_free_variant_id::text AND v.active = TRUE),
-          (
-            SELECT v.label
-            FROM product_variants v
-            WHERE v.product_id = fp.id
-            ORDER BY v.price ASC
-            LIMIT 1
-          )
-        ) as resolved_free_variant_label
+        reward.id as resolved_free_variant_id,
+        reward.label as resolved_free_variant_label
       FROM auto_discounts ad
       LEFT JOIN products tp ON tp.id::text = ad.trigger_product_id::text
-      LEFT JOIN products fp ON fp.id::text = ad.effect_free_product_id::text
+      LEFT JOIN products fp ON fp.id::text = ad.effect_free_product_id::text AND fp.active = TRUE
+      LEFT JOIN LATERAL (
+        SELECT v.id, v.label FROM product_variants v
+        WHERE v.product_id = fp.id AND v.active = TRUE AND v.stock_level != 'none'
+        ORDER BY (v.id::text = ad.effect_free_variant_id::text) DESC NULLS LAST, v.price ASC, v.id ASC
+        LIMIT 1
+      ) reward ON TRUE
       WHERE ad.active = TRUE
       ORDER BY ad.priority DESC
     `;
@@ -73,10 +66,10 @@ export async function POST(request: NextRequest) {
       if (discount.trigger_type === "spend_amount") {
         triggerMet = cartTotal >= (discount.trigger_spend_amount || 0);
       } else if (discount.trigger_type === "item_in_cart") {
-        triggerMet = cart.some((item: any) => String(item?.productId || "") === String(discount.trigger_product_id || ""));
+        triggerMet = cart.some((item: any) => String(item?.productId || "") === String(discount.trigger_product_id || "") && (!discount.trigger_variant_id || String(item?.variantId) === String(discount.trigger_variant_id)));
       } else if (discount.trigger_type === "both") {
         const spendMet = cartTotal >= (discount.trigger_spend_amount || 0);
-        const itemMet = cart.some((item: any) => String(item?.productId || "") === String(discount.trigger_product_id || ""));
+        const itemMet = cart.some((item: any) => String(item?.productId || "") === String(discount.trigger_product_id || "") && (!discount.trigger_variant_id || String(item?.variantId) === String(discount.trigger_variant_id)));
         triggerMet = spendMet && itemMet;
       }
 
@@ -88,8 +81,12 @@ export async function POST(request: NextRequest) {
         if (discount.effect_type === "fixed_amount") {
           discountAmount = Math.min(cartTotal, Math.max(0, Number(discount.effect_value) || 0));
         } else if (discount.effect_type === "percentage") {
-          discountAmount = Math.min(cartTotal, cartTotal * ((Number(discount.effect_value) || 0) / 100));
+          // Match the order route's clamp so a legacy/out-of-range rule
+          // cannot promise a different discount than checkout applies.
+          const pct = Math.max(0, Math.min(100, Number(discount.effect_value) || 0));
+          discountAmount = Math.min(cartTotal, cartTotal * (pct / 100));
         } else if (discount.effect_type === "free_item" && discount.effect_free_product_id) {
+          if (!discount.resolved_free_variant_id) continue;
           freeItem = {
             productId: discount.effect_free_product_id,
             productName: discount.effect_free_product_name,

@@ -136,7 +136,7 @@ export async function getProducts(category?: string): Promise<Product[]> {
                 LIMIT 1
               )
             )
-            ORDER BY v.label
+            ORDER BY v.sort_order, v.label, v.id
           )
           FROM product_variants v
           WHERE v.product_id = p.id AND v.active = TRUE
@@ -190,8 +190,7 @@ export async function getProducts(category?: string): Promise<Product[]> {
 
 export async function getProductBySlug(slug: string): Promise<Product | null> {
   if (!sql) {
-    console.error("Neon Database: DATABASE_URL is missing. No data available.");
-    return null;
+    throw new Error("Database not configured");
   }
 
   try {
@@ -219,7 +218,7 @@ export async function getProductBySlug(slug: string): Promise<Product | null> {
                 LIMIT 1
               )
             )
-            ORDER BY v.label
+            ORDER BY v.sort_order, v.label, v.id
           )
           FROM product_variants v
           WHERE v.product_id = p.id AND v.active = TRUE
@@ -271,7 +270,7 @@ export async function getProductBySlug(slug: string): Promise<Product | null> {
       `Neon Database query failed for product slug ${slug}:`,
       error,
     );
-    return null;
+    throw error;
   }
 }
 
@@ -309,12 +308,14 @@ export async function getHours(): Promise<PickupHour[]> {
   try {
     const rows = await sql`
       SELECT
-        weekday,
-        MIN(start_time)::text || ' – ' || MAX(end_time)::text as time_range
-      FROM weekly_availability_rules
-      WHERE active = TRUE
-      GROUP BY weekday
-      ORDER BY weekday ASC
+        r.weekday,
+        MIN(r.start_time)::text || ' – ' || MAX(r.end_time)::text as time_range
+      FROM weekly_availability_rules r
+      JOIN pickup_locations l
+        ON l.id = r.pickup_location_id AND l.active = TRUE
+      WHERE r.active = TRUE
+      GROUP BY r.weekday
+      ORDER BY r.weekday ASC
     `;
 
     const dayMap: Record<number, string> = {
@@ -338,6 +339,24 @@ export async function getHours(): Promise<PickupHour[]> {
   }
 }
 
+export async function hasAvailablePromoCodes(): Promise<boolean> {
+  if (!sql) return false;
+  try {
+    const rows = await sql`
+      SELECT EXISTS (
+        SELECT 1 FROM discount_codes dc
+        WHERE dc.active = TRUE AND dc.valid_from <= CURRENT_TIMESTAMP
+          AND (dc.valid_until IS NULL OR dc.valid_until >= CURRENT_TIMESTAMP)
+          AND (dc.max_uses IS NULL OR (SELECT COUNT(*) FROM orders o WHERE o.promo_code = dc.code) < dc.max_uses)
+      ) AS available
+    `;
+    return rows[0]?.available === true;
+  } catch (error) {
+    console.error("Failed to check promo availability:", error);
+    return false;
+  }
+}
+
 export async function getStoreSettings(): Promise<Record<string, string>> {
   if (!sql) return {};
   try {
@@ -346,6 +365,40 @@ export async function getStoreSettings(): Promise<Record<string, string>> {
   } catch (error) {
     console.error("Neon Database query failed for store settings:", error);
     return {};
+  }
+}
+
+export interface GalleryItem {
+  id: number;
+  title: string;
+  description: string;
+  image_url: string;
+  created_at: string;
+}
+
+export async function getGalleryItems(): Promise<GalleryItem[]> {
+  if (!sql) {
+    console.error("Neon Database: DATABASE_URL is missing. No data available.");
+    return [];
+  }
+
+  try {
+    const rows = await sql`
+      SELECT id, title, description, image_url, created_at
+      FROM gallery_items
+      ORDER BY created_at DESC
+    `;
+
+    return rows.map((row: any) => ({
+      id: Number(row.id),
+      title: row.title,
+      description: row.description || "",
+      image_url: row.image_url,
+      created_at: row.created_at,
+    }));
+  } catch (error) {
+    console.error("Neon Database query failed for gallery:", error);
+    return [];
   }
 }
 
@@ -409,9 +462,17 @@ export async function getFaqs(): Promise<Faq[]> {
   }
 }
 
+function normalizeWhatsApp(value: string | undefined | null): string {
+  let val = String(value || "").replace(/\D/g, "");
+  if (val.startsWith("0")) val = "61" + val.substring(1);
+  return val;
+}
+
 export async function getSellerWhatsApp(): Promise<string> {
+  // Match the order route's fallback: a deployment may configure the number
+  // in SELLER_WHATSAPP without ever writing it to store_settings.
   if (!sql) {
-    return "";
+    return normalizeWhatsApp(process.env.SELLER_WHATSAPP);
   }
 
   try {
@@ -422,15 +483,9 @@ export async function getSellerWhatsApp(): Promise<string> {
       LIMIT 1
     `;
 
-    if (rows.length === 0) return "";
-    let val = String(rows[0].value || "").replace(/\D/g, "");
-    
-    if (val.startsWith("0")) {
-      val = "61" + val.substring(1);
-    }
-    return val;
+    return normalizeWhatsApp(rows[0]?.value || process.env.SELLER_WHATSAPP);
   } catch (error) {
     console.error("Neon Database query failed for WhatsApp setting:", error);
-    return "";
+    return normalizeWhatsApp(process.env.SELLER_WHATSAPP);
   }
 }

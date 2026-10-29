@@ -2,6 +2,7 @@ import { getFaqs } from "@/lib/dataService";
 import Accordion from "@/components/Accordion";
 
 export const revalidate = 60;
+export const metadata = { title: "FAQ", description: "Answers about Aquatic Emerald products and ordering.", alternates: { canonical: "/faq" } };
 
 export default async function FaqPage() {
   const faqs = await getFaqs();

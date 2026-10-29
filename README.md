@@ -1,6 +1,6 @@
 # Aquatic Emerald Website
 
-A full-stack e-commerce platform for ordering aquatic products, built with Next.js, React, TypeScript, and Tailwind CSS. Features include product management, order tracking, promotional codes, customer FAQ, and admin dashboard.
+A full-stack e-commerce platform for ordering aquatic products, built with Next.js, React, TypeScript, and Tailwind CSS. Features include product management, order management, promotional codes, customer FAQ, and admin dashboard.
 
 ## Overview
 
@@ -26,7 +26,6 @@ Aquatic Emerald is a modern, serverless e-commerce solution designed to manage p
 - **Shopping Cart**: Add, update, and manage cart items
 - **Checkout**: Secure order placement with address and contact info
 - **Discount Codes**: Apply promo codes and auto-discounts
-- **Order Tracking**: View order status and history
 - **FAQ Section**: Browse frequently asked questions
 - **Guides**: Access product guides and care instructions
 
@@ -43,7 +42,6 @@ Aquatic Emerald is a modern, serverless e-commerce solution designed to manage p
   - Business hours/times
 - **Locations**: Manage multiple store locations
 - **Settings**: Configure business settings
-- **Reports**: View sales data and analytics
 
 ## Project Structure
 
@@ -72,7 +70,7 @@ src/
 │   │   └── [other endpoints]
 │   ├── checkout/         # Checkout pages
 │   ├── faq/              # Customer FAQ
-│   └── shop/             # Product shop pages
+│   └── products/         # Product catalog pages
 ├── components/           # Reusable React components
 ├── lib/                  # Utilities and services
 │   ├── dataService.ts    # Database queries
@@ -113,11 +111,6 @@ src/
 - **Auto-Discounts**: Rule-based discounts (e.g., 10% off on orders over $50)
 - Discount validation and application in checkout
 
-### Analytics
-- Sales dashboard with charts
-- Order trends and revenue tracking
-- Customer insights
-
 ## API Endpoints
 
 ### Products
@@ -129,7 +122,6 @@ src/
 ### Orders
 - `GET /api/orders` - List orders (admin)
 - `POST /api/orders` - Create order (customer)
-- `GET /api/orders/[id]` - Get order details
 - `PUT /api/orders/[id]` - Update order (admin)
 
 ### Discount Codes

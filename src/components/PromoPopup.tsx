@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import { X, Percent } from "lucide-react";
 import Link from "next/link";
-import { motion, AnimatePresence } from "motion/react";
+import { motion } from "motion/react";
+import * as Dialog from "@radix-ui/react-dialog";
 
 interface PopupData {
   id: number;
@@ -109,28 +110,11 @@ export default function PromoPopup() {
         </motion.button>
       )}
 
-      {/* Popup modal */}
-      <AnimatePresence>
-        {showPopup && (
-          <>
-            {/* Backdrop */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={handleDismiss}
-              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
-            />
-
-            {/* Popup content */}
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              transition={{ type: "spring", damping: 25 }}
-              className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[90vw] max-w-3xl"
-            >
-              <div className="bg-card border-2 border-border rounded-3xl overflow-hidden shadow-2xl">
+      <Dialog.Root open={showPopup} onOpenChange={(open) => { if (!open) handleDismiss(); }}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50" />
+          <Dialog.Content aria-describedby={undefined} className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[90vw] max-w-3xl">
+              <div className="bg-card border-2 border-border rounded-3xl overflow-x-hidden overflow-y-auto max-h-[90dvh] shadow-2xl">
                 <button
                   onClick={handleDismiss}
                   className="absolute top-4 right-4 z-10 w-8 h-8 rounded-full bg-black/50 hover:bg-black/70 text-white flex items-center justify-center transition-colors cursor-pointer"
@@ -139,42 +123,38 @@ export default function PromoPopup() {
                   <X className="w-5 h-5" />
                 </button>
 
-                <div className="grid md:grid-cols-2">
-                  {/* Image side */}
-                  {popup.image_url && (
-                    <div className="relative h-64 md:h-auto bg-muted">
-                      <img
-                        src={popup.image_url}
-                        alt={popup.heading}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                  )}
-
-                  {/* Content side */}
-                  <div className="p-8 md:p-10 flex flex-col justify-center">
-                    <h2 className="font-serif text-3xl md:text-4xl font-bold mb-4">
-                      {popup.heading}
-                    </h2>
-                    {popup.body_text && (
-                      <p className="text-muted-foreground mb-6 text-base leading-relaxed">
-                        {popup.body_text}
-                      </p>
-                    )}
-                    <Link
-                      href={buttonUrl}
-                      onClick={handleDismiss}
-                      className="inline-block px-8 py-4 bg-primary text-primary-foreground rounded-full font-semibold text-center hover:opacity-90 transition-opacity duration-200"
-                    >
-                      {popup.button_text}
-                    </Link>
+                {/* Image spans the entire popup width, above the content */}
+                {popup.image_url && (
+                  <div className="relative w-full h-56 md:h-72 bg-muted">
+                    <img
+                      src={popup.image_url}
+                      alt={popup.heading}
+                      className="w-full h-full object-cover"
+                    />
                   </div>
+                )}
+
+                <div className="p-8 md:p-10 flex flex-col justify-center">
+                  <Dialog.Title className="font-serif text-3xl md:text-4xl font-bold mb-4">
+                    {popup.heading}
+                  </Dialog.Title>
+                  {popup.body_text && (
+                    <p className="text-muted-foreground mb-6 text-base leading-relaxed">
+                      {popup.body_text}
+                    </p>
+                  )}
+                  <Link
+                    href={buttonUrl}
+                    onClick={handleDismiss}
+                    className="inline-block px-8 py-4 bg-primary text-primary-foreground rounded-full font-semibold text-center hover:opacity-90 transition-opacity duration-200"
+                  >
+                    {popup.button_text}
+                  </Link>
                 </div>
               </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
     </>
   );
 }

@@ -16,6 +16,10 @@ export async function PUT(
 
   try {
     const { id } = await params;
+    const popupId = Number(id);
+    if (!Number.isInteger(popupId) || popupId < 1) {
+      return NextResponse.json({ error: "Invalid promo popup id" }, { status: 400 });
+    }
     const body = await request.json();
     const {
       name,
@@ -27,6 +31,14 @@ export async function PUT(
       delay_seconds,
       active
     } = body;
+
+    const existing = await sql`
+      SELECT image_url FROM promo_popups WHERE id = ${popupId}
+    `;
+    if (existing.length === 0) {
+      return NextResponse.json({ error: "Promo popup not found" }, { status: 404 });
+    }
+    const previousImageUrl = String(existing[0].image_url || "");
 
     const result = await sql`
       UPDATE promo_popups
@@ -40,12 +52,22 @@ export async function PUT(
         delay_seconds = ${delay_seconds || 3},
         active = ${active},
         updated_at = CURRENT_TIMESTAMP
-      WHERE id = ${parseInt(id)}
+      WHERE id = ${popupId}
       RETURNING *
     `;
 
     if (result.length === 0) {
       return NextResponse.json({ error: "Promo popup not found" }, { status: 404 });
+    }
+
+    // Only remove the replaced blob after the row no longer references it.
+    const nextImageUrl = String(result[0].image_url || "");
+    if (previousImageUrl && previousImageUrl !== nextImageUrl && previousImageUrl.includes("vercel-storage.com")) {
+      try {
+        await del(previousImageUrl);
+      } catch (blobError) {
+        console.error("Failed to delete replaced promo image:", blobError);
+      }
     }
 
     return NextResponse.json(result[0]);
@@ -68,31 +90,32 @@ export async function DELETE(
 
   try {
     const { id } = await params;
-    
-    // Fetch the popup to get image_url for deletion
-    const popup = await sql`
-      SELECT image_url FROM promo_popups WHERE id = ${parseInt(id)}
+    const popupId = Number(id);
+    if (!Number.isInteger(popupId) || popupId < 1) {
+      return NextResponse.json({ error: "Invalid promo popup id" }, { status: 400 });
+    }
+
+    // Delete the row first. Deleting the blob before this succeeds would
+    // leave a popup in the database pointing at a missing image if the
+    // delete failed.
+    const deleted = await sql`
+      DELETE FROM promo_popups
+      WHERE id = ${popupId}
+      RETURNING image_url
     `;
 
-    if (popup.length === 0) {
+    if (deleted.length === 0) {
       return NextResponse.json({ error: "Promo popup not found" }, { status: 404 });
     }
 
-    // Delete from Vercel Blob if image exists
-    if (popup[0].image_url) {
+    // Blob cleanup is best-effort once the row is gone.
+    if (deleted[0].image_url) {
       try {
-        await del(popup[0].image_url);
+        await del(deleted[0].image_url);
       } catch (blobError) {
         console.error("Failed to delete blob image:", blobError);
-        // Continue with DB deletion even if blob delete fails
       }
     }
-
-    // Delete from database
-    await sql`
-      DELETE FROM promo_popups
-      WHERE id = ${parseInt(id)}
-    `;
 
     return NextResponse.json({ success: true });
   } catch (error) {

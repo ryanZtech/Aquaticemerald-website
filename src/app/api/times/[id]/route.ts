@@ -75,7 +75,7 @@ export async function PUT(
 
     const result = await sql`
       UPDATE weekly_availability_rules
-      SET pickup_location_id = ${locId}, weekday = ${wd}, start_time = ${start_time}, end_time = ${end_time}, slot_duration_minutes = ${slotMin}, max_pickups_per_slot = ${maxPick}, active = ${active}
+      SET pickup_location_id = ${locId}, weekday = ${wd}, start_time = ${start_time}, end_time = ${end_time}, slot_duration_minutes = ${slotMin}, max_pickups_per_slot = ${maxPick}, active = ${active ?? true}
       WHERE id = ${parseInt(id)}
       RETURNING *
     `;

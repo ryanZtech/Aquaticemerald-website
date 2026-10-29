@@ -13,7 +13,10 @@ export async function GET() {
   try {
     const rows = await sql`SELECT key, value FROM store_settings`;
     const settings = Object.fromEntries(rows.map((r) => [r.key, r.value]));
-    return NextResponse.json(settings);
+    return NextResponse.json({ ...settings, turnstile_health: {
+      siteKeyConfigured: Boolean(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim()),
+      secretKeyConfigured: Boolean(process.env.TURNSTILE_SECRET_KEY?.trim()),
+    } }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (error) {
     console.error("Error fetching settings from database:", error);
     return NextResponse.json({ error: "Failed to fetch settings" }, { status: 500 });

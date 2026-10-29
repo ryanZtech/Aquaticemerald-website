@@ -5,6 +5,7 @@ import ContactForm from "@/components/ContactForm";
 import type { ComponentType, SVGProps } from "react";
 
 export const revalidate = 60;
+export const metadata = { title: "Contact", description: "Get in touch with Aquatic Emerald.", alternates: { canonical: "/contact" } };
 
 export default async function ContactPage() {
   const whatsapp = await getSellerWhatsApp();

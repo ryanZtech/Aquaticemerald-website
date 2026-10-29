@@ -3,7 +3,7 @@
 import { cookies, headers } from "next/headers";
 import { compareSync } from "bcrypt-ts";
 import { SignJWT } from "jose";
-import { sql } from "@/lib/db";
+import { pool } from "@/lib/db";
 import { getClientIp } from "@/lib/rateLimit";
 import { sanitizeEnv } from "@/lib/env";
 
@@ -22,40 +22,40 @@ export async function loginAdmin(formData: FormData) {
     };
   }
 
+  if (!password || typeof password !== "string") return { error: "Invalid password" };
+  let isMatch = false;
+
   // 1. Rate Limiting (3 tries per 5 minutes)
-  if (!sql) {
-    console.error("Database connection unavailable for rate limiting.");
-  } else {
+  if (!pool) return { error: "Login is temporarily unavailable. Please try again later." };
+  try {
+    const ip = getClientIp(await headers());
+    const client = await pool.connect();
     try {
-      const headerList = await headers();
-      const ip = getClientIp(headerList);
-
-      // Clean up old attempts (> 5 mins)
-      await sql`DELETE FROM login_attempts WHERE attempted_at < NOW() - INTERVAL '5 minutes'`;
-
-      // Count recent attempts
-      const attemptsResult =
-        await sql`SELECT count(*) FROM login_attempts WHERE ip_address = ${ip}`;
-      const attemptCount = parseInt(attemptsResult[0].count);
-
-      if (attemptCount >= 3) {
+      await client.query("BEGIN");
+      await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`admin-login:${ip}`]);
+      await client.query("DELETE FROM login_attempts WHERE ip_address = $1 AND attempted_at < NOW() - INTERVAL '5 minutes'", [ip]);
+      const attempts = await client.query("SELECT count(*) FROM login_attempts WHERE ip_address = $1 AND attempted_at >= NOW() - INTERVAL '5 minutes'", [ip]);
+      if (Number(attempts.rows[0].count) >= 3) {
+        await client.query("ROLLBACK");
         return { error: "Too many attempts. Please wait 5 minutes." };
       }
-
-      // Log this attempt
-      await sql`INSERT INTO login_attempts (ip_address) VALUES (${ip})`;
-    } catch (err) {
-      console.error("Rate limiting check failed:", err);
+      isMatch = compareSync(password, expectedHash);
+      if (isMatch) await client.query("DELETE FROM login_attempts WHERE ip_address = $1", [ip]);
+      else await client.query("INSERT INTO login_attempts (ip_address) VALUES ($1)", [ip]);
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => {});
+      throw error;
+    } finally {
+      client.release();
     }
-  }
-
-  if (!password || typeof password !== "string") {
-    return { error: "Invalid password" };
+  } catch (err) {
+    console.error("Rate limiting check failed:", err);
+    return { error: "Login is temporarily unavailable. Please try again later." };
   }
 
   try {
-    // 2. Verify Password
-    const isMatch = compareSync(password, expectedHash);
+    // 2. Password verification is performed while holding the rate-limit lock.
     if (!isMatch) {
       return { error: "Invalid password" };
     }

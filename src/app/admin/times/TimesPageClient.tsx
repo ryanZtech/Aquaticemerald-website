@@ -56,6 +56,7 @@ export default function TimesPageClient() {
     try {
       const response = await fetch("/api/times");
       const data = await response.json();
+      if (!response.ok || !Array.isArray(data)) throw new Error("Failed to load time rules");
       setRules(data);
     } catch (error) {
       console.error("Error fetching time rules:", error);
@@ -69,6 +70,7 @@ export default function TimesPageClient() {
     try {
       const response = await fetch("/api/locations");
       const data = await response.json();
+      if (!response.ok || !Array.isArray(data)) throw new Error("Failed to load locations");
       setLocations(data);
     } catch (error) {
       console.error("Error fetching locations:", error);
@@ -422,7 +424,7 @@ export default function TimesPageClient() {
               </Select>
             </div>
             <div>
-              <label className="text-sm font-medium mb-2 block">Days</label>
+              <label className="text-sm font-medium mb-2 block">{editingRule ? "Day (select one)" : "Days"}</label>
               <div className="grid grid-cols-4 gap-2">
                 {WEEKDAYS.map((day, idx) => (
                   <div key={idx} className="flex items-center gap-2">
@@ -433,7 +435,7 @@ export default function TimesPageClient() {
                         setFormData((prev) => ({
                           ...prev,
                           weekdays: checked
-                            ? [...prev.weekdays, idx]
+                            ? (editingRule ? [idx] : [...prev.weekdays, idx])
                             : prev.weekdays.filter((d) => d !== idx),
                         }));
                       }}

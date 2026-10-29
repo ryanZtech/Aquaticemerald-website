@@ -118,6 +118,7 @@ export default function GuidesPageClient() {
     try {
       const response = await fetch("/api/guides");
       const data = await response.json();
+      if (!response.ok || !Array.isArray(data)) throw new Error("Failed to load guides");
       setGuides(data);
     } catch (error) {
       console.error("Error fetching guides:", error);
@@ -321,7 +322,7 @@ export default function GuidesPageClient() {
                   setFormData((prev) => ({
                     ...prev,
                     title,
-                    slug: prev.slug || generateSlug(title),
+                    slug: !prev.slug || prev.slug === generateSlug(prev.title) ? generateSlug(title) : prev.slug,
                   }));
                 }}
                 placeholder="Guide title"

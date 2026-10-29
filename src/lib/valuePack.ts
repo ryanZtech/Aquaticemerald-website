@@ -1,4 +1,4 @@
-import { sql } from "./db";
+import { sql as defaultSql } from "./db";
 import { deriveStockLevel, type StockLevel } from "./stockLimits";
 
 export { deriveStockLevel };
@@ -32,6 +32,7 @@ export interface ValuePackItemInput {
  */
 export async function recomputePackProduct(
   packProductId: string,
+  sql = defaultSql,
 ): Promise<StockLevel | null> {
   if (!sql) return null;
 
@@ -68,16 +69,16 @@ export async function recomputePackProduct(
  */
 export async function recomputeDependentPacks(
   variantIds: string[],
+  sql = defaultSql,
 ): Promise<void> {
   if (!sql || variantIds.length === 0) return;
 
-  // A pack may itself be an item of another pack, so propagate level by
-  // level: recompute the packs containing the changed variants, and if a
-  // pack's derived level actually moved, push ITS variants into the next
-  // round. The loop is depth-capped (packs can't nest meaningfully deeper
-  // than a level or two) which also breaks any accidental cycle.
+  // Propagate through nested packs, allowing deeper chains while bounding
+  // work in the presence of accidental cycles.
+  const count = await sql`SELECT count(*) AS count FROM products WHERE value_pack = TRUE`;
+  const maxRounds = Math.max(1, Number(count[0].count) * 7 + 1);
   let frontier = variantIds;
-  for (let depth = 0; depth < 5 && frontier.length > 0; depth++) {
+  for (let depth = 0; depth < maxRounds && frontier.length > 0; depth++) {
     const packRows = await sql`
       SELECT DISTINCT vpi.pack_product_id AS id
       FROM value_pack_items vpi
@@ -92,12 +93,12 @@ export async function recomputeDependentPacks(
       const before = await sql`
         SELECT DISTINCT stock_level FROM product_variants WHERE product_id = ${row.id}
       `;
-      const derived = await recomputePackProduct(row.id);
+      const derived = await recomputePackProduct(row.id, sql);
       const changed =
         derived !== null &&
         (before.length !== 1 || before[0].stock_level !== derived);
       if (changed) {
-        next.push(...(await variantIdsForProduct(row.id)));
+        next.push(...(await variantIdsForProduct(row.id, sql)));
       }
     }
     frontier = next;
@@ -110,6 +111,7 @@ export async function recomputeDependentPacks(
  */
 export async function variantIdsForProduct(
   productId: string,
+  sql = defaultSql,
 ): Promise<string[]> {
   if (!sql) return [];
   const rows = await sql`
@@ -126,6 +128,7 @@ export async function variantIdsForProduct(
 export async function packsUsingVariants(
   variantIds: string[],
   excludePackId?: string,
+  sql = defaultSql,
 ): Promise<string[]> {
   if (!sql || variantIds.length === 0) return [];
   // The exclude filter is split out rather than written as

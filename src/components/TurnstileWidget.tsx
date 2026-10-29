@@ -1,15 +1,11 @@
 "use client";
 
-import { forwardRef, useEffect, useId, useImperativeHandle, useRef } from "react";
-import Script from "next/script";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 
 declare global {
   interface Window {
     turnstile?: {
-      render: (
-        container: string | HTMLElement,
-        options: Record<string, unknown>,
-      ) => string;
+      render: (container: string | HTMLElement, options: Record<string, unknown>) => string;
       reset: (widgetId?: string) => void;
       remove: (widgetId?: string) => void;
     };
@@ -17,10 +13,6 @@ declare global {
 }
 
 export interface TurnstileHandle {
-  /** Request a fresh token. Required before retrying after a failed
-   * submission — Turnstile tokens are single-use, so re-submitting the
-   * same token will be rejected by siteverify even if the widget still
-   * visually shows a checkmark. */
   reset: () => void;
 }
 
@@ -32,74 +24,90 @@ interface TurnstileWidgetProps {
   className?: string;
 }
 
+const SCRIPT_URL = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+
 const TurnstileWidget = forwardRef<TurnstileHandle, TurnstileWidgetProps>(
-  function TurnstileWidget(
-    { siteKey, onVerify, onExpire, onError, className },
-    ref,
-  ) {
+  function TurnstileWidget({ siteKey, onVerify, onExpire, onError, className }, ref) {
     const containerRef = useRef<HTMLDivElement>(null);
     const widgetIdRef = useRef<string | null>(null);
-    const elementId = useId().replace(/:/g, "");
+    const callbacks = useRef({ onVerify, onExpire, onError });
+    callbacks.current = { onVerify, onExpire, onError };
+    const [error, setError] = useState("");
+    const [attempt, setAttempt] = useState(0);
 
     useImperativeHandle(ref, () => ({
       reset: () => {
-        if (widgetIdRef.current && window.turnstile) {
-          window.turnstile.reset(widgetIdRef.current);
-        }
+        if (widgetIdRef.current && window.turnstile) window.turnstile.reset(widgetIdRef.current);
       },
     }));
 
     useEffect(() => {
       let cancelled = false;
-      let pollId: ReturnType<typeof setInterval> | null = null;
-
-      function renderWidget() {
-        if (cancelled || !containerRef.current || !window.turnstile) return;
-        if (widgetIdRef.current) return; // avoid double-render (e.g. StrictMode)
-        widgetIdRef.current = window.turnstile.render(containerRef.current, {
-          sitekey: siteKey,
-          callback: (token: string) => onVerify(token),
-          "expired-callback": () => {
-            onExpire?.();
-          },
-          "error-callback": () => {
-            onError?.();
-          },
-        });
-      }
-
-      if (window.turnstile) {
-        renderWidget();
-      } else {
-        pollId = setInterval(() => {
-          if (window.turnstile) {
-            if (pollId) clearInterval(pollId);
-            renderWidget();
-          }
-        }, 100);
-      }
-
-      return () => {
-        cancelled = true;
-        if (pollId) clearInterval(pollId);
-        if (widgetIdRef.current && window.turnstile) {
-          window.turnstile.remove(widgetIdRef.current);
-          widgetIdRef.current = null;
+      let rendered = false;
+      const fail = () => {
+        if (cancelled) return;
+        setError("Verification could not load. Check your connection or blocker, then retry.");
+        callbacks.current.onError?.();
+      };
+      const render = () => {
+        if (cancelled || rendered || !window.turnstile || !containerRef.current) return;
+        try {
+          widgetIdRef.current = window.turnstile.render(containerRef.current, {
+            sitekey: siteKey,
+            callback: (token: string) => { clearTimeout(timeout); setError(""); callbacks.current.onVerify(token); },
+            "expired-callback": () => callbacks.current.onExpire?.(),
+            "error-callback": () => { fail(); return true; },
+          });
+          rendered = true;
+          clearInterval(interval);
+          clearTimeout(timeout);
+        } catch {
+          fail();
         }
       };
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [siteKey]);
+      if (!siteKey) {
+        setError("Verification is not configured. Please contact the store.");
+        callbacks.current.onError?.();
+        return;
+      }
+      setError("");
+      let script = document.querySelector<HTMLScriptElement>(`script[src="${SCRIPT_URL}"]`);
+      if (!script && !window.turnstile) {
+        script = document.createElement("script");
+        script.src = SCRIPT_URL;
+        script.async = true;
+        document.head.appendChild(script);
+      }
+      const interval = setInterval(render, 100);
+      const timeout = setTimeout(() => {
+        clearInterval(interval);
+        fail();
+      }, 10000);
+      script?.addEventListener("error", fail);
+      render();
+      return () => {
+        cancelled = true;
+        clearInterval(interval);
+        clearTimeout(timeout);
+        script?.removeEventListener("error", fail);
+        if (widgetIdRef.current && window.turnstile) window.turnstile.remove(widgetIdRef.current);
+        widgetIdRef.current = null;
+      };
+    }, [siteKey, attempt]);
 
     return (
-      <>
-        <Script
-          src="https://challenges.cloudflare.com/turnstile/v0/api.js"
-          strategy="afterInteractive"
-          async
-          defer
-        />
-        <div ref={containerRef} id={`turnstile-${elementId}`} className={className} />
-      </>
+      <div className={className}>
+        <div ref={containerRef} />
+        {error && (
+          <div role="alert" className="text-sm text-destructive mt-2">
+            <p>{error}</p>
+            {siteKey && <button type="button" className="underline mt-1" onClick={() => {
+              if (!window.turnstile) document.querySelector(`script[src="${SCRIPT_URL}"]`)?.remove();
+              setAttempt((value) => value + 1);
+            }}>Retry verification</button>}
+          </div>
+        )}
+      </div>
     );
   },
 );

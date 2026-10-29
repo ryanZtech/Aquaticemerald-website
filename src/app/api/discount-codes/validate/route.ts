@@ -31,7 +31,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
+    let body: any;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
+    }
     const code = typeof body?.code === "string" ? body.code.trim().slice(0, 60) : "";
     const cartTotal = Number(body?.cartTotal);
 
@@ -83,9 +88,15 @@ export async function POST(request: NextRequest) {
       }
       discountAmount = Math.min(cartTotal, amount);
     } else if (discount.discount_type === "free_item") {
+      const rewards = await sql`
+        SELECT v.id FROM product_variants v JOIN products p ON p.id = v.product_id
+        WHERE p.id = ${discount.free_product_id} AND p.active = TRUE AND v.active = TRUE AND v.stock_level != 'none'
+        ORDER BY (v.id = ${discount.free_variant_id}) DESC NULLS LAST, v.price ASC LIMIT 1
+      `;
+      if (!rewards.length) return NextResponse.json({ error: "This promotional item is currently unavailable." }, { status: 400 });
       freeItem = {
         productId: discount.free_product_id,
-        variantId: discount.free_variant_id,
+        variantId: rewards[0].id,
         productName: discount.free_product_name,
         productSlug: discount.free_product_slug,
       };

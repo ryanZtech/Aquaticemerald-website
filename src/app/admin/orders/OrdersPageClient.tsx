@@ -5,6 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/app/components/ui/button";
 import { Copy, Check, X, Trash2, ChevronDown, ChevronRight, Phone, Mail } from "lucide-react";
 import { toast } from "sonner";
+const STORE_TIMEZONE = "Australia/Sydney";
 
 interface OrderItem {
   id: number;
@@ -26,6 +27,7 @@ interface Order {
   pickup_location_detail: string | null;
   pickup_slot_at: string | null;
   status: string;
+  notes: string | null;
   subtotal: number;
   discount_amount: number | null;
   promo_code: string | null;
@@ -132,7 +134,8 @@ export default function OrdersPageClient() {
     try {
       const res = await fetch("/api/orders");
       const data = await res.json();
-      setOrders(data || []);
+      if (!res.ok || !Array.isArray(data)) throw new Error("Failed to load orders");
+      setOrders(data);
     } catch (e) {
       console.error(e);
       toast.error("Failed to load orders");
@@ -197,37 +200,37 @@ export default function OrdersPageClient() {
   const formatPickupTime = (dateStr: string) => {
     const date = new Date(dateStr);
     if (isNaN(date.getTime())) return "Invalid date";
-    const datePart = date.toLocaleDateString("en-AU", {
+    const datePart = date.toLocaleDateString("en-AU", { timeZone: STORE_TIMEZONE,
       weekday: "short",
       day: "numeric",
       month: "short",
     });
-    const time = date.toLocaleTimeString("en-AU", { hour: "numeric", minute: "2-digit" });
+    const time = date.toLocaleTimeString("en-AU", { timeZone: STORE_TIMEZONE, hour: "numeric", minute: "2-digit" });
     return `${datePart} · ${time}`;
   };
 
   const formatPickupFull = (dateStr: string) => {
     const date = new Date(dateStr);
     if (isNaN(date.getTime())) return "Invalid date";
-    const datePart = date.toLocaleDateString("en-AU", {
+    const datePart = date.toLocaleDateString("en-AU", { timeZone: STORE_TIMEZONE,
       weekday: "long",
       day: "numeric",
       month: "long",
       year: "numeric",
     });
-    const time = date.toLocaleTimeString("en-AU", { hour: "numeric", minute: "2-digit" });
+    const time = date.toLocaleTimeString("en-AU", { timeZone: STORE_TIMEZONE, hour: "numeric", minute: "2-digit" });
     return `${datePart} · ${time}`;
   };
 
   const formatOrderTime = (dateStr: string) => {
     const date = new Date(dateStr);
     if (isNaN(date.getTime())) return "Invalid date";
-    const datePart = date.toLocaleDateString("en-AU", {
+    const datePart = date.toLocaleDateString("en-AU", { timeZone: STORE_TIMEZONE,
       day: "numeric",
       month: "short",
       year: "numeric",
     });
-    const time = date.toLocaleTimeString("en-AU", { hour: "numeric", minute: "2-digit" });
+    const time = date.toLocaleTimeString("en-AU", { timeZone: STORE_TIMEZONE, hour: "numeric", minute: "2-digit" });
     return `${datePart} · ${time}`;
   };
 
@@ -241,7 +244,7 @@ export default function OrdersPageClient() {
     const itemsText = order.items.map(i => `${i.quantity}× ${i.snapshot_product_name}`).join(", ");
     const pickupAt = order.pickup_slot_at ? formatPickupTime(order.pickup_slot_at) : "N/A";
     const loc = order.pickup_location_name || "the pickup location";
-    const msg = `just to confirm, you ordered ${itemsText} for $${Number(order.total).toFixed(2)}, and we'll meet up at ${loc} at ${pickupAt}`;
+    const msg = `just to confirm, you ordered ${itemsText} for $${Number(order.total).toFixed(2)}, and we'll meet up at ${loc} at ${pickupAt} (Sydney time)`;
     try {
       navigator.clipboard.writeText(msg);
       toast.success("Copied message to clipboard");
@@ -393,7 +396,7 @@ export default function OrdersPageClient() {
                         ? <ChevronDown className="w-4 h-4 text-muted-foreground" />
                         : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
                     </TableCell>
-                    <TableCell className="font-medium">#{o.id}</TableCell>
+                    <TableCell className="font-medium">{o.notes?.match(/\bAE-[A-Z0-9-]+\b/)?.[0] || `#${o.id}`}{o.notes && <div className="text-xs font-normal text-muted-foreground whitespace-pre-line">{o.notes.replace(/\bAE-[A-Z0-9-]+\b/, "").trim()}</div>}</TableCell>
                     <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
                       {formatOrderTime(o.created_at)}
                     </TableCell>
@@ -500,7 +503,7 @@ export default function OrdersPageClient() {
                             ? <ChevronDown className="w-4 h-4 text-muted-foreground" />
                             : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
                         </TableCell>
-                        <TableCell className="font-medium">#{o.id}</TableCell>
+                        <TableCell className="font-medium">{o.notes?.match(/\bAE-[A-Z0-9-]+\b/)?.[0] || `#${o.id}`}{o.notes && <div className="text-xs font-normal text-muted-foreground whitespace-pre-line">{o.notes.replace(/\bAE-[A-Z0-9-]+\b/, "").trim()}</div>}</TableCell>
                     <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
                       {formatOrderTime(o.created_at)}
                     </TableCell>

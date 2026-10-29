@@ -1,7 +1,7 @@
 import { getProductBySlug } from "@/lib/dataService";
 import ProductDetailClient from "@/components/ProductDetailClient";
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { notFound } from "next/navigation";
+import type { Metadata } from "next";
 
 interface ProductPageProps {
   params: Promise<{ slug: string }>;
@@ -9,23 +9,21 @@ interface ProductPageProps {
 
 export const revalidate = 60;
 
+export async function generateMetadata({ params }: ProductPageProps): Promise<Metadata> {
+  const { slug } = await params;
+  const product = await getProductBySlug(slug);
+  if (!product) return { title: "Product not found" };
+  const description = product.description || `Discover ${product.name} at Aquatic Emerald.`;
+  const url = `/products/${encodeURIComponent(product.slug)}`;
+  const images = product.img ? [product.img] : undefined;
+  return { title: product.name, description, alternates: { canonical: url }, openGraph: { title: product.name, description, url, images }, twitter: { card: "summary_large_image", title: product.name, description, images } };
+}
+
 export default async function ProductPage({ params }: ProductPageProps) {
   const { slug } = await params;
   const product = await getProductBySlug(slug);
 
-  if (!product) {
-    return (
-      <div className="pt-24 pb-16 px-4 max-w-xl mx-auto text-center min-h-screen flex flex-col justify-center items-center">
-        <p className="text-muted-foreground mb-4 font-serif text-lg">Product not found.</p>
-        <Link 
-          href="/products" 
-          className="text-primary text-sm font-medium hover:underline inline-flex items-center gap-2"
-        >
-          <ArrowLeft className="w-4 h-4" /> Back to Products
-        </Link>
-      </div>
-    );
-  }
+  if (!product) notFound();
 
   return <ProductDetailClient product={product} />;
 }

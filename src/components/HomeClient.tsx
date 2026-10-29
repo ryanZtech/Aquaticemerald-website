@@ -20,9 +20,12 @@ export default function HomeClient({ products, settings }: HomeClientProps) {
   
   const featured = products.filter((p) => p.variants.length > 0).slice(0, 4);
 
-  const heroImg = settings.hero_image || "https://aquaticemerald.com/hero.png";
-  const sceneImg =
-    settings.scene_image || "https://aquaticemerald.com/front1.png";
+  const configuredHero = settings.hero_image || "/hero.png";
+  const configuredScene = settings.scene_image || "/front1.png";
+  const heroLocal = /^(?:https?:\/\/(?:www\.)?aquaticemerald\.com)?\/hero\.png$/i.test(configuredHero);
+  const sceneLocal = /^(?:https?:\/\/(?:www\.)?aquaticemerald\.com)?\/front1\.png$/i.test(configuredScene);
+  const heroImg = heroLocal ? "/hero-1600.webp" : configuredHero;
+  const sceneImg = sceneLocal ? "/front1-1600.webp" : configuredScene;
 
   return (
     <div>
@@ -34,6 +37,11 @@ export default function HomeClient({ products, settings }: HomeClientProps) {
         {heroImg ? (
           <img
             src={heroImg}
+            srcSet={heroLocal ? "/hero-800.webp 800w, /hero-1600.webp 1600w, /hero-2400.webp 2400w" : undefined}
+            sizes="100vw"
+            width={2930}
+            height={1443}
+            fetchPriority="high"
             alt="Lush Nature Aquarium aquascape with dense green plants"
             className="absolute inset-0 w-full h-full object-cover scale-[1.03] opacity-80"
           />
@@ -126,6 +134,11 @@ export default function HomeClient({ products, settings }: HomeClientProps) {
         {sceneImg ? (
           <img
             src={sceneImg}
+            srcSet={sceneLocal ? "/front1-800.webp 800w, /front1-1600.webp 1600w, /front1-2400.webp 2400w" : undefined}
+            sizes="100vw"
+            width={4032}
+            height={1945}
+            loading="lazy"
             alt="Curved aquarium filled with vibrant aquatic plants and moss"
             className="w-full h-full object-cover opacity-70"
           />
@@ -162,7 +175,7 @@ export default function HomeClient({ products, settings }: HomeClientProps) {
             {
               Icon: MapPin,
               title: "Convenient Pickup",
-              desc: "Three pickup locations across the Hills District: choose a 30-minute window that fits your schedule, weekdays, Saturdays, and Sundays.",
+              desc: "Choose a pickup location and an available time window across the Hills District at checkout.",
             },
             {
               Icon: MessageCircle,

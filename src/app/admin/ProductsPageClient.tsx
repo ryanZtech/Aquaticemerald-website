@@ -69,6 +69,7 @@ export default function ProductsPageClient() {
   const [formDialogOpen, setFormDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [confirmClear, setConfirmClear] = useState(false);
+  const [clearConfirmation, setClearConfirmation] = useState("");
 
   const [detailProduct, setDetailProduct] = useState<Product | null>(null);
   const [viewingProduct, setViewingProduct] = useState(false);
@@ -85,6 +86,7 @@ export default function ProductsPageClient() {
         fetch("/api/products"),
         fetch("/api/categories"),
       ]);
+      if (!productsRes.ok) throw new Error(`Failed to load products (${productsRes.status})`);
 
       const productData = await productsRes.json();
       const categoryData = await categoriesRes.json();
@@ -184,9 +186,9 @@ export default function ProductsPageClient() {
     }
   };
 
-  const handleClearProducts = async () => {
+  const handleClearProducts = async (action: "archive" | "restore") => {
     try {
-      const res = await fetch("/api/products/clear", { method: "POST" });
+      const res = await fetch("/api/products/clear", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, confirmation: clearConfirmation }) });
       if (res.ok) {
         const json = await res.json();
         toast.success(json.message || "Inventory wiped clean");
@@ -201,6 +203,7 @@ export default function ProductsPageClient() {
       toast.error("Failed to wipe products");
     } finally {
       setConfirmClear(false);
+      setClearConfirmation("");
     }
   };
 
@@ -349,52 +352,8 @@ export default function ProductsPageClient() {
                             const file = e.target.files?.[0];
                             if (!file) return;
                             try {
-                              const prodRes = await fetch(
-                                `/api/products/${detailProduct.id}`,
-                              );
-                              const prod = await prodRes.json();
                               const fd = new FormData();
-                              fd.append(
-                                "name",
-                                prod.name || detailProduct.name,
-                              );
-                              fd.append(
-                                "slug",
-                                prod.slug || detailProduct.slug,
-                              );
-                              fd.append(
-                                "categoryId",
-                                prod.category_id || prod.category_id === 0
-                                  ? String(prod.category_id)
-                                  : "0",
-                              );
-                              fd.append(
-                                "shortDescription",
-                                prod.short_description ||
-                                  prod.short_description ||
-                                  "",
-                              );
-                              fd.append(
-                                "fullDescription",
-                                prod.full_description ||
-                                  prod.full_description ||
-                                  "",
-                              );
-                              fd.append(
-                                "variants",
-                                JSON.stringify(
-                                  prod.variants || detailProduct.variants || [],
-                                ),
-                              );
-                              fd.append(
-                                "attributes",
-                                JSON.stringify(
-                                  prod.attributes ||
-                                    detailProduct.attributes ||
-                                    {},
-                                ),
-                              );
-                              fd.append("image", file);
+                              fd.append("heroImage", file);
                               const res = await fetch(
                                 `/api/products/${detailProduct.id}`,
                                 { method: "PUT", body: fd },
@@ -705,8 +664,9 @@ export default function ProductsPageClient() {
                   {confirmClear ? (
                     <div className="flex items-center gap-2 bg-destructive/10 border border-destructive/30 rounded-lg px-3 py-1.5">
                       <span className="text-xs text-destructive font-medium">
-                        Delete ALL products?
+                        Type ARCHIVE to hide all active products:
                       </span>
+                      <Input aria-label="Type ARCHIVE to confirm" value={clearConfirmation} onChange={(e) => setClearConfirmation(e.target.value)} className="w-32 h-8" />
                       <Button
                         size="sm"
                         variant="ghost"
@@ -718,9 +678,10 @@ export default function ProductsPageClient() {
                       <Button
                         size="sm"
                         className="h-7 px-2 text-xs bg-destructive hover:bg-destructive/90 text-destructive-foreground cursor-pointer"
-                        onClick={handleClearProducts}
+                        disabled={clearConfirmation !== "ARCHIVE"}
+                        onClick={() => handleClearProducts("archive")}
                       >
-                        Yes, delete all
+                        Archive inventory
                       </Button>
                     </div>
                   ) : (
@@ -732,6 +693,7 @@ export default function ProductsPageClient() {
                       Clear Inventory
                     </Button>
                   )}
+                  <Button variant="ghost" onClick={() => { if (confirm("Restore the most recently archived inventory batch?")) handleClearProducts("restore"); }}>Restore inventory</Button>
                 </div>
               </div>
 

@@ -2,6 +2,7 @@ import { getProducts, getStoreSettings } from "@/lib/dataService";
 import HomeClient from "@/components/HomeClient";
 
 export const revalidate = 60;
+export const metadata = { alternates: { canonical: "/" } };
 
 const CLIENT_SAFE_SETTING_KEYS = ["hero_image", "scene_image"] as const;
 

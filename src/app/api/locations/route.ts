@@ -1,21 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
+import { requireAdmin } from "@/lib/adminAuth";
 
 export async function GET() {
   if (!sql) {
-    return NextResponse.json([], { status: 200 });
+    return NextResponse.json({ error: "Database not configured" }, { status: 500 });
   }
 
   try {
+    const isAdmin = (await requireAdmin()) === null;
     const rows = await sql`
       SELECT id, name, address as detail, address, instructions, active
       FROM pickup_locations
+      WHERE ${isAdmin} OR active = TRUE
       ORDER BY name
     `;
     return NextResponse.json(rows);
   } catch (error) {
     console.error("Error fetching locations:", error);
-    return NextResponse.json([], { status: 200 });
+    return NextResponse.json({ error: "Failed to fetch locations" }, { status: 500 });
   }
 }
 

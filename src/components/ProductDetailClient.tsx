@@ -83,7 +83,7 @@ export default function ProductDetailClient({
   useEffect(() => {
     if (product.variants && product.variants.length > 0) {
       
-      const firstVariantLabel = product.variants[0].label;
+      const firstVariantLabel = (product.variants.find((variant) => maxQtyForLevel(variant.stock_level, stockLimits) > 0) || product.variants[0]).label;
       const optionCount = firstVariantLabel.split(" / ").length;
 
       const optionNames =
@@ -121,7 +121,7 @@ export default function ProductDetailClient({
       setSelectedValues({});
       setMatchedVariant(null);
     }
-  }, [product]);
+  }, [product, stockLimits]);
 
   useEffect(() => {
     if (product.variants && product.variants.length > 0 && options.length > 0) {
@@ -142,7 +142,9 @@ export default function ProductDetailClient({
     } else {
       setMatchedVariant(product.variants?.[0] || null);
     }
-  }, [selectedValues, options, product]);
+    // Re-run when the public stock limits arrive so the page opens on the
+    // first genuinely in-stock variant, not merely the first default one.
+  }, [selectedValues, options, product, stockLimits]);
 
   useEffect(() => {
     if (maxQty <= 0) {

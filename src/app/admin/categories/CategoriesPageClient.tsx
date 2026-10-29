@@ -37,6 +37,7 @@ export default function CategoriesPageClient() {
     try {
       const response = await fetch("/api/categories");
       const data = await response.json();
+      if (!response.ok || !Array.isArray(data)) throw new Error("Failed to load categories");
       setCategories(data);
     } catch (error) {
       console.error("Error fetching categories:", error);

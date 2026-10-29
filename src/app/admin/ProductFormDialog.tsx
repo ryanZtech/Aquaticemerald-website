@@ -83,6 +83,7 @@ export default function ProductFormDialog({
 }: ProductFormDialogProps) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(false);
+  const [productLoaded, setProductLoaded] = useState(false);
   
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
@@ -93,6 +94,7 @@ export default function ProductFormDialog({
   const [productImages, setProductImages] = useState<ProductImage[]>([]);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [primaryNewImage, setPrimaryNewImage] = useState<number | null>(null);
   
   const [variantOptions, setVariantOptions] = useState<VariantOption[]>([]);
   const [variants, setVariants] = useState<Array<Variant & { imageFile?: File; imagePreview?: string }>>([]);
@@ -113,6 +115,8 @@ export default function ProductFormDialog({
 
   useEffect(() => {
     if (open) {
+      resetForm();
+      setProductLoaded(!editingProduct);
       fetchCategories();
       fetchCatalog();
       if (editingProduct) {
@@ -137,6 +141,7 @@ export default function ProductFormDialog({
     try {
       const response = await fetch("/api/categories");
       const data = await response.json();
+      if (!response.ok || !Array.isArray(data)) throw new Error("Failed to load categories");
       setCategories(data);
     } catch (error) {
       console.error("Error fetching categories:", error);
@@ -146,7 +151,9 @@ export default function ProductFormDialog({
   const loadProductData = async () => {
     try {
       const response = await fetch(`/api/products/${editingProduct.id}`);
+      if (!response.ok) throw new Error(`Failed to load product (${response.status})`);
       const data = await response.json();
+      if (!response.ok || !data || typeof data !== "object") throw new Error("Failed to load product");
       
       setName(data.name);
       setSlug(data.slug);
@@ -165,10 +172,7 @@ export default function ProductFormDialog({
 
       const loadedVariants = rawVariants.map((v: any) => {
         const rawId = String(v.id || "");
-        const prefix = `${editingProduct.id}-`;
-        const variantId = rawId.startsWith(prefix)
-          ? rawId.slice(prefix.length)
-          : rawId;
+        const variantId = rawId;
         return {
           id: variantId || Math.random().toString(),
           label: v.label,
@@ -235,6 +239,7 @@ export default function ProductFormDialog({
         });
         setVariantOptions(constructedOptions);
       }
+      setProductLoaded(true);
     } catch (error) {
       console.error("Error loading product:", error);
       toast.error("Failed to load product data");
@@ -250,6 +255,7 @@ export default function ProductFormDialog({
     setProductImages([]);
     setImageFiles([]);
     setImagePreviews([]);
+    setPrimaryNewImage(null);
     setVariantOptions([]);
     setVariants([]);
     setCareLevel("");
@@ -367,12 +373,14 @@ export default function ProductFormDialog({
       combinations.push(...newCombinations);
     }
 
-    const newVariants: Array<Variant & { imageFile?: File; imagePreview?: string }> = combinations.map((combo, index) => ({
-      id: `var_${Date.now()}_${index}`,
-      label: combo.join(" / "),
-      price: 0,
-      stock_level: "none",
-    }));
+    const newVariants: Array<Variant & { imageFile?: File; imagePreview?: string }> = combinations.map((combo, index) => {
+      const label = combo.join(" / ");
+      return variants.find((variant) => variant.label === label) || {
+        id: `var_${Date.now()}_${index}`, label, price: 0, stock_level: "none",
+      };
+    });
+    if (editingProduct && variants.some((variant) => !newVariants.some((next) => next.id === variant.id)) &&
+        !confirm("Generating these variants will remove existing variants that no longer match. Continue?")) return;
 
     setVariants(newVariants);
     toast.success(`Generated ${newVariants.length} variants`);
@@ -460,6 +468,7 @@ export default function ProductFormDialog({
   };
 
   const setPrimaryImage = (index: number) => {
+    setPrimaryNewImage(index >= productImages.length ? index - productImages.length : null);
     setProductImages(prev => prev.map((img, i) => ({
       ...img,
       is_primary: i === index
@@ -468,15 +477,42 @@ export default function ProductFormDialog({
 
   const removeProductImage = (index: number) => {
     if (imagePreviews.length > 0 && index >= productImages.length) {
-      setImagePreviews(prev => prev.filter((_, i) => i !== (index - productImages.length)));
-      setImageFiles(prev => prev.filter((_, i) => i !== (index - productImages.length)));
+      const removed = index - productImages.length;
+      const removedWasPrimary = primaryNewImage === removed;
+      setImagePreviews(prev => prev.filter((_, i) => i !== removed));
+      setImageFiles(prev => prev.filter((_, i) => i !== removed));
+
+      if (removedWasPrimary) {
+        // Promote another new image when one remains; otherwise fall back to
+        // an existing gallery image so the product never loses its hero.
+        if (imageFiles.length > 1) {
+          setPrimaryNewImage(0);
+        } else {
+          setPrimaryNewImage(null);
+          setProductImages(prev =>
+            prev.length ? prev.map((img, i) => ({ ...img, is_primary: i === 0 })) : prev,
+          );
+        }
+      } else {
+        setPrimaryNewImage(prev => prev === null ? null : prev > removed ? prev - 1 : prev);
+      }
     } else {
-      setProductImages(prev => prev.filter((_, i) => i !== index));
+      setProductImages(prev => {
+        const removedWasPrimary = prev[index]?.is_primary;
+        const remaining = prev.filter((_, i) => i !== index);
+        if (removedWasPrimary && remaining.length && primaryNewImage === null) remaining[0] = { ...remaining[0], is_primary: true };
+        if (removedWasPrimary && !remaining.length && imageFiles.length && primaryNewImage === null) setPrimaryNewImage(0);
+        return remaining;
+      });
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!productLoaded) {
+      toast.error("Product data has not loaded. Close and reopen the form before saving.");
+      return;
+    }
     
     if (!name || !slug || !categoryId) {
       toast.error("Please fill in all required fields");
@@ -518,6 +554,7 @@ export default function ProductFormDialog({
       formData.append("fullDescription", fullDescription);
       
       formData.append("productImages", JSON.stringify(productImages));
+      if (primaryNewImage !== null) formData.append("primaryNewImage", String(primaryNewImage));
       for (let i = 0; i < imageFiles.length; i++) {
         formData.append("newImages", imageFiles[i]);
       }
@@ -551,6 +588,7 @@ export default function ProductFormDialog({
         Light: light,
         "Average Size": avgSize,
         Origin: origin,
+        "Variant Options": "",
       };
 
       if (variantOptions.length > 0) {
@@ -590,7 +628,7 @@ export default function ProductFormDialog({
 
   const allImages = [
     ...productImages,
-    ...imagePreviews.map((preview, i) => ({ image_url: preview, is_primary: false, alt_text: `New Image ${i + 1}` } as ProductImage))
+    ...imagePreviews.map((preview, i) => ({ image_url: preview, is_primary: primaryNewImage === i, alt_text: `New Image ${i + 1}` } as ProductImage))
   ];
 
   const content = (
@@ -1117,7 +1155,7 @@ export default function ProductFormDialog({
           <Button type="button" variant="outline" onClick={onClose} disabled={loading} className="mr-2">
             Cancel
           </Button>
-          <Button type="submit" disabled={loading} form={undefined} onClick={() => {}}>
+          <Button type="submit" disabled={loading || !productLoaded} form={undefined} onClick={() => {}}>
             {loading ? "Saving..." : editingProduct ? "Update Product" : "Create Product"}
           </Button>
         </div>

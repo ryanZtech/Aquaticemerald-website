@@ -31,16 +31,10 @@ function loadDatabaseUrl() {
 
   // This project keeps its credentials in `.env` (Next.js also loads
   // `.env.local` when present) — try both before giving up.
-  const envPath = ["./.env.local", "./.env"].find((p) => existsSync(p));
-  if (!envPath) {
-    throw new Error(
-      `DATABASE_URL is not set and neither .env.local nor .env was found in the current directory.\n` +
-        `Run this script from the folder that contains your env file (your project root).`,
-    );
-  }
-
-  const contents = readFileSync(envPath, "utf8");
-  for (const rawLine of contents.split("\n")) {
+  for (const envPath of ["./.env.local", "./.env"]) {
+    if (!existsSync(envPath)) continue;
+    const contents = readFileSync(envPath, "utf8");
+    for (const rawLine of contents.split("\n")) {
     const line = rawLine.trim();
     if (!line || line.startsWith("#")) continue;
     const eq = line.indexOf("=");
@@ -54,9 +48,10 @@ function loadDatabaseUrl() {
     ) {
       value = value.slice(1, -1);
     }
-    return value;
+      if (value) return value;
+    }
   }
-  throw new Error(`DATABASE_URL was not found inside ${envPath}.`);
+  throw new Error("DATABASE_URL was not found in .env.local or .env.");
 }
 
 const STEPS = [

@@ -8,12 +8,15 @@ import React from "react";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Aquatic Emerald",
+  metadataBase: new URL("https://www.aquaticemerald.com"),
+  title: { default: "Aquatic Emerald", template: "%s | Aquatic Emerald" },
   description:
     "Curated home-grown freshwater botanicals, shrimp, and snails for the discerning aquarium hobbyist in Sydney Hills District.",
   keywords:
     "aquarium plants, freshwater shrimp, bloody mary shrimp, trumpet snails, Hills District, Sydney aquariums",
   authors: [{ name: "Aquatic Emerald" }],
+  openGraph: { type: "website", siteName: "Aquatic Emerald", title: "Aquatic Emerald", description: "Home-grown freshwater plants, shrimp and snails for Sydney aquariums.", images: ["/hero-1600.webp"] },
+  twitter: { card: "summary_large_image", title: "Aquatic Emerald", description: "Home-grown freshwater plants, shrimp and snails for Sydney aquariums.", images: ["/hero-1600.webp"] },
   icons: {
     icon: "/logo.png",
   },

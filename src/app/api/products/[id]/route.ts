@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sql } from "@/lib/db";
+import { sql, pool, transactionSql } from "@/lib/db";
+import { requireAdmin } from "@/lib/adminAuth";
 import { put, del } from "@vercel/blob";
 import { validateImageFile, safeImageKey } from "@/lib/fileValidation";
 import { normalizeStockLevel } from "@/lib/stockLimits";
@@ -25,6 +26,7 @@ export async function GET(
 
   try {
     const { id } = await params;
+    const isAdmin = (await requireAdmin()) === null;
 
     const rows = await sql`
       SELECT
@@ -46,10 +48,10 @@ export async function GET(
                 LIMIT 1
               )
             )
-            ORDER BY v.label
+            ORDER BY v.sort_order, v.label, v.id
           )
           FROM product_variants v
-          WHERE v.product_id = p.id
+          WHERE v.product_id = p.id AND (${isAdmin} OR v.active = TRUE)
         ), '[]'::json) as variants,
         coalesce((
           SELECT json_agg(
@@ -66,7 +68,7 @@ export async function GET(
           FROM value_pack_items vpi
           JOIN product_variants iv ON iv.id = vpi.item_variant_id
           JOIN products ip ON ip.id = iv.product_id
-          WHERE vpi.pack_product_id = p.id
+          WHERE vpi.pack_product_id = p.id AND (${isAdmin} OR (iv.active = TRUE AND ip.active = TRUE))
         ), '[]'::json) as pack_items,
         coalesce((
           SELECT json_agg(
@@ -84,7 +86,7 @@ export async function GET(
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
       LEFT JOIN images i ON p.id = i.product_id AND i.is_primary = TRUE
-      WHERE p.id = ${id}
+      WHERE p.id = ${id} AND (${isAdmin} OR p.active = TRUE)
       GROUP BY p.id, p.slug, p.name, p.category_id, c.slug, c.name, p.short_description, p.full_description, p.value_pack, p.value_pack_sync_stock, i.image_url
     `;
 
@@ -132,19 +134,80 @@ export async function PUT(
   try {
     const { id } = await params;
     const formData = await request.formData();
+    const heroImage = formData.get("heroImage");
+    if (heroImage instanceof File) {
+      const validation = validateImageFile(heroImage);
+      if (!validation.valid) return NextResponse.json({ error: validation.error }, { status: 400 });
+      if (!pool) return NextResponse.json({ error: "Database not configured" }, { status: 500 });
+      const blob = await put(safeImageKey(`products/${id}`, heroImage), heroImage, { access: "public", addRandomSuffix: true });
+      let client;
+      try {
+        client = await pool.connect();
+        await client.query("BEGIN");
+        const product = await client.query("SELECT name FROM products WHERE id = $1 FOR UPDATE", [id]);
+        if (!product.rows.length) throw new Error("Product not found");
+        await client.query("UPDATE images SET is_primary = FALSE WHERE product_id = $1", [id]);
+        await client.query("INSERT INTO images (product_id, image_url, alt_text, is_primary) VALUES ($1, $2, $3, TRUE)", [id, blob.url, product.rows[0].name]);
+        await client.query("COMMIT");
+      } catch (error) {
+        if (client) await client.query("ROLLBACK").catch(() => {});
+        await del(blob.url).catch((cleanupError) => console.error("Failed to clean up uploaded image:", cleanupError));
+        throw error;
+      } finally {
+        client?.release();
+      }
+      return NextResponse.json({ success: true });
+    }
     const name = formData.get("name") as string;
     const slug = formData.get("slug") as string;
     const categoryId = formData.get("categoryId") as string;
     const shortDescription = formData.get("shortDescription") as string;
     const fullDescription = formData.get("fullDescription") as string;
-    const variants = JSON.parse(formData.get("variants") as string);
-    const attributes = JSON.parse(
-      (formData.get("attributes") as string) || "{}",
-    );
-    const productImages = JSON.parse(
-      (formData.get("productImages") as string) || "[]",
-    );
+
+    // Mirror POST validation. Without this, a blank price or negative value
+    // could reach the numeric column (a 500 after uploads) or be persisted
+    // and make checkout reject the product later.
+    if (!name || !String(name).trim()) {
+      return NextResponse.json({ error: "Product name is required" }, { status: 400 });
+    }
+    if (!slug || !String(slug).trim()) {
+      return NextResponse.json({ error: "Product slug is required" }, { status: 400 });
+    }
+    const catId = parseInt(String(categoryId));
+    if (!Number.isInteger(catId) || catId < 1) {
+      return NextResponse.json({ error: "Valid categoryId is required" }, { status: 400 });
+    }
+
+    let variants: any[];
+    let attributes: Record<string, unknown>;
+    let productImages: any[];
+    try {
+      variants = JSON.parse(formData.get("variants") as string);
+      attributes = JSON.parse((formData.get("attributes") as string) || "{}");
+      productImages = JSON.parse((formData.get("productImages") as string) || "[]");
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON in variants, attributes, or productImages" }, { status: 400 });
+    }
     const newImages = formData.getAll("newImages") as File[];
+    if (!Array.isArray(variants) || variants.length === 0 || !Array.isArray(productImages) ||
+        !attributes || typeof attributes !== "object" || Array.isArray(attributes)) {
+      return NextResponse.json({ error: "At least one variant and a valid image list are required." }, { status: 400 });
+    }
+    for (const variant of variants) {
+      const price = Number(variant?.price);
+      if (!variant?.label || !String(variant.label).trim()) {
+        return NextResponse.json({ error: "Each variant needs a label" }, { status: 400 });
+      }
+      if (!Number.isFinite(price) || price < 0 || price > 1000000) {
+        return NextResponse.json({ error: `Invalid price for variant "${variant?.label || "?"}"` }, { status: 400 });
+      }
+    }
+    const existingVariantRows = await sql`SELECT id FROM product_variants WHERE product_id = ${id}`;
+    const existingVariantIds = new Set(existingVariantRows.map((row) => String(row.id)));
+    const resolveVariantId = (variantId: unknown) => {
+      const raw = String(variantId);
+      return existingVariantIds.has(raw) ? raw : `${id}-${raw}`;
+    };
 
     // --- Value pack fields ---
     const valuePack = formData.get("valuePack") === "true";
@@ -162,7 +225,7 @@ export async function PUT(
           { status: 400 },
         );
       }
-      const ownVariantIds = variants.map((v: any) => `${id}-${v.id}`);
+      const ownVariantIds = variants.map((v: any) => resolveVariantId(v.id));
       const normalized = normalizePackItems(parsedItems, ownVariantIds);
       if (normalized.error || !normalized.items) {
         return NextResponse.json(
@@ -173,9 +236,29 @@ export async function PUT(
       packItems = normalized.items;
     }
 
+    if (!pool) return NextResponse.json({ error: "Database not configured" }, { status: 500 });
+    const client = await pool.connect();
+    const uploadedUrls: string[] = [];
+    const removedUrls: string[] = [];
+    let committed = false;
+    try {
+    await client.query("BEGIN");
+    const sql = transactionSql(client);
+    if (valuePack) {
+      await client.query("SELECT pg_advisory_xact_lock(hashtext('value-pack-graph'))");
+      const cycle = await client.query(`WITH RECURSIVE descendants(id) AS (
+        SELECT product_id FROM product_variants WHERE id = ANY($1::text[])
+        UNION
+        SELECT v.product_id FROM descendants d
+          JOIN value_pack_items i ON i.pack_product_id = d.id
+          JOIN product_variants v ON v.id = i.item_variant_id
+      ) SELECT 1 FROM descendants WHERE id = $2 LIMIT 1`, [packItems.map((item) => item.variantId), id]);
+      if (cycle.rows.length) return NextResponse.json({ error: "A value pack cannot contain itself, directly or through another pack." }, { status: 400 });
+    }
+
     await sql`
       UPDATE products
-      SET name = ${name}, slug = ${slug}, category_id = ${parseInt(categoryId)},
+      SET name = ${name}, slug = ${slug}, category_id = ${catId},
           short_description = ${shortDescription}, full_description = ${fullDescription},
           value_pack = ${valuePack},
           value_pack_sync_stock = ${valuePack ? valuePackSyncStock : false},
@@ -197,7 +280,7 @@ export async function PUT(
     const submittedVariantIds: string[] = [];
 
     for (const variant of variants) {
-      const variantId = `${id}-${variant.id}`;
+      const variantId = resolveVariantId(variant.id);
       submittedVariantIds.push(variantId);
       const stockLevel = normalizeStockLevel(
         variant.stock_level || variant.stockLevel,
@@ -210,7 +293,6 @@ export async function PUT(
           label = EXCLUDED.label,
           price = EXCLUDED.price,
           stock_level = EXCLUDED.stock_level,
-          active = TRUE,
           updated_at = CURRENT_TIMESTAMP
       `;
 
@@ -230,6 +312,7 @@ export async function PUT(
             addRandomSuffix: true,
           },
         );
+        uploadedUrls.push(blob.url);
         // A new image was uploaded for this variant — replace only its
         // primary image row, leaving any other images it might have alone.
         await sql`DELETE FROM variant_images WHERE variant_id = ${variantId} AND is_primary = TRUE`;
@@ -267,14 +350,14 @@ export async function PUT(
       await sql`
         SELECT id FROM product_variants
         WHERE product_id = ${id}
-          AND id != ALL(${submittedVariantIds.length > 0 ? submittedVariantIds : [null]})
+          AND NOT (id = ANY(${submittedVariantIds}::text[]))
       `
     ).map((r: any) => String(r.id));
-    const packsUsingRemoved = await packsUsingVariants(removedVariantIds, id);
+    const packsUsingRemoved = await packsUsingVariants(removedVariantIds, id, sql);
     await sql`
       DELETE FROM product_variants
       WHERE product_id = ${id}
-        AND id != ALL(${submittedVariantIds.length > 0 ? submittedVariantIds : [null]})
+        AND NOT (id = ANY(${submittedVariantIds}::text[]))
     `;
 
     // --- Value pack items ---
@@ -295,14 +378,15 @@ export async function PUT(
     // Materialize derived stock for this pack, then any pack whose items
     // changed because variants above were edited or removed.
     if (valuePack) {
-      await recomputePackProduct(id);
+      await recomputePackProduct(id, sql);
     }
-    await recomputeDependentPacks(submittedVariantIds);
+    await recomputeDependentPacks(submittedVariantIds, sql);
     for (const packId of packsUsingRemoved) {
-      await recomputePackProduct(packId);
+      await recomputePackProduct(packId, sql);
+      await recomputeDependentPacks(await variantIdsForProduct(packId, sql), sql);
     }
 
-    if (newImages.length > 0 || productImages.length > 0) {
+    if (formData.has("productImages")) {
       const existingImages: any[] =
         await sql`SELECT id, image_url FROM images WHERE product_id = ${id}`;
       const existingImageIds = existingImages.map((img) => img.id);
@@ -314,15 +398,9 @@ export async function PUT(
       );
 
       for (const img of imagesToDelete) {
-        if (img.image_url.includes("vercel-storage.com")) {
-          try {
-            await del(img.image_url);
-          } catch (e) {
-            console.error("Failed to delete old image:", e);
-          }
-        }
+        if (img.image_url.includes("vercel-storage.com")) removedUrls.push(img.image_url);
       }
-      await sql`DELETE FROM images WHERE product_id = ${id} AND id != ALL(${productImageIdsToKeep.length > 0 ? productImageIdsToKeep : [null]})`;
+      await sql`DELETE FROM images WHERE product_id = ${id} AND NOT (id = ANY(${productImageIdsToKeep}::int[]))`;
 
       const uploadedProductImages: Array<{
         image_url: string;
@@ -339,14 +417,16 @@ export async function PUT(
           access: "public",
           addRandomSuffix: true,
         });
+        uploadedUrls.push(blob.url);
         uploadedProductImages.push({
           image_url: blob.url,
           alt_text: `${name} Image ${i + 1}`,
-          is_primary: false,
+          is_primary: Number(formData.get("primaryNewImage")) === i && formData.has("primaryNewImage"),
         });
       }
 
       const allProductImages = [...productImages, ...uploadedProductImages];
+      if (allProductImages.length && !allProductImages.some((img: any) => img.is_primary)) allProductImages[0].is_primary = true;
       for (const img of allProductImages) {
         if (!img.id) {
           await sql`
@@ -357,13 +437,14 @@ export async function PUT(
           await sql`
             UPDATE images
             SET alt_text = ${img.alt_text || name}, is_primary = ${img.is_primary}
-            WHERE id = ${img.id}
+            WHERE id = ${img.id} AND product_id = ${id}
           `;
         }
       }
     }
 
-    await sql`DELETE FROM product_attribute_values WHERE product_id = ${id}`;
+    await sql`DELETE FROM product_attribute_values WHERE product_id = ${id}
+      AND attribute_id IN (SELECT id FROM product_attributes WHERE name = ANY(${Object.keys(attributes)}::text[]))`;
     for (const [attrName, attrValue] of Object.entries(attributes)) {
       if (attrValue) {
         let attrId;
@@ -387,7 +468,17 @@ export async function PUT(
       }
     }
 
+    await client.query("COMMIT");
+    committed = true;
+    for (const url of removedUrls) await del(url).catch((error) => console.error("Failed to delete old image:", error));
     return NextResponse.json({ success: true });
+    } finally {
+      if (!committed) {
+        await client.query("ROLLBACK").catch(() => {});
+        for (const url of uploadedUrls) await del(url).catch((error) => console.error("Failed to clean up upload:", error));
+      }
+      client.release();
+    }
   } catch (error) {
     console.error("Error updating product:", error);
     return NextResponse.json(
@@ -415,29 +506,45 @@ export async function DELETE(
   try {
     const { id } = await params;
 
-    const images =
-      await sql`SELECT image_url FROM images WHERE product_id = ${id}`;
-    for (const img of images) {
+    if (!pool) return NextResponse.json({ error: "Database not configured" }, { status: 500 });
+    const client = await pool.connect();
+    let images: Array<{ image_url: string }> = [];
+    let variantImages: Array<{ image_url: string }> = [];
+    try {
+      await client.query("BEGIN");
+      const tx = transactionSql(client);
+      images = await tx`SELECT image_url FROM images WHERE product_id = ${id}` as Array<{ image_url: string }>;
+      // Variant photos live in a separate table and cascade away with the
+      // product, so their blobs must be collected here too or they leak.
+      variantImages = await tx`
+        SELECT vi.image_url
+        FROM variant_images vi
+        JOIN product_variants v ON v.id = vi.variant_id
+        WHERE v.product_id = ${id}
+      ` as Array<{ image_url: string }>;
+      const ownVariantIds = await variantIdsForProduct(id, tx);
+      const dependentPacks = await packsUsingVariants(ownVariantIds, id, tx);
+      const deleted = await tx`DELETE FROM products WHERE id = ${id} RETURNING id` as Array<{ id: string }>;
+      if (deleted.length === 0) {
+        await client.query("ROLLBACK");
+        return NextResponse.json({ error: "Product not found" }, { status: 404 });
+      }
+      for (const packId of dependentPacks) {
+        await recomputePackProduct(packId, tx);
+        await recomputeDependentPacks(await variantIdsForProduct(packId, tx), tx);
+      }
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => {});
+      throw error;
+    } finally {
+      client.release();
+    }
+    for (const img of [...images, ...variantImages]) {
       if (img.image_url.includes("vercel-storage.com")) {
-        try {
-          await del(img.image_url);
-        } catch (e) {
-          console.error("Failed to delete image:", e);
-        }
+        await del(img.image_url).catch((error) => console.error("Failed to delete image:", error));
       }
     }
-
-    // Packs containing this product's variants need their stock recomputed
-    // after the cascade removes their items — capture them first.
-    const ownVariantIds = await variantIdsForProduct(id);
-    const dependentPacks = await packsUsingVariants(ownVariantIds, id);
-
-    await sql`DELETE FROM products WHERE id = ${id}`;
-
-    for (const packId of dependentPacks) {
-      await recomputePackProduct(packId);
-    }
-
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Error deleting product:", error);

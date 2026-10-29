@@ -23,6 +23,7 @@ function getMaxAllowedQty(item: CartItem, limits: StockLimits): number {
 
 interface CartContextType {
   cart: CartItem[];
+  isHydrated: boolean;
   addToCart: (item: CartItem) => void;
   updateQty: (productId: string, variantId: string, qty: number) => void;
   removeItem: (productId: string, variantId: string) => void;
@@ -65,7 +66,7 @@ function sanitizeCartItems(raw: unknown): CartItem[] {
     const qty = Math.floor(Number(e.qty));
     if (!productId || !variantId || !name) continue;
     if (!Number.isFinite(price) || price < 0 || price > 1_000_000) continue;
-    if (!Number.isFinite(qty) || qty < 1 || qty > 99) continue;
+    if (!Number.isSafeInteger(qty) || qty < 1) continue;
     items.push({
       productId,
       variantId,
@@ -100,13 +101,20 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   } | null>(null);
 
   useEffect(() => {
-    const savedCart = localStorage.getItem("aquatic_emerald_cart");
-    if (savedCart) {
-      try {
-        setCart(sanitizeCartItems(JSON.parse(savedCart)));
-      } catch (e) {
-        console.error("Failed to parse cart from localStorage:", e);
+    // Storage access itself can throw (private mode, blocked cookies, quota),
+    // not just JSON.parse. A cart the browser refuses to read must not take
+    // down the storefront.
+    try {
+      const savedCart = localStorage.getItem("aquatic_emerald_cart");
+      if (savedCart) {
+        try {
+          setCart(sanitizeCartItems(JSON.parse(savedCart)));
+        } catch (e) {
+          console.error("Failed to parse cart from localStorage:", e);
+        }
       }
+    } catch (e) {
+      console.error("Failed to read cart from localStorage:", e);
     }
     setIsHydrated(true);
   }, []);
@@ -130,8 +138,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (isHydrated) {
+    if (!isHydrated) return;
+    try {
       localStorage.setItem("aquatic_emerald_cart", JSON.stringify(cart));
+    } catch (e) {
+      // Persistence is best-effort; the in-memory cart still works.
+      console.error("Failed to persist cart to localStorage:", e);
     }
   }, [cart, isHydrated]);
 
@@ -170,6 +182,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         }
       } catch (error) {
         console.error("Failed to evaluate auto discounts:", error);
+        if (!cancelled) setAutoDiscount(null);
       }
     }
 
@@ -254,6 +267,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     <CartContext.Provider
       value={{
         cart,
+        isHydrated,
         addToCart,
         updateQty,
         removeItem,

@@ -35,7 +35,8 @@ export default function LocationsClient() {
     try {
       const res = await fetch("/api/locations");
       const data = await res.json();
-      setLocations(data || []);
+      if (!res.ok || !Array.isArray(data)) throw new Error("Failed to load locations");
+      setLocations(data);
     } catch (e) {
       console.error(e);
       toast.error("Failed to load locations");

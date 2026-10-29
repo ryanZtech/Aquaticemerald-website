@@ -193,6 +193,15 @@ export default function Navbar() {
           </Link>
 
           <Link
+            href="/gallery"
+            className={`text-sm font-medium transition-colors hover:text-primary ${
+              pathname === "/gallery" ? "text-primary" : "text-muted-foreground"
+            }`}
+          >
+            Gallery
+          </Link>
+
+          <Link
             href="/faq"
             className={`text-sm font-medium transition-colors hover:text-primary ${
               pathname === "/faq" ? "text-primary" : "text-muted-foreground"
@@ -245,6 +254,8 @@ export default function Navbar() {
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             className="md:hidden w-9 h-9 rounded-full bg-secondary flex items-center justify-center hover:bg-accent transition-colors cursor-pointer"
             aria-label="Toggle menu"
+            aria-expanded={mobileMenuOpen}
+            aria-controls="mobile-navigation"
           >
             {mobileMenuOpen ? (
               <X className="w-4 h-4 text-primary" />
@@ -259,6 +270,7 @@ export default function Navbar() {
       <AnimatePresence>
         {mobileMenuOpen && (
           <motion.div
+            id="mobile-navigation"
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
@@ -331,6 +343,17 @@ export default function Navbar() {
               }`}
             >
               Guides
+            </Link>
+
+            <Link
+              href="/gallery"
+              className={`block text-sm font-medium py-2 px-3 rounded-lg hover:bg-accent ${
+                pathname === "/gallery"
+                  ? "text-primary bg-primary/5"
+                  : "text-foreground"
+              }`}
+            >
+              Gallery
             </Link>
 
             <Link

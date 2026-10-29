@@ -61,20 +61,6 @@ export async function POST(request: NextRequest) {
   const cleanEmail = email.trim().slice(0, 320);
   const cleanMessage = message.trim().slice(0, 2000);
 
-  // Persist submission to the database
-  try {
-    await ensureTable();
-    if (sql) {
-      await sql`
-        INSERT INTO contact_submissions (email, message)
-        VALUES (${cleanEmail}, ${cleanMessage})
-      `;
-    }
-  } catch (e) {
-    console.error("Failed to save contact submission to DB:", e);
-    // Non-fatal — we still attempt to send the email.
-  }
-
   let sellerEmail: string | null = null;
   try {
     if (sql) {
@@ -139,5 +125,15 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Save only after the email succeeds, so failed sends do not create duplicate rows on retry.
+  try {
+    await ensureTable();
+    if (sql) {
+      await sql`INSERT INTO contact_submissions (email, message) VALUES (${cleanEmail}, ${cleanMessage})`;
+    }
+  } catch (e) {
+    // The email was already delivered; reporting failure here would encourage a duplicate retry.
+    console.error("Failed to save delivered contact submission:", e);
+  }
   return NextResponse.json({ success: true });
 }

@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useCart } from "@/context/CartContext";
+import { isValidEmail, isValidPhone } from "@/lib/contactValidation";
 import TurnstileWidget, { TurnstileHandle } from "@/components/TurnstileWidget";
 const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
 import {
@@ -32,6 +32,7 @@ interface CheckoutClientProps {
   locations: PickupLocation[];
   hours: PickupHour[];
   whatsapp: string;
+  hasPromoCodes: boolean;
 }
 
 interface TimeRule {
@@ -51,11 +52,37 @@ interface SlotOption {
   maxPickups: number;
 }
 
+const STORE_TIMEZONE = "Australia/Sydney";
+
+function sydneyParts(date: Date) {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: STORE_TIMEZONE, year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23",
+  }).formatToParts(date);
+  return Object.fromEntries(parts.map((p) => [p.type, Number(p.value)]));
+}
+
+function sydneyDate(year: number, month: number, day: number, hour: number, minute: number): Date {
+  const target = Date.UTC(year, month, day, hour, minute);
+  let instant = target;
+  for (let i = 0; i < 3; i++) {
+    const p = sydneyParts(new Date(instant));
+    const represented = Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second);
+    const adjustment = target - represented;
+    if (!adjustment) break;
+    instant += adjustment;
+  }
+  return new Date(instant);
+}
+
 function formatClockValue(date: Date) {
-  return date.toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-  });
+  return date.toLocaleTimeString("en-US", { timeZone: STORE_TIMEZONE, hour: "numeric", minute: "2-digit" });
+}
+
+function createOrderReference() {
+  const bytes = crypto.getRandomValues(new Uint8Array(8));
+  const id = Array.from(bytes, (b) => b.toString(16).padStart(2, "0").toUpperCase()).join("");
+  return `AE-${id.slice(0, 4)}-${id.slice(4, 8)}-${id.slice(8, 12)}-${id.slice(12, 16)}`;
 }
 
 function buildSlotsForDate(
@@ -69,21 +96,22 @@ function buildSlotsForDate(
   for (const rule of rules) {
     const [startHour, startMinute] = rule.start_time.split(":").map(Number);
     const [endHour, endMinute] = rule.end_time.split(":").map(Number);
-    let current = new Date(year, month, day, startHour, startMinute, 0, 0);
-    const end = new Date(year, month, day, endHour, endMinute, 0, 0);
+    const start = startHour * 60 + startMinute;
+    const end = endHour * 60 + endMinute;
     const slotMinutes = Math.max(1, Number(rule.slot_duration_minutes || 15));
 
-    while (current < end) {
-      const next = new Date(current.getTime() + slotMinutes * 60 * 1000);
-      if (next > end) break;
-
+    for (let minute = start; minute + slotMinutes <= end; minute += slotMinutes) {
+      const current = sydneyDate(year, month, day, Math.floor(minute / 60), minute % 60);
+      const nextMinute = minute + slotMinutes;
+      const next = sydneyDate(year, month, day, Math.floor(nextMinute / 60), nextMinute % 60);
+      const parts = sydneyParts(current);
+      // Skip nonexistent local times during the daylight-saving transition.
+      if (parts.year !== year || parts.month !== month + 1 || parts.day !== day || parts.hour !== Math.floor(minute / 60) || parts.minute !== minute % 60) continue;
       slots.push({
         label: `${formatClockValue(current)} - ${formatClockValue(next)}`,
         pickupSlotAt: current.toISOString(),
         maxPickups: Math.max(1, Number(rule.max_pickups_per_slot || 1)),
       });
-
-      current = next;
     }
   }
 
@@ -102,20 +130,24 @@ export default function CheckoutClient({
   locations,
   hours,
   whatsapp,
+  hasPromoCodes,
 }: CheckoutClientProps) {
-  const { cart, cartTotal, clearCart, autoDiscount } = useCart();
-  const router = useRouter();
+  const { cart, cartTotal, clearCart, autoDiscount, isHydrated } = useCart();
+  const [confirmation, setConfirmation] = useState<{ orderRef: string; url: string | null; total: number } | null>(null);
+  const [pendingOrder, setPendingOrder] = useState<Record<string, any> | null>(null);
+  const [quote, setQuote] = useState<{ fingerprint: string; subtotal: number; discountAmount: number; total: number; items: Array<{ productId: string; variantId: string; price: number }> } | null>(null);
 
-  const today = new Date();
-  const todayY = today.getFullYear();
-  const todayM = today.getMonth();
-  const todayD = today.getDate();
+  const today = sydneyParts(new Date());
+  const todayY = today.year;
+  const todayM = today.month - 1;
+  const todayD = today.day;
 
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [location, setLocation] = useState("");
   const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const turnstileRef = useRef<TurnstileHandle>(null);
   const [year, setYear] = useState(todayY);
@@ -137,6 +169,7 @@ export default function CheckoutClient({
     code: string;
     discount_type: string;
     discount_amount: number;
+    discount_value: number;
     description?: string;
     free_item?: { productName: string } | null;
   } | null>(null);
@@ -144,27 +177,68 @@ export default function CheckoutClient({
   const [promoError, setPromoError] = useState("");
 
   useEffect(() => {
-    const generate22CharId = () => {
-      const chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-      const segment = (len: number) => {
-        let res = "";
-        for (let i = 0; i < len; i++) {
-          res += chars.charAt(Math.floor(Math.random() * chars.length));
-        }
-        return res;
-      };
-      return `AE-${segment(4)}-${segment(4)}-${segment(4)}-${segment(4)}`;
+    // Restore each value independently: one corrupt entry must not prevent
+    // the other from being recovered (a lost pending order in particular is
+    // what makes a safe retry after an interrupted response possible).
+    const readSession = (key: string) => {
+      try {
+        return sessionStorage.getItem(key);
+      } catch (error) {
+        console.error(`Could not read ${key} from sessionStorage:`, error);
+        return null;
+      }
     };
-    setOrderId(generate22CharId());
-
-    // Auto-apply promo from URL
-    const params = new URLSearchParams(window.location.search);
-    const promoParam = params.get("promo");
-    if (promoParam) {
-      setPromoCode(promoParam);
-      setTimeout(() => handleApplyPromo(promoParam), 500);
+    const clearSession = (key: string) => {
+      try {
+        sessionStorage.removeItem(key);
+      } catch (error) {
+        console.error(`Could not clear ${key} from sessionStorage:`, error);
+      }
+    };
+    const savedConfirmation = readSession("aquatic_emerald_order_confirmation");
+    if (savedConfirmation) {
+      try {
+        setConfirmation(JSON.parse(savedConfirmation));
+      } catch (error) {
+        console.error("Could not restore order confirmation:", error);
+        clearSession("aquatic_emerald_order_confirmation");
+      }
     }
+    const savedPending = readSession("aquatic_emerald_pending_order");
+    if (savedPending) {
+      try {
+        setPendingOrder(JSON.parse(savedPending));
+      } catch (error) {
+        console.error("Could not restore pending order:", error);
+        clearSession("aquatic_emerald_pending_order");
+      }
+    }
+    setOrderId(createOrderReference());
+
   }, []);
+
+  const initialPromoHandled = useRef(false);
+  useEffect(() => {
+    if (!isHydrated || initialPromoHandled.current) return;
+    const promoParam = new URLSearchParams(window.location.search).get("promo");
+    let storedPromo: string | null = null;
+    try {
+      if (promoParam) sessionStorage.setItem("aquatic_emerald_pending_promo", promoParam);
+      storedPromo = sessionStorage.getItem("aquatic_emerald_pending_promo");
+    } catch (error) {
+      console.error("Could not access the pending promo in sessionStorage:", error);
+    }
+    const pendingPromo = promoParam || storedPromo;
+    if (!pendingPromo || cart.length === 0) return;
+    initialPromoHandled.current = true;
+    try {
+      sessionStorage.removeItem("aquatic_emerald_pending_promo");
+    } catch (error) {
+      console.error("Could not clear the pending promo:", error);
+    }
+    setPromoCode(pendingPromo);
+    void handleApplyPromo(pendingPromo);
+  }, [isHydrated, cart]);
 
   const handleApplyPromo = async (code?: string) => {
     const codeToApply = code || promoCode;
@@ -189,6 +263,7 @@ export default function CheckoutClient({
           code: data.code,
           discount_type: data.discount_type,
           discount_amount: data.discount_amount || 0,
+          discount_value: Number(data.discount_value) || 0,
           description: data.description,
           free_item: data.free_item || null,
         });
@@ -213,16 +288,21 @@ export default function CheckoutClient({
     setPromoError("");
   };
 
-  const subtotal = cart.reduce((s, it) => s + it.price * it.qty, 0);
+  const fingerprint = JSON.stringify({ cart, autoDiscount, appliedPromo });
+  const activeQuote = quote?.fingerprint === fingerprint ? quote : null;
+  const money = (amount: number) => Math.round((amount + Number.EPSILON) * 100) / 100;
+  const subtotal = activeQuote?.subtotal ?? money(cart.reduce((s, it) => s + it.price * it.qty, 0));
   // Combine the automatic discount (evaluated from the cart, no code
   // needed) with any manually-applied promo code — this mirrors exactly
   // how the server computes it in orders/route.ts (autoDiscountAmount +
   // promo discount, additive), so what's shown here is what will actually
   // be charged rather than a guess that only ever reflected the promo code.
   const autoDiscountAmount = autoDiscount?.discount_amount || 0;
-  const promoDiscountAmount = appliedPromo?.discount_amount || 0;
-  const discountAmount = autoDiscountAmount + promoDiscountAmount;
-  const finalTotal = Math.max(0, subtotal - discountAmount);
+  const promoDiscountAmount = !appliedPromo ? 0 : appliedPromo.discount_type === "percentage"
+    ? Math.min(subtotal, subtotal * appliedPromo.discount_value / 100)
+    : appliedPromo.discount_type === "fixed_amount" ? Math.min(subtotal, appliedPromo.discount_value) : 0;
+  const discountAmount = activeQuote?.discountAmount ?? Math.min(subtotal, money(autoDiscountAmount + promoDiscountAmount));
+  const finalTotal = activeQuote?.total ?? money(Math.max(0, subtotal - discountAmount));
 
   const availableMonths = Array.from({ length: 6 }, (_, i) => {
     const d = new Date(todayY, todayM + i, 1);
@@ -262,7 +342,7 @@ export default function CheckoutClient({
     // Block past dates
     if (year < todayY) return true;
     if (year === todayY && month < todayM) return true;
-    if (year === todayY && month === todayM && d <= todayD) return true;
+    if (year === todayY && month === todayM && d < todayD) return true;
     
     // If no location selected, allow all future dates
     if (!location || isCustomLocation) return false;
@@ -281,6 +361,10 @@ export default function CheckoutClient({
           rule.weekday === dow
       );
       if (!hasRules) return true;
+      if (year === todayY && month === todayM && d === todayD) {
+        const rules = timeRules.filter((rule) => rule.active && rule.pickup_location_id === selectedLocationId && rule.weekday === dow);
+        return !buildSlotsForDate(rules, year, month, d).some((slot) => new Date(slot.pickupSlotAt).getTime() > Date.now());
+      }
     }
     
     return false;
@@ -304,7 +388,7 @@ export default function CheckoutClient({
   const timeWindows = slotOptions.map((slot) => ({
     ...slot,
     bookedCount: bookedSlotCounts[slot.pickupSlotAt] || 0,
-    disabled: (bookedSlotCounts[slot.pickupSlotAt] || 0) >= slot.maxPickups,
+    disabled: loadingSlots || new Date(slot.pickupSlotAt).getTime() <= Date.now() || (bookedSlotCounts[slot.pickupSlotAt] || 0) >= slot.maxPickups,
   }));
 
   useEffect(() => {
@@ -317,6 +401,10 @@ export default function CheckoutClient({
 
     async function loadBookedSlots() {
       setLoadingSlots(true);
+      // Do not let counts from the previously selected day/location mark
+      // slots here as full (or leave a stale full slot enabled) if this
+      // request fails.
+      setBookedSlotCounts({});
       try {
         // Aggregate booked counts only — the admin-only /api/orders endpoint
         // would (correctly) 401 for customers.
@@ -324,7 +412,10 @@ export default function CheckoutClient({
           `/api/slots/availability?locationId=${selectedLocationId}`,
           { cache: "no-store" }
         );
-        if (!res.ok) return;
+        if (!res.ok) {
+          if (!cancelled) setBookedSlotCounts({});
+          return;
+        }
         const data = await res.json();
         const counts: Record<string, number> = isPlainObject(data)
           ? data
@@ -335,6 +426,7 @@ export default function CheckoutClient({
         }
       } catch (error) {
         console.error("Failed to load booked slots:", error);
+        if (!cancelled) setBookedSlotCounts({});
       } finally {
         if (!cancelled) {
           setLoadingSlots(false);
@@ -386,17 +478,18 @@ export default function CheckoutClient({
 
   const canConfirm =
     name.trim().length >= 2 &&
-    phone.trim().length >= 8 &&
-    email.trim().includes("@") &&
+    isValidPhone(phone) &&
+    isValidEmail(email) &&
     location &&
     (isCustomLocation || (day !== null && timeWindow)) &&
-    Boolean(turnstileToken);
+    Boolean(turnstileToken) && finalTotal >= 5 && !promoLoading;
 
   const getMissingFields = () => {
     const missing: string[] = [];
     if (name.trim().length < 2) missing.push("name");
-    if (phone.trim().length < 8) missing.push("phone number");
-    if (!email.trim().includes("@")) missing.push("email");
+    if (!isValidPhone(phone)) missing.push("phone number");
+    if (!isValidEmail(email)) missing.push("email");
+    if (finalTotal < 5) missing.push("minimum order of $5");
     if (!location) missing.push("location");
     if (!isCustomLocation) {
       if (day === null) missing.push("date");
@@ -412,20 +505,27 @@ export default function CheckoutClient({
     : "";
 
   const handleConfirm = async () => {
+    if (savingRef.current) return;
     let hasError = false;
     if (!name.trim() || name.trim().length < 2) {
       setNameError(true);
       hasError = true;
     }
-    if (!phone.trim() || phone.trim().length < 8) {
+    if (!isValidPhone(phone)) {
       setPhoneError(true);
       hasError = true;
     }
 
+    if (pendingOrder) hasError = false;
     if (hasError) return;
 
-    if (!email.trim() || !email.includes("@")) {
+    if (!pendingOrder && !isValidEmail(email)) {
       alert("Please enter a valid email address");
+      return;
+    }
+
+    if (!pendingOrder && finalTotal < 5) {
+      alert("Minimum order is $5.00. Please add more items.");
       return;
     }
 
@@ -434,26 +534,31 @@ export default function CheckoutClient({
       return;
     }
 
+    savingRef.current = true;
     setSaving(true);
+    let pendingPayload: Record<string, any> | null = null;
     try {
       const pickup_slot_at = isCustomLocation ? null : timeWindow;
 
-      const payload = {
+      const payload = pendingOrder ? { ...pendingOrder, turnstile_token: turnstileToken } : {
         orderRef: orderId,
         customer_name: name || "",
         customer_email: email,
         customer_phone: phone,
         pickup_location_id: isCustomLocation ? null : parseInt(location) || null,
         pickup_slot_at,
-        cart,
+        cart: cart.map((item) => ({ ...item, price: activeQuote?.items.find((v) => v.productId === item.productId && v.variantId === item.variantId)?.price ?? item.price })),
         subtotal,
         total: finalTotal,
         promo_code: appliedPromo?.code || null,
+        expected_auto_free_variant: autoDiscount?.free_item?.variantId || null,
         discount_amount: discountAmount,
         notes: isCustomLocation ? `Custom location - to be negotiated via WhatsApp` : "",
         turnstile_token: turnstileToken,
       };
 
+      pendingPayload = { ...payload, turnstile_token: null };
+      sessionStorage.setItem("aquatic_emerald_pending_order", JSON.stringify(pendingPayload));
       const res = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -461,8 +566,23 @@ export default function CheckoutClient({
       });
 
       if (!res.ok) {
-        const err = await res.json();
+        const err = await res.json().catch(() => ({}));
         console.error("Order creation failed:", err);
+        const priceQuote = res.status === 409 && err.quote;
+        if (priceQuote) {
+          setQuote({ ...err.quote, fingerprint });
+        }
+        // Ambiguous failures (network/timeout/5xx/rate limit) keep the
+        // pending reference so a retry is idempotent. A definite 4xx means
+        // the request was rejected, so return to the form instead of
+        // trapping the customer on a retry screen that can never succeed.
+        const ambiguous = res.status >= 500 || res.status === 429 || (res.status === 409 && !priceQuote);
+        if (ambiguous) {
+          setPendingOrder(pendingPayload);
+        } else {
+          sessionStorage.removeItem("aquatic_emerald_pending_order");
+          setPendingOrder(null);
+        }
         alert(err.error || "Failed to create order. Please try again.");
         // The Turnstile token is single-use — whether it was this request
         // that consumed it or it had simply expired, a retry needs a fresh
@@ -475,26 +595,68 @@ export default function CheckoutClient({
       const result = await res.json();
       console.log("Order created successfully:", result);
 
-      const msg = isCustomLocation 
-        ? `my order number is ${orderId}, please confirm my order. I would like to arrange a custom pickup location and time with you.`
-        : `my order number is ${orderId}, please confirm my order`;
-      const whatsappUrl = `https://wa.me/${whatsapp}?text=${encodeURIComponent(msg)}`;
-
-      window.open(whatsappUrl, "_blank");
-
-      setTimeout(() => {
-        clearCart();
-        router.push("/");
-      }, 500);
+      const ref = String(payload.orderRef);
+      const msg = !payload.pickup_location_id
+        ? `my order number is ${ref}, please confirm my order. I would like to arrange a custom pickup location and time with you.`
+        : `my order number is ${ref}, please confirm my order`;
+      const phoneNumber = whatsapp.replace(/\D/g, "");
+      const confirmed = { orderRef: ref, total: Number(result.total), url: phoneNumber ? `https://wa.me/${phoneNumber}?text=${encodeURIComponent(msg)}` : null };
+      sessionStorage.setItem("aquatic_emerald_order_confirmation", JSON.stringify(confirmed));
+      sessionStorage.removeItem("aquatic_emerald_pending_order");
+      setPendingOrder(null);
+      setConfirmation(confirmed);
+      clearCart();
     } catch (e) {
       console.error(e);
-      alert("Failed to submit order");
+      if (pendingPayload) setPendingOrder(pendingPayload);
+      alert("The order response was lost. Please retry this same order; do not start a new checkout.");
       setTurnstileToken(null);
       turnstileRef.current?.reset();
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   };
+
+  if (confirmation) {
+    return (
+      <div className="pt-24 pb-16 px-4 max-w-xl mx-auto text-center min-h-screen flex flex-col justify-center items-center gap-4">
+        <h1 className="font-serif text-3xl">Order received</h1>
+        <p>Your order reference is <strong>{confirmation.orderRef}</strong>.</p>
+        <p>Order total: ${confirmation.total.toFixed(2)}</p>
+        {confirmation.url ? <a href={confirmation.url} target="_blank" rel="noopener noreferrer" className="px-6 py-3 bg-primary text-primary-foreground rounded-full">Confirm on WhatsApp</a> : <p>WhatsApp is unavailable. Please contact the store with your order reference.</p>}
+        <Link href="/products" className="underline" onClick={() => { sessionStorage.removeItem("aquatic_emerald_order_confirmation"); setConfirmation(null); }}>Continue shopping</Link>
+      </div>
+    );
+  }
+
+  if (pendingOrder) {
+    const startNewOrder = () => {
+      // Escape hatch for a reference the server will never let through
+      // (for example a hash mismatch). Only the pending marker and local
+      // reference are reset — no request is sent, so this cannot create a
+      // duplicate by itself.
+      try {
+        sessionStorage.removeItem("aquatic_emerald_pending_order");
+      } catch (error) {
+        console.error("Could not clear the pending order:", error);
+      }
+      setPendingOrder(null);
+      setTurnstileToken(null);
+      setOrderId(createOrderReference());
+    };
+
+    return <div className="pt-24 pb-16 px-4 max-w-xl mx-auto text-center min-h-screen flex flex-col justify-center items-center gap-4">
+      <h1 className="font-serif text-3xl">Check your order</h1>
+      <p>The previous response was interrupted. Retry order <strong>{String(pendingOrder.orderRef)}</strong> to safely recover its result.</p>
+      <TurnstileWidget ref={turnstileRef} siteKey={TURNSTILE_SITE_KEY} onVerify={setTurnstileToken} onExpire={() => setTurnstileToken(null)} onError={() => setTurnstileToken(null)} />
+      <button type="button" onClick={handleConfirm} disabled={!turnstileToken || saving} className="px-6 py-3 bg-primary text-primary-foreground rounded-full disabled:opacity-50">{saving ? "Checking…" : "Retry order"}</button>
+      <p className="text-xs text-muted-foreground max-w-sm">
+        If retrying keeps failing and you have not received an order confirmation, you can start a new checkout. Do not do this if your order was already confirmed.
+      </p>
+      <button type="button" onClick={startNewOrder} disabled={saving} className="text-sm underline text-muted-foreground disabled:opacity-50">Start a new order</button>
+    </div>;
+  }
 
   if (cart.length === 0) {
     return (
@@ -554,7 +716,7 @@ export default function CheckoutClient({
                   </span>
                 </span>
                 <span className="font-medium">
-                  ${(item.price * item.qty).toFixed(2)}
+                  ${((activeQuote?.items.find((v) => v.productId === item.productId && v.variantId === item.variantId)?.price ?? item.price) * item.qty).toFixed(2)}
                 </span>
               </div>
             ))}
@@ -589,7 +751,7 @@ export default function CheckoutClient({
           )}
 
           {/* Promo Code Input */}
-          {!appliedPromo ? (
+          {!hasPromoCodes && !appliedPromo && !promoError ? null : !appliedPromo ? (
             <div className="mb-4 pb-4 border-b border-border">
               <label className="text-xs font-medium mb-2 block">Promo Code</label>
               <div className="flex gap-2">
@@ -671,10 +833,11 @@ export default function CheckoutClient({
           </p>
           <div className="space-y-4">
             <div>
-              <label className="flex items-center gap-2 text-sm font-medium mb-2">
+              <label htmlFor="checkout-phone" className="flex items-center gap-2 text-sm font-medium mb-2">
                 <Phone className="w-4 h-4 text-muted-foreground" /> Phone Number
               </label>
               <input
+                id="checkout-phone"
                 type="tel"
                 value={phone}
                 onChange={(e) => {
@@ -691,10 +854,11 @@ export default function CheckoutClient({
               )}
             </div>
             <div>
-              <label className="flex items-center gap-2 text-sm font-medium mb-2">
+              <label htmlFor="checkout-email" className="flex items-center gap-2 text-sm font-medium mb-2">
                 <Mail className="w-4 h-4 text-muted-foreground" /> Email
               </label>
               <input
+                id="checkout-email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -703,10 +867,11 @@ export default function CheckoutClient({
               />
             </div>
             <div>
-              <label className="flex items-center gap-2 text-sm font-medium mb-2">
+              <label htmlFor="checkout-name" className="flex items-center gap-2 text-sm font-medium mb-2">
                 <User className="w-4 h-4 text-muted-foreground" /> Name *
               </label>
               <input
+                id="checkout-name"
                 type="text"
                 value={name}
                 onChange={(e) => {
@@ -929,7 +1094,7 @@ export default function CheckoutClient({
           </button>
           {canConfirm && (
             <p className="text-center text-xs text-muted-foreground mt-3 leading-relaxed font-light">
-              This opens WhatsApp with your order reference number pre-filled.
+              After placing your order, use the confirmation link to message us on WhatsApp.
               Your order is confirmed once the seller responds.
             </p>
           )}

@@ -3,9 +3,10 @@ import { jwtVerify } from "jose";
 import { redirect } from "next/navigation";
 import { sanitizeEnv } from "@/lib/env";
 import { Button } from "@/app/components/ui/button";
-import { LogOut, Package, MapPin, Settings, FolderTree, ShoppingCart, BookOpen, Clock, CircleHelp, Percent, MessageSquare } from "lucide-react";
+import { LogOut, Package, MapPin, Settings, FolderTree, ShoppingCart, BookOpen, Clock, CircleHelp, Percent, MessageSquare, Images } from "lucide-react";
 import Link from "next/link";
 import { logoutAdmin } from "@/app/actions/auth";
+import { Toaster } from "sonner";
 
 export default async function AdminLayout({
   children,
@@ -93,6 +94,12 @@ export default async function AdminLayout({
             <BookOpen className="w-4 h-4 text-foreground transition-transform duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)] group-hover:scale-125 group-hover:-rotate-6" /> Care Guides
           </Link>
           <Link
+            href="/admin/gallery"
+            className="group flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-accent text-sm font-medium transition-colors"
+          >
+            <Images className="w-4 h-4 text-foreground transition-transform duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)] group-hover:scale-125 group-hover:-rotate-6" /> Gallery
+          </Link>
+          <Link
             href="/admin/faq"
             className="group flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-accent text-sm font-medium transition-colors"
           >
@@ -120,6 +127,7 @@ export default async function AdminLayout({
 
       {}
       <main className="flex-1 min-w-0 p-6 sm:p-10">{children}</main>
+      <Toaster richColors />
     </div>
   );
 }

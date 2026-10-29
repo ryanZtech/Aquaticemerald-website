@@ -4,6 +4,12 @@ import { buildCustomerHtml, buildSellerHtml } from "@/lib/emailTemplatesSimple";
 import { requireAdmin } from "@/lib/adminAuth";
 import { rateLimit, getClientIp } from "@/lib/rateLimit";
 import { verifyTurnstileToken } from "@/lib/turnstile";
+import { STORE_TIMEZONE } from "@/lib/pickupSlots";
+import { isValidEmail, isValidPhone } from "@/lib/contactValidation";
+import { createHash } from "node:crypto";
+import type { PoolClient } from "@neondatabase/serverless";
+
+const money = (amount: number) => Math.round((amount + Number.EPSILON) * 100) / 100;
 import {
   parseStockLimitSettings,
   maxQtyForLevel,
@@ -24,33 +30,26 @@ interface OrderLineItem {
 async function findFreeVariant(
   productId: string,
   preferredVariantId: string | null,
+  client?: PoolClient,
 ): Promise<{ id: string; label: string | null; product_name: string } | null> {
-  if (!sql) return null;
-  if (preferredVariantId) {
-    const rows = await sql`
-      SELECT v.id, v.label, v.stock_level, p.name AS product_name
-      FROM product_variants v
-      JOIN products p ON p.id = v.product_id
-      WHERE v.id = ${preferredVariantId} AND v.product_id = ${productId}
-        AND v.active = TRUE AND p.active = TRUE
-      LIMIT 1
-    `;
-    if (rows.length > 0 && rows[0].stock_level !== "none") {
-      return { id: rows[0].id, label: rows[0].label, product_name: rows[0].product_name };
-    }
+  if (client) {
+    const result = await client.query(
+      `SELECT v.id, v.label, p.name AS product_name FROM product_variants v
+       JOIN products p ON p.id = v.product_id
+       WHERE v.product_id = $1 AND v.active = TRUE AND p.active = TRUE AND v.stock_level != 'none'
+       ORDER BY (v.id = $2) DESC NULLS LAST, v.price ASC, v.id ASC LIMIT 1`,
+      [productId, preferredVariantId],
+    );
+    return result.rows[0] ?? null;
   }
-  // Fall back to the cheapest in-stock variant of the product.
-  const fallbackRows = await sql`
-    SELECT v.id, v.label, v.stock_level, p.name AS product_name
-    FROM product_variants v
+  if (!sql) return null;
+  const rows = await sql`
+    SELECT v.id, v.label, p.name AS product_name FROM product_variants v
     JOIN products p ON p.id = v.product_id
-    WHERE v.product_id = ${productId} AND v.stock_level != 'none'
-      AND v.active = TRUE AND p.active = TRUE
-    ORDER BY v.price ASC
-    LIMIT 1
+    WHERE v.product_id = ${productId} AND v.active = TRUE AND p.active = TRUE AND v.stock_level != 'none'
+    ORDER BY (v.id = ${preferredVariantId}) DESC NULLS LAST, v.price ASC, v.id ASC LIMIT 1
   `;
-  if (fallbackRows.length === 0) return null;
-  return { id: fallbackRows[0].id, label: fallbackRows[0].label, product_name: fallbackRows[0].product_name };
+  return rows[0] ? { id: rows[0].id, label: rows[0].label, product_name: rows[0].product_name } : null;
 }
 
 export async function GET() {
@@ -66,7 +65,7 @@ export async function GET() {
 
   try {
     const rows = await sql`
-      SELECT o.id, o.customer_name, o.customer_email, o.customer_phone, o.pickup_location_id, pl.name as pickup_location_name, pl.address as pickup_location_detail, o.pickup_slot_at, o.status, o.subtotal, o.discount_amount, o.promo_code, o.total, o.created_at,
+      SELECT o.id, o.customer_name, o.customer_email, o.customer_phone, o.pickup_location_id, pl.name as pickup_location_name, pl.address as pickup_location_detail, o.pickup_slot_at, o.status, o.notes, o.subtotal, o.discount_amount, o.promo_code, o.total, o.created_at,
         coalesce(
           json_agg(
             json_build_object(
@@ -110,12 +109,16 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  let reservedSlot = false;
-  let reservedLocationId: number | null = null;
-  let reservedSlotAt: string | null = null;
 
+  let committedResult: { success: true; orderId: number | null; subtotal: number; discountAmount: number; total: number; promoCode: string | null; freeItems: string[] } | null = null;
+  let orderLockClient: PoolClient | null = null;
   try {
-    const body = await request.json();
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
+    }
     const {
       orderRef,
       customer_name,
@@ -126,9 +129,13 @@ export async function POST(request: NextRequest) {
       cart: rawCart = [],
       notes,
       promo_code,
+      expected_auto_free_variant,
       turnstile_token,
     } = body || {};
 
+    if (typeof orderRef !== "string" || !/^AE-[A-Z0-9]{4}(?:-[A-Z0-9]{4}){3}$/.test(orderRef)) {
+      return NextResponse.json({ error: "Invalid order reference. Please reload checkout." }, { status: 400 });
+    }
     if (!customer_name || String(customer_name).trim().length < 2) {
       return NextResponse.json({ error: "Customer name is required and must be at least 2 characters." }, { status: 400 });
     }
@@ -142,9 +149,53 @@ export async function POST(request: NextRequest) {
     const cleanNotes = notes ? String(notes).slice(0, 2000) : "";
     const cleanPromoCode = promo_code ? String(promo_code).trim().slice(0, 60) : null;
     const cleanOrderRef = orderRef ? String(orderRef).trim().slice(0, 40) : "";
+    if (typeof customer_email !== "string" || !isValidEmail(customer_email)) {
+      return NextResponse.json({ error: "Please enter a valid email address." }, { status: 400 });
+    }
+    if (typeof customer_phone !== "string" || !isValidPhone(customer_phone)) {
+      return NextResponse.json({ error: "Please enter a valid phone number." }, { status: 400 });
+    }
 
     if (!Array.isArray(rawCart) || rawCart.length === 0) {
       return NextResponse.json({ error: "Your cart is empty." }, { status: 400 });
+    }
+
+    // A random reference and a hash of the submitted order make retries safe even
+    // if the first response was lost after the transaction committed.
+    const requestHash = createHash("sha256").update(JSON.stringify({
+      orderRef, customer_name: cleanName, customer_email: cleanEmail.toLowerCase(),
+      customer_phone: cleanPhone, pickup_location_id, pickup_slot_at, cart: rawCart,
+      notes: cleanNotes, promo_code: cleanPromoCode,
+      expected_auto_free_variant, expected_subtotal: body.subtotal,
+      expected_discount: body.discount_amount, expected_total: body.total,
+    })).digest("hex");
+    if (!pool) return NextResponse.json({ error: "Database not configured" }, { status: 500 });
+    // Serialize initialization: concurrent CREATE TABLE IF NOT EXISTS can
+    // still race in PostgreSQL before the table has been created.
+    const setupClient = await pool.connect();
+    try {
+      await setupClient.query("BEGIN");
+      await setupClient.query("SELECT pg_advisory_xact_lock(hashtext('order-submission-schema'))");
+      await setupClient.query(`CREATE TABLE IF NOT EXISTS order_submission_keys (
+        reference TEXT PRIMARY KEY, request_hash TEXT NOT NULL, result JSONB NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )`);
+      await setupClient.query("COMMIT");
+    } catch (error) {
+      await setupClient.query("ROLLBACK").catch(() => {});
+      throw error;
+    } finally {
+      setupClient.release();
+    }
+    // Fast path for a retry whose first response was lost: the key row is
+    // permanent once its transaction commits. This lookup deliberately does
+    // NOT take a pooled connection or open a transaction — Turnstile and the
+    // catalog reads below must not hold a database session. The authoritative
+    // re-check happens under the per-reference advisory lock before writing.
+    const previous = await sql`SELECT request_hash, result FROM order_submission_keys WHERE reference = ${cleanOrderRef}`;
+    if (previous.length) {
+      if (previous[0].request_hash !== requestHash) return NextResponse.json({ error: "This reference was already used for a different order. Please contact the store." }, { status: 409 });
+      return NextResponse.json(previous[0].result);
     }
 
     // Same rule as everywhere else Turnstile is used in this app: verify
@@ -183,23 +234,27 @@ export async function POST(request: NextRequest) {
       qty: number;
     }> = [];
 
+    const quantities = new Map<string, number>();
     for (const rawItem of rawCart) {
+      const qty = Number(rawItem?.qty);
+      if (!rawItem?.productId || !rawItem?.variantId || !Number.isSafeInteger(qty) || qty < 1) {
+        return NextResponse.json({ error: "Invalid item in cart." }, { status: 400 });
+      }
+      const key = JSON.stringify([String(rawItem.productId), String(rawItem.variantId)]);
+      quantities.set(key, (quantities.get(key) || 0) + qty);
+    }
+
+    for (const [key, qty] of quantities) {
+      const [productId, variantId] = JSON.parse(key) as [string, string];
       // NOTE: products.id and product_variants.id are TEXT (slug-style) primary
       // keys, not numeric IDs — do not coerce with Number(), or every valid
       // item will be rejected as NaN.
-      const productId = rawItem?.productId ? String(rawItem.productId) : null;
-      const variantId = rawItem?.variantId ? String(rawItem.variantId) : null;
-      const qty = Math.max(1, Math.floor(Number(rawItem?.qty) || 0));
-
-      if (!productId || !variantId || qty < 1) {
-        return NextResponse.json({ error: "Invalid item in cart." }, { status: 400 });
-      }
-
       const variantRows = await sql`
         SELECT v.id, v.label, v.price, v.stock_level, v.product_id, p.name AS product_name
         FROM product_variants v
         JOIN products p ON p.id = v.product_id
         WHERE v.id = ${variantId} AND v.product_id = ${productId}
+          AND v.active = TRUE AND p.active = TRUE
         LIMIT 1
       `;
 
@@ -241,7 +296,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const subtotal = verifiedCart.reduce((sum, it) => sum + it.price * it.qty, 0);
+    const subtotal = money(verifiedCart.reduce((sum, it) => sum + money(it.price) * it.qty, 0));
 
     // --- Auto-discounts (e.g. "spend $50 get $10 off", "buy X get Y free") ---
     // These were previously evaluated only for display on the cart page
@@ -266,10 +321,10 @@ export async function POST(request: NextRequest) {
         if (discount.trigger_type === "spend_amount") {
           triggerMet = subtotal >= Math.max(0, Number(discount.trigger_spend_amount || 0));
         } else if (discount.trigger_type === "item_in_cart") {
-          triggerMet = verifiedCart.some((it) => String(it.productId || "") === String(discount.trigger_product_id || ""));
+          triggerMet = verifiedCart.some((it) => String(it.productId || "") === String(discount.trigger_product_id || "") && (!discount.trigger_variant_id || String(it.variantId) === String(discount.trigger_variant_id)));
         } else if (discount.trigger_type === "both") {
           const spendMet = subtotal >= Math.max(0, Number(discount.trigger_spend_amount || 0));
-          const itemMet = verifiedCart.some((it) => String(it.productId || "") === String(discount.trigger_product_id || ""));
+          const itemMet = verifiedCart.some((it) => String(it.productId || "") === String(discount.trigger_product_id || "") && (!discount.trigger_variant_id || String(it.variantId) === String(discount.trigger_variant_id)));
           triggerMet = spendMet && itemMet;
         }
 
@@ -281,6 +336,7 @@ export async function POST(request: NextRequest) {
           autoDiscountAmount = Math.min(subtotal, subtotal * Math.max(0, Math.min(100, Number(discount.effect_value || 0))) / 100);
         } else if (discount.effect_type === "free_item" && discount.effect_free_product_id) {
           const variant = await findFreeVariant(discount.effect_free_product_id, discount.effect_free_variant_id);
+          if (!variant) continue;
           if (variant) {
             autoFreeItem = {
               productId: discount.effect_free_product_id,
@@ -295,21 +351,23 @@ export async function POST(request: NextRequest) {
         break; // highest-priority matching discount wins
       }
     } catch (e) {
-      // An auto-discount misconfiguration shouldn't block checkout.
       console.error("Failed to evaluate auto-discounts:", e);
+      return NextResponse.json({ error: "Unable to verify discounts. Please try again." }, { status: 503 });
     }
 
-    // Enforce the $5 minimum order server-side (the cart page only
-    // enforces this in the browser, which a direct API call bypasses).
-    // Provisional check with the auto-discount; re-checked against the
-    // final total inside the transaction once the promo code is applied.
-    if (Math.max(0, subtotal - autoDiscountAmount) < 5) {
-      return NextResponse.json({ error: "Minimum order is $5.00. Please add more items." }, { status: 400 });
+    if (expected_auto_free_variant && autoFreeItem?.variantId !== String(expected_auto_free_variant)) {
+      return NextResponse.json({ error: "The promotional item is no longer available. Please review your cart." }, { status: 400 });
     }
 
     const pickupLocationId = pickup_location_id ? Number(pickup_location_id) : null;
     const slotStart = pickup_slot_at || null;
-    const isCustomLocation = !pickupLocationId || !Number.isInteger(pickupLocationId) || pickupLocationId < 1;
+    const isCustomLocation = pickup_location_id == null || pickup_location_id === "";
+    if (isCustomLocation && slotStart) {
+      return NextResponse.json({ error: "Custom pickup locations cannot have a reserved time." }, { status: 400 });
+    }
+    if (!isCustomLocation && (!Number.isInteger(pickupLocationId) || !pickupLocationId || pickupLocationId < 1)) {
+      return NextResponse.json({ error: "Invalid pickup location." }, { status: 400 });
+    }
     if (!isCustomLocation && !slotStart) {
       return NextResponse.json({ error: "Please choose a pickup date and time." }, { status: 400 });
     }
@@ -325,37 +383,12 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    if (resolvedLocationId && slotStart) {
-      const dayOfWeek = new Date(slotStart).getDay();
-      const ruleRows = await sql`
-        SELECT max_pickups_per_slot FROM weekly_availability_rules
-        WHERE pickup_location_id = ${resolvedLocationId}
-          AND weekday = ${dayOfWeek}
-          AND active = TRUE
-        LIMIT 1
-      `;
-      const maxPickups = Math.max(1, Number(ruleRows[0]?.max_pickups_per_slot || 1));
-
-      const reservationRows = await sql`
-        INSERT INTO slot_reservations (pickup_location_id, slot_at, current_count, max_capacity, is_blocked)
-        VALUES (${resolvedLocationId}, ${slotStart}, 1, ${maxPickups}, FALSE)
-        ON CONFLICT (pickup_location_id, slot_at)
-        DO UPDATE
-        SET current_count = slot_reservations.current_count + 1,
-            max_capacity = EXCLUDED.max_capacity
-        WHERE NOT slot_reservations.is_blocked
-          AND slot_reservations.current_count < slot_reservations.max_capacity
-        RETURNING id, current_count, max_capacity
-      `;
-
-      if (!reservationRows || reservationRows.length === 0) {
-        return NextResponse.json({ error: "This time slot is fully booked. Please choose another time." }, { status: 400 });
-      }
-
-      reservedSlot = true;
-      reservedLocationId = resolvedLocationId;
-      reservedSlotAt = slotStart;
+    if (!isCustomLocation && (!Number.isInteger(pickupLocationId) || !slotStart || Number.isNaN(new Date(slotStart).getTime()))) {
+      return NextResponse.json({ error: "Invalid pickup location or time." }, { status: 400 });
     }
+
+    // Load all data needed for confirmations before committing the order.
+    const pickupDetails = resolvedLocationId ? await sql`SELECT name, address AS detail FROM pickup_locations WHERE id = ${resolvedLocationId}` : [];
 
     if (!pool) {
       return NextResponse.json({ error: "Database not configured" }, { status: 500 });
@@ -380,14 +413,67 @@ export async function POST(request: NextRequest) {
     //    allows. `SELECT ... FOR UPDATE` below locks the discount code's
     //    row so a second concurrent redemption blocks until the first
     //    transaction commits (or rolls back), then re-checks the count.
+    // Take the lock only after Turnstile and every catalog read. Holding an
+    // open transaction across those (especially the external siteverify
+    // call) would tie up a pool connection for the whole checkout and can
+    // exhaust the pool under concurrent orders.
     const client = await pool.connect();
+    orderLockClient = client;
+    await client.query("BEGIN");
+    await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`order:${cleanOrderRef}`]);
     let orderId: number | null = null;
     let discountAmount = autoDiscountAmount;
     let appliedPromoCode: string | null = null;
     let promoFreeItem: OrderLineItem | null = null;
 
     try {
-      await client.query("BEGIN");
+      const prior = await client.query("SELECT request_hash, result FROM order_submission_keys WHERE reference = $1", [cleanOrderRef]);
+      if (prior.rows.length) {
+        await client.query("ROLLBACK");
+        if (prior.rows[0].request_hash !== requestHash) return NextResponse.json({ error: "This reference was already used for a different order. Please contact the store." }, { status: 409 });
+        return NextResponse.json(prior.rows[0].result);
+      }
+
+      if (!isCustomLocation) {
+        const rules = await client.query(
+          `SELECT r.max_pickups_per_slot
+           FROM weekly_availability_rules r
+           JOIN pickup_locations l ON l.id = r.pickup_location_id AND l.active = TRUE
+           WHERE r.pickup_location_id = $1 AND r.active = TRUE
+             AND $2::timestamptz > CURRENT_TIMESTAMP
+             AND r.weekday = EXTRACT(DOW FROM $2::timestamptz AT TIME ZONE 'Australia/Sydney')
+             AND ($2::timestamptz AT TIME ZONE 'Australia/Sydney')::time >= r.start_time
+             AND ($2::timestamptz AT TIME ZONE 'Australia/Sydney')::time + make_interval(mins => r.slot_duration_minutes) <= r.end_time
+             AND EXTRACT(SECOND FROM ($2::timestamptz AT TIME ZONE 'Australia/Sydney')::time) = 0
+             AND mod(EXTRACT(EPOCH FROM (($2::timestamptz AT TIME ZONE 'Australia/Sydney')::time - r.start_time))::integer, NULLIF(r.slot_duration_minutes * 60, 0)) = 0
+             AND r.slot_duration_minutes > 0 AND r.max_pickups_per_slot > 0
+           ORDER BY r.id LIMIT 1`,
+          [resolvedLocationId, slotStart],
+        );
+        if (!rules.rows.length) {
+          await client.query("ROLLBACK");
+          return NextResponse.json({ error: "This pickup time is not available. Please choose another time." }, { status: 400 });
+        }
+        await client.query(
+          `INSERT INTO slot_reservations (pickup_location_id, slot_at, current_count, max_capacity, is_blocked)
+           VALUES ($1, $2, 0, $3, FALSE) ON CONFLICT (pickup_location_id, slot_at) DO NOTHING`,
+          [resolvedLocationId, slotStart, rules.rows[0].max_pickups_per_slot],
+        );
+        await client.query("SELECT id FROM slot_reservations WHERE pickup_location_id = $1 AND slot_at = $2 FOR UPDATE", [resolvedLocationId, slotStart]);
+        const reservation = await client.query(
+          `UPDATE slot_reservations r SET current_count = GREATEST(r.current_count,
+             (SELECT COUNT(*) FROM orders o WHERE o.pickup_location_id = $1 AND o.pickup_slot_at = $2 AND o.status != 'cancelled')) + 1,
+             max_capacity = $3
+           WHERE r.pickup_location_id = $1 AND r.slot_at = $2 AND NOT r.is_blocked
+             AND GREATEST(r.current_count, (SELECT COUNT(*) FROM orders o WHERE o.pickup_location_id = $1 AND o.pickup_slot_at = $2 AND o.status != 'cancelled')) < $3
+           RETURNING r.id`,
+          [resolvedLocationId, slotStart, rules.rows[0].max_pickups_per_slot],
+        );
+        if (!reservation.rows.length) {
+          await client.query("ROLLBACK");
+          return NextResponse.json({ error: "This time slot is fully booked. Please choose another time." }, { status: 400 });
+        }
+      }
 
       if (cleanPromoCode) {
         const promoRows = await client.query(
@@ -408,7 +494,7 @@ export async function POST(request: NextRequest) {
             [discount.code],
           );
           const currentUses = parseInt(usesResult.rows[0].count, 10);
-          const withinUsageLimit = !discount.max_uses || currentUses < discount.max_uses;
+          const withinUsageLimit = discount.max_uses == null || currentUses < Number(discount.max_uses);
 
           if (withinUsageLimit) {
             if (discount.discount_type === "percentage") {
@@ -417,7 +503,11 @@ export async function POST(request: NextRequest) {
             } else if (discount.discount_type === "fixed_amount") {
               discountAmount += Math.min(subtotal, Math.max(0, Number(discount.discount_value) || 0));
             } else if (discount.discount_type === "free_item" && discount.free_product_id) {
-              const variant = await findFreeVariant(discount.free_product_id, discount.free_variant_id);
+              const variant = await findFreeVariant(discount.free_product_id, discount.free_variant_id, client);
+              if (!variant) {
+                await client.query("ROLLBACK");
+                return NextResponse.json({ error: "This promotional item is currently unavailable." }, { status: 400 });
+              }
               if (variant) {
                 promoFreeItem = {
                   productId: discount.free_product_id,
@@ -431,12 +521,24 @@ export async function POST(request: NextRequest) {
             }
             appliedPromoCode = discount.code;
           }
-          // If the code is invalid/expired/exhausted, we simply don't apply
-          // a discount rather than failing the whole order.
+        }
+        if (!appliedPromoCode) {
+          await client.query("ROLLBACK");
+          return NextResponse.json({ error: "This promo code is invalid, expired, or exhausted. Please remove it or try another." }, { status: 400 });
         }
       }
 
-      const total = Math.max(0, subtotal - discountAmount);
+      discountAmount = Math.min(subtotal, money(discountAmount));
+      const total = money(Math.max(0, subtotal - discountAmount));
+      const clientPricesMatch = rawCart.every((item: any) => {
+        const verified = verifiedCart.find((v) => v.productId === String(item.productId) && v.variantId === String(item.variantId));
+        return verified && Number.isFinite(Number(item.price)) && money(Number(item.price)) === money(verified.price);
+      });
+      if (!clientPricesMatch || typeof body.subtotal !== "number" || typeof body.discount_amount !== "number" || typeof body.total !== "number" || !Number.isFinite(body.subtotal) || !Number.isFinite(body.discount_amount) || !Number.isFinite(body.total) ||
+          money(Number(body.subtotal)) !== subtotal || money(Number(body.discount_amount)) !== discountAmount || money(Number(body.total)) !== total) {
+        await client.query("ROLLBACK");
+        return NextResponse.json({ error: "Prices or discounts have changed. Please review the updated total and confirm again.", quote: { subtotal, discountAmount, total, items: verifiedCart.map(({ productId, variantId, price }) => ({ productId, variantId, price })) } }, { status: 409 });
+      }
       if (total < 5) {
         await client.query("ROLLBACK");
         return NextResponse.json({ error: "Minimum order is $5.00. Please add more items." }, { status: 400 });
@@ -449,6 +551,16 @@ export async function POST(request: NextRequest) {
         finalItems.push(promoFreeItem);
       }
 
+      for (const freeItem of finalItems.filter((item) => item.price === 0)) {
+        const rows = await client.query("SELECT stock_level FROM product_variants WHERE id = $1 AND active = TRUE", [freeItem.variantId]);
+        const max = rows.rows.length ? maxQtyForLevel(rows.rows[0].stock_level, stockLimits) : 0;
+        const totalQty = finalItems.filter((item) => item.variantId === freeItem.variantId).reduce((sum, item) => sum + item.qty, 0);
+        if (totalQty > max) {
+          await client.query("ROLLBACK");
+          return NextResponse.json({ error: "A promotional item exceeds the available order limit. Please review your cart." }, { status: 400 });
+        }
+      }
+
       const insertResult = await client.query(
         `INSERT INTO orders (customer_name, customer_email, customer_phone, pickup_location_id, pickup_slot_at, notes, subtotal, discount_amount, total, promo_code)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
@@ -459,7 +571,7 @@ export async function POST(request: NextRequest) {
           cleanPhone,
           resolvedLocationId,
           pickup_slot_at || null,
-          cleanNotes || cleanOrderRef || null,
+          [cleanOrderRef, cleanNotes].filter(Boolean).join("\n") || null,
           subtotal,
           discountAmount,
           total,
@@ -476,15 +588,23 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      const result = {
+        success: true as const, orderId, subtotal, discountAmount, total,
+        promoCode: appliedPromoCode,
+        freeItems: finalItems.filter((it) => it.price === 0).map((it) => it.name),
+      };
+      await client.query("INSERT INTO order_submission_keys (reference, request_hash, result) VALUES ($1, $2, $3::jsonb)", [cleanOrderRef, requestHash, JSON.stringify(result)]);
       await client.query("COMMIT");
+      committedResult = result;
     } catch (err) {
       await client.query("ROLLBACK").catch(() => {});
       throw err;
-    } finally {
-      client.release();
     }
 
-    const total = Math.max(0, subtotal - discountAmount);
+    orderLockClient.release();
+    orderLockClient = null;
+
+    const total = money(Math.max(0, subtotal - discountAmount));
     const cart: OrderLineItem[] = [...verifiedCart];
     if (autoFreeItem) cart.push(autoFreeItem);
     if (promoFreeItem && !(autoFreeItem && autoFreeItem.productId === promoFreeItem.productId && autoFreeItem.variantId === promoFreeItem.variantId)) {
@@ -511,15 +631,14 @@ export async function POST(request: NextRequest) {
     const sellerWaLink = sellerWhatsApp ? `https://wa.me/${sellerWhatsApp}` : '';
 
     const currentYear = new Date().getFullYear();
-    const pickupDetails = resolvedLocationId ? await sql`SELECT name, address AS detail FROM pickup_locations WHERE id = ${resolvedLocationId}` : [];
     const pickupName = isCustomLocation ? 'Custom Location (to be arranged)' : (pickupDetails[0]?.name || 'N/A');
     const pickupDetail = isCustomLocation ? 'Location and time will be negotiated via WhatsApp' : (pickupDetails[0]?.detail || '');
     const pickupDateObj = pickup_slot_at ? new Date(pickup_slot_at) : null;
     const formattedPickupDate = isCustomLocation ? 'To be arranged via WhatsApp' : (pickupDateObj
-      ? pickupDateObj.toLocaleDateString('en-AU', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+      ? pickupDateObj.toLocaleDateString('en-AU', { timeZone: STORE_TIMEZONE, weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
       : 'N/A');
     const formattedPickupTime = isCustomLocation ? '' : (pickupDateObj
-      ? pickupDateObj.toLocaleTimeString('en-AU', { hour: 'numeric', minute: '2-digit', hour12: true })
+      ? pickupDateObj.toLocaleTimeString('en-AU', { timeZone: STORE_TIMEZONE, hour: 'numeric', minute: '2-digit', hour12: true })
       : 'N/A');
 
     const RESEND_API_KEY = process.env.RESEND_API_KEY;
@@ -621,19 +740,13 @@ export async function POST(request: NextRequest) {
       freeItems: cart.filter((it) => it.price === 0).map((it) => it.name),
     });
   } catch (error) {
-    console.error("Error creating order:", error);
-    if (reservedSlot && reservedLocationId && reservedSlotAt) {
-      try {
-        await sql`
-          UPDATE slot_reservations
-          SET current_count = GREATEST(current_count - 1, 0)
-          WHERE pickup_location_id = ${reservedLocationId}
-            AND slot_at = ${reservedSlotAt}
-        `;
-      } catch (releaseError) {
-        console.error("Failed to release slot reservation after order error:", releaseError);
-      }
-    }
+    console.error(committedResult ? "Order committed, but confirmation failed:" : "Error creating order:", error);
+    if (committedResult) return NextResponse.json(committedResult);
     return NextResponse.json({ error: "Failed to create order" }, { status: 500 });
+  } finally {
+    if (orderLockClient) {
+      await orderLockClient.query("ROLLBACK").catch(() => {});
+      orderLockClient.release();
+    }
   }
 }

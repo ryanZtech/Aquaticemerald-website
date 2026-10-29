@@ -118,6 +118,7 @@ export default function FaqPageClient() {
     try {
       const response = await fetch("/api/faqs");
       const data = await response.json();
+      if (!response.ok || !Array.isArray(data)) throw new Error("Failed to load FAQs");
       setFaqs(data);
     } catch (error) {
       console.error("Error fetching FAQs:", error);
@@ -313,7 +314,7 @@ export default function FaqPageClient() {
                   setFormData((prev) => ({
                     ...prev,
                     title,
-                    slug: prev.slug || generateSlug(title),
+                    slug: !prev.slug || prev.slug === generateSlug(prev.title) ? generateSlug(title) : prev.slug,
                   }));
                 }}
                 placeholder="FAQ question"

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sql } from "@/lib/db";
-import { put } from "@vercel/blob";
+import { sql, pool, transactionSql } from "@/lib/db";
+import { requireAdmin } from "@/lib/adminAuth";
+import { put, del } from "@vercel/blob";
 import { validateImageFile, safeImageKey } from "@/lib/fileValidation";
 import { normalizeStockLevel } from "@/lib/stockLimits";
 import {
@@ -18,6 +19,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    const isAdmin = (await requireAdmin()) === null;
     const searchParams = request.nextUrl.searchParams;
     const search = searchParams.get("search") || "";
     const category = searchParams.get("category");
@@ -42,10 +44,10 @@ export async function GET(request: NextRequest) {
                 LIMIT 1
               )
             )
-            ORDER BY v.label
+            ORDER BY v.sort_order, v.label, v.id
           )
           FROM product_variants v
-          WHERE v.product_id = p.id
+          WHERE v.product_id = p.id AND ($1::boolean OR v.active = TRUE)
         ), '[]'::json) as variants,
         coalesce((
           SELECT json_agg(
@@ -62,7 +64,7 @@ export async function GET(request: NextRequest) {
           FROM value_pack_items vpi
           JOIN product_variants iv ON iv.id = vpi.item_variant_id
           JOIN products ip ON ip.id = iv.product_id
-          WHERE vpi.pack_product_id = p.id
+          WHERE vpi.pack_product_id = p.id AND ($1::boolean OR (iv.active = TRUE AND ip.active = TRUE))
         ), '[]'::json) as pack_items,
         coalesce((
           SELECT json_agg(
@@ -82,8 +84,8 @@ export async function GET(request: NextRequest) {
       LEFT JOIN images i ON p.id = i.product_id AND i.is_primary = TRUE
     `;
 
-    const conditions = [];
-    const params: any[] = [];
+    const conditions = ["($1::boolean OR p.active = TRUE)"];
+    const params: any[] = [isAdmin];
 
     if (search) {
       conditions.push(
@@ -225,6 +227,13 @@ export async function POST(request: NextRequest) {
       packItems = normalized.items;
     }
 
+    if (!pool) return NextResponse.json({ error: "Database not configured" }, { status: 500 });
+    const client = await pool.connect();
+    const uploadedUrls: string[] = [];
+    let committed = false;
+    try {
+    await client.query("BEGIN");
+    const sql = transactionSql(client);
     const uploadedProductImages: Array<{
       image_url: string;
       alt_text: string;
@@ -240,10 +249,11 @@ export async function POST(request: NextRequest) {
         access: "public",
         addRandomSuffix: true,
       });
+      uploadedUrls.push(blob.url);
       uploadedProductImages.push({
         image_url: blob.url,
         alt_text: `${name} Image ${i + 1}`,
-        is_primary: i === 0 && productImages.length === 0,
+        is_primary: formData.has("primaryNewImage") ? Number(formData.get("primaryNewImage")) === i : i === 0 && productImages.length === 0,
       });
     }
 
@@ -282,6 +292,7 @@ export async function POST(request: NextRequest) {
             addRandomSuffix: true,
           },
         );
+        uploadedUrls.push(blob.url);
         await sql`
           INSERT INTO variant_images (variant_id, image_url, alt_text, is_primary)
           VALUES (${variantId}, ${blob.url}, ${variant.label}, TRUE)
@@ -307,7 +318,7 @@ export async function POST(request: NextRequest) {
         sortOrder++;
       }
       // Materialize the derived stock level into the pack's own variant(s).
-      await recomputePackProduct(productId);
+      await recomputePackProduct(productId, sql);
     }
 
     for (const [attrName, attrValue] of Object.entries(attributes)) {
@@ -333,7 +344,16 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    await client.query("COMMIT");
+    committed = true;
     return NextResponse.json({ success: true, productId });
+    } finally {
+      if (!committed) {
+        await client.query("ROLLBACK").catch(() => {});
+        for (const url of uploadedUrls) await del(url).catch((error) => console.error("Failed to clean up upload:", error));
+      }
+      client.release();
+    }
   } catch (error: any) {
     console.error("Error creating product:", error);
     if (error?.message?.includes("duplicate key")) {

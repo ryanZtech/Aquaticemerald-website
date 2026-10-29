@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
+import { requireAdmin } from "@/lib/adminAuth";
 
 export async function GET() {
   if (!sql) {
@@ -10,9 +11,14 @@ export async function GET() {
   }
 
   try {
+    // Public callers (navbar/product filters) must only see publishable
+    // categories; the admin screen still needs inactive ones so they can be
+    // edited or reactivated.
+    const isAdmin = (await requireAdmin()) === null;
     const categories = await sql`
       SELECT id, name, slug, description, image_url, icon_name, parent_id, sort_order, active
       FROM categories
+      WHERE ${isAdmin} OR active = TRUE
       ORDER BY sort_order, name
     `;
     return NextResponse.json(categories);

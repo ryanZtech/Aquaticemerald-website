@@ -52,7 +52,9 @@ export default function LoginPage() {
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-8 py-6">
             <div className="space-y-4">
+              <label htmlFor="admin-password" className="block text-sm font-medium">Password</label>
               <Input
+                id="admin-password"
                 name="password"
                 type="password"
                 placeholder="Admin Password"

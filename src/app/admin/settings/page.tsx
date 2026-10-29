@@ -84,10 +84,13 @@ function SettingRow({
 
 export default function AdminSettingsPage() {
   const [loading, setLoading] = useState(true);
+  const [loaded, setLoaded] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>("idle");
 
   const [whatsapp, setWhatsapp] = useState("");
   const [email, setEmail] = useState("");
+  const [turnstileHealth, setTurnstileHealth] = useState<{ siteKeyConfigured: boolean; secretKeyConfigured: boolean } | null>(null);
 
   // One quantity field per stock level, keyed by the level itself.
   const [maxQtyByLevel, setMaxQtyByLevel] = useState<Record<StockLevel, string>>(
@@ -100,37 +103,51 @@ export default function AdminSettingsPage() {
     },
   );
 
-  useEffect(() => {
-    async function loadSettings() {
-      try {
-        const response = await fetch("/api/settings");
-        if (response.ok) {
-          const data = await response.json();
-          if (data.seller_whatsapp) setWhatsapp(data.seller_whatsapp);
-          if (data.seller_email) setEmail(data.seller_email);
-
-          setMaxQtyByLevel((prev) => {
-            const next = { ...prev };
-            STOCK_LEVELS.forEach((level) => {
-              const settingsKey = STOCK_LEVEL_SETTINGS_KEYS[level];
-              if (data[settingsKey] !== undefined) {
-                next[level] = String(data[settingsKey]);
-              }
-            });
-            return next;
-          });
-        }
-      } catch (error) {
-        console.error("Failed to load settings:", error);
-        toast.error("Failed to load settings from database");
-      } finally {
-        setLoading(false);
+  const loadSettings = async () => {
+    setLoading(true);
+    setLoadFailed(false);
+    try {
+      const response = await fetch("/api/settings");
+      if (!response.ok) {
+        throw new Error(`Settings request failed (${response.status})`);
       }
+      const data = await response.json();
+      setTurnstileHealth(data.turnstile_health || null);
+      if (data.seller_whatsapp) setWhatsapp(data.seller_whatsapp);
+      if (data.seller_email) setEmail(data.seller_email);
+
+      setMaxQtyByLevel((prev) => {
+        const next = { ...prev };
+        STOCK_LEVELS.forEach((level) => {
+          const settingsKey = STOCK_LEVEL_SETTINGS_KEYS[level];
+          if (data[settingsKey] !== undefined) {
+            next[level] = String(data[settingsKey]);
+          }
+        });
+        return next;
+      });
+      setLoaded(true);
+    } catch (error) {
+      console.error("Failed to load settings:", error);
+      // Never let autosave run against the default form values: a failed
+      // load used to leave empty/default fields that the next keystroke
+      // would happily write over the real settings.
+      setLoaded(false);
+      setLoadFailed(true);
+      toast.error("Failed to load settings from database");
+    } finally {
+      setLoading(false);
     }
-    loadSettings();
+  };
+
+  useEffect(() => {
+    void loadSettings();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const saveSettings = async () => {
+  const saveQueue = useRef<Promise<void>>(Promise.resolve());
+  const saveVersion = useRef(0);
+  const saveSettings = async (version: number) => {
     setSaveState("saving");
     try {
       const stockLimitPayload: Record<string, string> = {};
@@ -153,14 +170,14 @@ export default function AdminSettingsPage() {
       });
 
       if (response.ok) {
-        setSaveState("saved");
+        if (version === saveVersion.current) setSaveState("saved");
       } else {
-        setSaveState("error");
+        if (version === saveVersion.current) setSaveState("error");
         toast.error("Failed to save settings");
       }
     } catch (error) {
       console.error("Error saving settings:", error);
-      setSaveState("error");
+      if (version === saveVersion.current) setSaveState("error");
       toast.error("An error occurred while saving settings");
     }
   };
@@ -168,15 +185,19 @@ export default function AdminSettingsPage() {
   // Autosave: every change is written shortly after you stop typing.
   const skipFirstChange = useRef(true);
   useEffect(() => {
-    if (loading) return;
+    if (loading || !loaded) return;
     if (skipFirstChange.current) {
       skipFirstChange.current = false;
       return;
     }
-    const timer = setTimeout(saveSettings, 800);
+    const version = ++saveVersion.current;
+    setSaveState("saving");
+    const timer = setTimeout(() => {
+      saveQueue.current = saveQueue.current.then(() => saveSettings(version));
+    }, 800);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [whatsapp, email, maxQtyByLevel, loading]);
+  }, [whatsapp, email, maxQtyByLevel, loading, loaded]);
 
   if (loading) {
     return (
@@ -208,14 +229,20 @@ export default function AdminSettingsPage() {
 
         <div
           className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-            saveState === "saving"
-              ? "bg-secondary text-secondary-foreground"
-              : saveState === "error"
-                ? "bg-destructive/10 text-destructive"
-                : "bg-primary/15 text-primary"
+            loadFailed
+              ? "bg-destructive/10 text-destructive"
+              : saveState === "saving"
+                ? "bg-secondary text-secondary-foreground"
+                : saveState === "error"
+                  ? "bg-destructive/10 text-destructive"
+                  : "bg-primary/15 text-primary"
           }`}
         >
-          {saveState === "saving" ? (
+          {loadFailed ? (
+            <>
+              <AlertCircle className="w-3.5 h-3.5" /> Settings unavailable
+            </>
+          ) : saveState === "saving" ? (
             <>
               <Loader2 className="w-3.5 h-3.5 animate-spin" /> Saving…
             </>
@@ -230,6 +257,22 @@ export default function AdminSettingsPage() {
           )}
         </div>
       </div>
+
+      {loadFailed && (
+        <div className="flex items-center justify-between gap-4 bg-destructive/10 border border-destructive/30 rounded-2xl px-4 py-3 text-sm text-destructive">
+          <span>
+            Settings could not be loaded, so autosave is disabled to avoid
+            overwriting the store&apos;s real values with defaults.
+          </span>
+          <button
+            type="button"
+            onClick={() => void loadSettings()}
+            className="shrink-0 px-3 py-1.5 rounded-lg bg-destructive text-destructive-foreground text-xs font-semibold cursor-pointer"
+          >
+            Retry load
+          </button>
+        </div>
+      )}
 
       <div className="space-y-3">
         <SectionHeader
@@ -267,6 +310,12 @@ export default function AdminSettingsPage() {
             className="w-56"
           />
         </SettingRow>
+      </div>
+
+      <div className="bg-card border border-border rounded-2xl p-4 text-sm">
+        <strong>Turnstile configuration:</strong>{" "}
+        {turnstileHealth ? (turnstileHealth.siteKeyConfigured && turnstileHealth.secretKeyConfigured ? "Both keys are present." : "Missing site key or secret key; checkout and contact verification will fail.") : "Unable to check configuration."}
+        <p className="text-xs text-muted-foreground mt-1">Key presence only; this does not test whether the keys match or the service is reachable.</p>
       </div>
 
       <div className="space-y-3">

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
+import { requireAdmin } from "@/lib/adminAuth";
 
 export async function GET() {
   if (!sql) {
@@ -7,9 +8,13 @@ export async function GET() {
   }
 
   try {
+    // Checkout only needs bookable rules; the admin screen needs inactive
+    // ones too so they can be re-enabled.
+    const isAdmin = (await requireAdmin()) === null;
     const rows = await sql`
       SELECT id, pickup_location_id, weekday, start_time, end_time, slot_duration_minutes, max_pickups_per_slot, active
       FROM weekly_availability_rules
+      WHERE ${isAdmin} OR active = TRUE
       ORDER BY pickup_location_id, weekday, start_time
     `;
     return NextResponse.json(rows);

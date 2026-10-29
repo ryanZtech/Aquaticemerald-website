@@ -1,7 +1,8 @@
 import { getLocations, getHours, getStoreSettings } from "@/lib/dataService";
 import { MapPin, Clock, ChevronDown } from "lucide-react";
 
-export const revalidate = 60; 
+export const revalidate = 60;
+export const metadata = { title: "Pickup Information", description: "Pickup locations and hours for Aquatic Emerald.", alternates: { canonical: "/info" } };
 
 export default async function InfoPage() {
   const [locations, hours, allSettings] = await Promise.all([
@@ -10,8 +11,9 @@ export default async function InfoPage() {
     getStoreSettings(),
   ]);
 
-  const sceneImg =
-    allSettings.scene_image || "https://aquaticemerald.com/front1.png";
+  const configuredScene = allSettings.scene_image || "/front1.png";
+  const sceneLocal = /^(?:https?:\/\/(?:www\.)?aquaticemerald\.com)?\/front1\.png$/i.test(configuredScene);
+  const sceneImg = sceneLocal ? "/front1-1600.webp" : configuredScene;
 
   const guides = [
     {
@@ -62,6 +64,10 @@ export default async function InfoPage() {
       <div className="relative rounded-3xl overflow-hidden h-64 sm:h-80 mb-16 bg-muted shadow-lg border border-border/10">
         <img
           src={sceneImg}
+          srcSet={sceneLocal ? "/front1-800.webp 800w, /front1-1600.webp 1600w, /front1-2400.webp 2400w" : undefined}
+          sizes="(max-width: 896px) 100vw, 896px"
+          width={4032}
+          height={1945}
           alt="Lush planted aquascape"
           className="w-full h-full object-cover"
         />
@@ -103,8 +109,7 @@ export default async function InfoPage() {
           ))}
         </div>
         <p className="text-xs text-muted-foreground mt-4 pt-4 border-t border-border font-light">
-          All pickups are scheduled in 15-minute windows. Select your preferred
-          slot at checkout.
+          Pickup windows depend on the selected location and day. Select an available slot at checkout.
         </p>
       </div>
 

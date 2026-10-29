@@ -23,3 +23,12 @@ if (databaseUrl && typeof WebSocket === 'undefined') {
 // and (for promo codes) check-and-lock a usage limit, all atomically.
 // Always `client.release()` (in a `finally`) after use.
 export const pool = databaseUrl ? new Pool({ connectionString: databaseUrl }) : null;
+
+/** Adapt a checked-out transaction client to the tagged queries used by catalog helpers. */
+export function transactionSql(client: { query: (text: string, values: any[]) => Promise<{ rows: any[] }> }): NonNullable<typeof sql> {
+  const tag = async (strings: TemplateStringsArray, ...values: unknown[]) => {
+    const text = strings.reduce((result, part, index) => result + (index ? `$${index}` : "") + part, "");
+    return (await client.query(text, values)).rows;
+  };
+  return tag as unknown as NonNullable<typeof sql>;
+}

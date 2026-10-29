@@ -4,7 +4,8 @@ import { rateLimit, getClientIp } from "@/lib/rateLimit";
 
 /**
  * Public, aggregate pickup-slot availability for one location:
- * `{ "<ISO slot start>": bookedCount }` for every non-cancelled order.
+ * `{ "<ISO slot start>": bookedCount }` for upcoming reservations.
+ * Blocked slots are represented by a count larger than any configured capacity.
  *
  * Deliberately returns counts only — no customer names/emails/phones — so it
  * is safe to expose anonymously. The checkout page previously derived this
@@ -34,12 +35,16 @@ export async function GET(request: NextRequest) {
 
   try {
     const rows = await sql`
-      SELECT pickup_slot_at, COUNT(*) AS booked
-      FROM orders
-      WHERE pickup_location_id = ${locationId}
-        AND status <> 'cancelled'
-        AND pickup_slot_at IS NOT NULL
-      GROUP BY pickup_slot_at
+      WITH order_counts AS (
+        SELECT pickup_slot_at AS slot_at, COUNT(*)::integer AS booked
+        FROM orders WHERE pickup_location_id = ${locationId} AND pickup_slot_at >= CURRENT_TIMESTAMP
+          AND status != 'cancelled'
+        GROUP BY pickup_slot_at
+      )
+      SELECT COALESCE(r.slot_at, o.slot_at) AS pickup_slot_at,
+        CASE WHEN r.is_blocked THEN 2147483647 ELSE GREATEST(COALESCE(r.current_count, 0), COALESCE(o.booked, 0)) END AS booked
+      FROM (SELECT * FROM slot_reservations WHERE pickup_location_id = ${locationId} AND slot_at >= CURRENT_TIMESTAMP) r
+      FULL JOIN order_counts o ON o.slot_at = r.slot_at
     `;
 
     const counts: Record<string, number> = {};

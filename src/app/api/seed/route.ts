@@ -269,6 +269,7 @@ export async function GET() {
     await sql`CREATE TABLE IF NOT EXISTS product_variants (id TEXT PRIMARY KEY, product_id TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE, label TEXT NOT NULL, price NUMERIC(10, 2) NOT NULL, stock_level TEXT NOT NULL DEFAULT 'none', active BOOLEAN DEFAULT TRUE, sku TEXT, sort_order INTEGER DEFAULT 0, updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP);`;
     await sql`ALTER TABLE product_variants ADD COLUMN IF NOT EXISTS stock_level TEXT NOT NULL DEFAULT 'none';`;
     await sql`ALTER TABLE product_variants ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP;`;
+    await sql`ALTER TABLE product_variants ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;`;
 
     await sql`CREATE TABLE IF NOT EXISTS images (id SERIAL PRIMARY KEY, product_id TEXT REFERENCES products(id) ON DELETE CASCADE, variant_id TEXT REFERENCES product_variants(id) ON DELETE CASCADE, image_url TEXT NOT NULL, alt_text TEXT, is_primary BOOLEAN DEFAULT FALSE, sort_order INTEGER DEFAULT 0, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP);`;
     await sql`CREATE TABLE IF NOT EXISTS variant_images (id SERIAL PRIMARY KEY, variant_id TEXT NOT NULL REFERENCES product_variants(id) ON DELETE CASCADE, image_url TEXT NOT NULL, alt_text TEXT, is_primary BOOLEAN DEFAULT FALSE, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP);`;
@@ -330,6 +331,7 @@ export async function GET() {
     `;
 
     await sql`CREATE TABLE IF NOT EXISTS guides (id SERIAL PRIMARY KEY, title TEXT NOT NULL, slug TEXT UNIQUE NOT NULL, body TEXT NOT NULL, display_order INTEGER DEFAULT 0, active BOOLEAN DEFAULT TRUE, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP);`;
+    await sql`CREATE TABLE IF NOT EXISTS gallery_items (id SERIAL PRIMARY KEY, title TEXT NOT NULL, description TEXT, image_url TEXT NOT NULL, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP);`;
     await sql`CREATE TABLE IF NOT EXISTS faqs (id SERIAL PRIMARY KEY, title TEXT NOT NULL, slug TEXT UNIQUE NOT NULL, body TEXT NOT NULL, display_order INTEGER DEFAULT 0, active BOOLEAN DEFAULT TRUE, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP);`;
     await sql`CREATE TABLE IF NOT EXISTS promo_popups (id SERIAL PRIMARY KEY, name TEXT NOT NULL, heading TEXT NOT NULL, body_text TEXT, button_text TEXT NOT NULL, button_url TEXT NOT NULL, image_url TEXT, delay_seconds INTEGER NOT NULL DEFAULT 3, active BOOLEAN NOT NULL DEFAULT TRUE, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP);`;
     await sql`CREATE TABLE IF NOT EXISTS discount_codes (id SERIAL PRIMARY KEY, code TEXT UNIQUE NOT NULL, description TEXT, discount_type TEXT NOT NULL, discount_value NUMERIC(10, 2), free_product_id TEXT REFERENCES products(id) ON DELETE SET NULL, free_variant_id TEXT REFERENCES product_variants(id) ON DELETE SET NULL, valid_from TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP, valid_until TIMESTAMP WITH TIME ZONE, max_uses INTEGER, active BOOLEAN NOT NULL DEFAULT TRUE, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP);`;
@@ -504,7 +506,7 @@ export async function GET() {
         const varId = `${p.id}-${v.id}`;
         await sql`INSERT INTO product_variants (id, product_id, label, price) VALUES (${varId}, ${p.id}, ${v.label}, ${v.price}) ON CONFLICT (id) DO NOTHING;`;
       }
-      await sql`INSERT INTO images (product_id, image_url, alt_text, is_primary) VALUES (${p.id}, ${p.img}, ${p.name}, TRUE) ON CONFLICT DO NOTHING;`;
+      await sql`INSERT INTO images (product_id, image_url, alt_text, is_primary) SELECT ${p.id}, ${p.img}, ${p.name}, TRUE WHERE NOT EXISTS (SELECT 1 FROM images WHERE product_id = ${p.id});`;
       const attrs = [
         { name: "Care Level", value: p.careLevel },
         { name: "Light", value: p.light },
@@ -519,20 +521,20 @@ export async function GET() {
     }
 
     for (const loc of LOCATIONS) {
-      await sql`INSERT INTO pickup_locations (name, address, instructions) VALUES (${loc.name}, ${loc.detail}, 'Please arrive on time.') ON CONFLICT DO NOTHING;`;
+      await sql`INSERT INTO pickup_locations (name, address, instructions) SELECT ${loc.name}, ${loc.detail}, 'Please arrive on time.' WHERE NOT EXISTS (SELECT 1 FROM pickup_locations WHERE name = ${loc.name});`;
     }
 
-    const locResult = await sql`SELECT id FROM pickup_locations;`;
+    const locResult = await sql`SELECT id FROM pickup_locations WHERE name = ANY(${LOCATIONS.map((loc) => loc.name)}::text[]);`;
     for (const loc of locResult) {
-      await sql`INSERT INTO weekly_availability_rules (pickup_location_id, weekday, start_time, end_time) VALUES (${loc.id}, 6, '11:00:00', '18:00:00') ON CONFLICT DO NOTHING;`;
-      await sql`INSERT INTO weekly_availability_rules (pickup_location_id, weekday, start_time, end_time) VALUES (${loc.id}, 0, '13:00:00', '18:00:00') ON CONFLICT DO NOTHING;`;
+      await sql`INSERT INTO weekly_availability_rules (pickup_location_id, weekday, start_time, end_time) SELECT ${loc.id}, 6, '11:00:00'::time, '18:00:00'::time WHERE NOT EXISTS (SELECT 1 FROM weekly_availability_rules WHERE pickup_location_id = ${loc.id} AND weekday = 6);`;
+      await sql`INSERT INTO weekly_availability_rules (pickup_location_id, weekday, start_time, end_time) SELECT ${loc.id}, 0, '13:00:00'::time, '18:00:00'::time WHERE NOT EXISTS (SELECT 1 FROM weekly_availability_rules WHERE pickup_location_id = ${loc.id} AND weekday = 0);`;
       for (let i = 1; i <= 5; i++) {
-        await sql`INSERT INTO weekly_availability_rules (pickup_location_id, weekday, start_time, end_time) VALUES (${loc.id}, ${i}, '16:30:00', '19:00:00') ON CONFLICT DO NOTHING;`;
+        await sql`INSERT INTO weekly_availability_rules (pickup_location_id, weekday, start_time, end_time) SELECT ${loc.id}, ${i}, '16:30:00'::time, '19:00:00'::time WHERE NOT EXISTS (SELECT 1 FROM weekly_availability_rules WHERE pickup_location_id = ${loc.id} AND weekday = ${i});`;
       }
     }
 
     const sellerEmail = process.env.SELLER_EMAIL || "seller@example.com";
-    await sql`INSERT INTO store_settings (key, value) VALUES ('seller_whatsapp', ${SELLER_WHATSAPP}), ('seller_email', ${sellerEmail}), ('hero_image', 'https://images.unsplash.com/photo-1779436853149-2e7d501f71cf?w=1600&h=900&fit=crop&auto=format'), ('scene_image', 'https://images.unsplash.com/photo-1779436853049-c19542e3c81c?w=1400&h=700&fit=crop&auto=format') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;`;
+    await sql`INSERT INTO store_settings (key, value) VALUES ('seller_whatsapp', ${SELLER_WHATSAPP}), ('seller_email', ${sellerEmail}), ('hero_image', 'https://images.unsplash.com/photo-1779436853149-2e7d501f71cf?w=1600&h=900&fit=crop&auto=format'), ('scene_image', 'https://images.unsplash.com/photo-1779436853049-c19542e3c81c?w=1400&h=700&fit=crop&auto=format') ON CONFLICT (key) DO NOTHING;`;
 
     console.log("Neon Seed API: Seeding complete.");
     return NextResponse.json({
