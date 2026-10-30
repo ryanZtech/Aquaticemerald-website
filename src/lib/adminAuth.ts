@@ -11,7 +11,7 @@ export const ADMIN_SESSION_COOKIE = "admin_session";
 // (or left idle past this window) every admin request starts failing with a
 // 401 and the UI shows the signed-out screen instead of a wall of
 // "Unauthorized" responses on screens the admin can still click around.
-export const ADMIN_SESSION_SECONDS = 60 * 60 * 12;
+export const ADMIN_SESSION_SECONDS = 60 * 60 * 2;
 
 const EXPIRED_MESSAGE =
   "Your admin session has expired. Please sign in again.";

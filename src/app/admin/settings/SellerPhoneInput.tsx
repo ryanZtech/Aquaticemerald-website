@@ -34,7 +34,11 @@ export default function SellerPhoneInput({
   return (
     <div
       className={cn(
-        "flex h-9 items-stretch overflow-hidden rounded-md border border-input bg-input-background",
+        // Same surface treatment as the shared Input component: the
+        // `--input-background` token is only defined for the light theme, so
+        // without the dark override this control stayed pale in dark mode
+        // while its text turned light.
+        "flex h-9 items-stretch overflow-hidden rounded-md border border-input bg-input-background dark:bg-input/30",
         "transition-[border-color,box-shadow] duration-200",
         "focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50",
         className,

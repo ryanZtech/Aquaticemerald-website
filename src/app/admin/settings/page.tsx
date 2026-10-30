@@ -18,6 +18,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
+import TurnstileWidget, { type TurnstileHandle } from "@/components/TurnstileWidget";
 import {
   STOCK_LEVELS,
   STOCK_LEVEL_LABELS,
@@ -38,6 +39,9 @@ const LEVEL_DESCRIPTIONS: Record<StockLevel, string> = {
 };
 
 type SaveState = "idle" | "saving" | "saved" | "error";
+
+// Inlined at build time, exactly like the checkout and contact form use it.
+const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
 
 /**
  * Rows in a group sit a few pixels apart, so the corners that touch each other
@@ -128,6 +132,10 @@ export default function AdminSettingsPage() {
   const [turnstileHealth, setTurnstileHealth] = useState<{ siteKeyConfigured: boolean; secretKeyConfigured: boolean } | null>(null);
   const [testResult, setTestResult] = useState<TestResult | null>(null);
   const [testingTurnstile, setTestingTurnstile] = useState(false);
+  // The capture is only mounted once the admin asks for a test, so a broken
+  // or unconfigured widget can't slow down the settings page itself.
+  const [showCaptcha, setShowCaptcha] = useState(false);
+  const turnstileRef = useRef<TurnstileHandle>(null);
 
   // One quantity field per stock level, keyed by the level itself.
   const [maxQtyByLevel, setMaxQtyByLevel] = useState<Record<StockLevel, string>>(
@@ -278,13 +286,15 @@ export default function AdminSettingsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [whatsapp, email, maxQtyByLevel, loading, loaded]);
 
-  const runTurnstileTest = async () => {
+  const runTurnstileTest = async (token?: string) => {
     setTestingTurnstile(true);
     setTestResult(null);
     try {
       const response = await fetch("/api/settings/turnstile-test", {
         method: "POST",
         credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: token ?? null }),
       });
       if (response.status === 401) return;
       const data = await response.json().catch(() => null);
@@ -299,6 +309,20 @@ export default function AdminSettingsPage() {
     } finally {
       setTestingTurnstile(false);
     }
+  };
+
+  // Test flow: mount the real widget and let it produce a token, which is the
+  // only honest way to prove the pair works. Without a site key there is
+  // nothing to render, so ask the server why instead.
+  const startTurnstileTest = () => {
+    setTestResult(null);
+    if (!TURNSTILE_SITE_KEY) {
+      void runTurnstileTest();
+      return;
+    }
+    setShowCaptcha(true);
+    // Tokens are single use, so a second test needs a fresh challenge.
+    turnstileRef.current?.reset();
   };
 
   const keysPresent =
@@ -436,14 +460,15 @@ export default function AdminSettingsPage() {
                 : "Unable to check configuration."}
             </p>
             <p className="text-xs text-muted-foreground font-light mt-1">
-              Key presence alone proves nothing — the test asks Cloudflare whether it accepts these keys.
+              Key presence alone proves nothing — the test renders Cloudflare&apos;s
+              widget here and verifies the token it returns.
             </p>
             <div className="flex items-center gap-3 mt-3">
               <Button
                 type="button"
                 size="sm"
                 variant="outline"
-                onClick={() => void runTurnstileTest()}
+                onClick={startTurnstileTest}
                 disabled={testingTurnstile}
                 className="cursor-pointer"
               >
@@ -452,9 +477,19 @@ export default function AdminSettingsPage() {
                 ) : (
                   <Play className="w-4 h-4 mr-2" />
                 )}
-                Test configuration
+                {showCaptcha ? "Test again" : "Test configuration"}
               </Button>
             </div>
+            {showCaptcha && TURNSTILE_SITE_KEY && (
+              <div className="mt-3 rounded-xl border border-border bg-muted/30 px-3 py-3">
+                <TurnstileWidget
+                  ref={turnstileRef}
+                  siteKey={TURNSTILE_SITE_KEY}
+                  onVerify={(token) => void runTurnstileTest(token)}
+                  onExpire={() => setTestResult(null)}
+                />
+              </div>
+            )}
             {testResult && (
               <div
                 role="status"
@@ -476,7 +511,7 @@ export default function AdminSettingsPage() {
           <img
             src="/cloudflare-logo.png"
             alt="Cloudflare"
-            className="h-7 w-auto shrink-0 self-start sm:self-center opacity-90"
+            className="h-5 w-auto shrink-0 self-start sm:self-center opacity-90"
           />
         </div>
       </div>

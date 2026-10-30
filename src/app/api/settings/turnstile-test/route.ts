@@ -1,16 +1,17 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/adminAuth";
+import { verifyTurnstileToken } from "@/lib/turnstile";
 
 export const dynamic = "force-dynamic";
 
 const SITEVERIFY_URL =
   "https://challenges.cloudflare.com/turnstile/v0/siteverify";
 
-// A deliberately bogus response token. Cloudflare answers a *valid* secret
-// with "invalid-input-response" for it, which is exactly what we want to see:
-// the secret was accepted and the service answered. A bad secret comes back
-// as "invalid-input-secret" instead. This proves the configuration without
-// needing a real challenge to be solved first.
+// Used only when no captcha was solved (e.g. the widget could not load): a
+// deliberately bogus response token. Cloudflare answers a *valid* secret with
+// "invalid-input-response" for it, which still proves the secret was accepted
+// and the service is reachable. A bad secret comes back as
+// "invalid-input-secret" instead.
 const PROBE_TOKEN = "XXXX.DUMMY.TOKEN.XXXX";
 
 // Real site keys are "0x4AAAAAAA…"; Cloudflare's documented test keys use
@@ -24,7 +25,7 @@ function reply(ok: boolean, message: string, errorCodes?: string[]) {
   );
 }
 
-export async function POST() {
+export async function POST(request: Request) {
   const authError = await requireAdmin();
   if (authError) return authError;
 
@@ -55,6 +56,45 @@ export async function POST() {
     return reply(
       false,
       "TURNSTILE_SECRET_KEY is one of Cloudflare's test secrets, which always fails verification. Replace it with the real secret from the Turnstile dashboard.",
+    );
+  }
+
+  const body = (await request.json().catch(() => null)) as
+    | { token?: unknown }
+    | null;
+  const token = typeof body?.token === "string" ? body.token.trim() : "";
+
+  // A real challenge was solved in the settings panel: verify it exactly the
+  // way checkout and the contact form do.
+  if (token) {
+    const result = await verifyTurnstileToken(token);
+    const codes = result.errorCodes ?? [];
+
+    if (result.success) {
+      return reply(
+        true,
+        "The captcha was solved and Cloudflare accepted the token — the keys and widget work end to end.",
+        codes,
+      );
+    }
+    if (codes.includes("invalid-input-secret") || codes.includes("missing-input-secret")) {
+      return reply(
+        false,
+        "Cloudflare rejected TURNSTILE_SECRET_KEY. Copy the secret from the Turnstile widget dashboard and redeploy.",
+        codes,
+      );
+    }
+    if (codes.includes("timeout-or-duplicate")) {
+      return reply(
+        false,
+        "That challenge was already used or has expired. Press Test again to solve a fresh one.",
+        codes,
+      );
+    }
+    return reply(
+      false,
+      `Cloudflare rejected the captcha${codes.length ? ` (${codes.join(", ")})` : ""}. Check that the site key and the secret belong to the same Turnstile widget.`,
+      codes,
     );
   }
 
@@ -102,7 +142,7 @@ export async function POST() {
     if (errorCodes.includes("invalid-input-response")) {
       return reply(
         true,
-        "Cloudflare accepted the secret key and is reachable. The site key is well formed, so the widget should verify real visitors.",
+        "Cloudflare accepted the secret key and is reachable. Solve the captcha above for a full end-to-end check.",
         errorCodes,
       );
     }
