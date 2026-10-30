@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { loginAdmin } from "@/app/actions/auth";
 import { useRouter } from "next/navigation";
 import { Button } from "@/app/components/ui/button";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, ShieldAlert } from "lucide-react";
 import { Input } from "@/app/components/ui/input";
 import {
   Card,
@@ -19,7 +19,14 @@ import {
 export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [expired, setExpired] = useState(false);
   const router = useRouter();
+
+  // The session guard and the admin layout both send admins here with
+  // ?expired=1 so it is obvious why they are suddenly back at the login form.
+  useEffect(() => {
+    setExpired(new URLSearchParams(window.location.search).get("expired") === "1");
+  }, []);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -46,11 +53,21 @@ export default function LoginPage() {
           </div>
           <CardTitle className="font-serif text-2xl">Admin Login</CardTitle>
           <CardDescription>
-            Enter your password to access the dashboard
+            {expired
+              ? "Your admin session ended. Sign in again to continue."
+              : "Enter your password to access the dashboard"}
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-8 py-6">
+            {expired && (
+              <div className="flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-800">
+                <ShieldAlert className="w-4 h-4 mt-0.5 shrink-0" />
+                <span>
+                  You were signed out because the panel sat idle for too long.
+                </span>
+              </div>
+            )}
             <div className="space-y-4">
               <label htmlFor="admin-password" className="block text-sm font-medium">Password</label>
               <Input

@@ -1,7 +1,10 @@
 import { cookies } from "next/headers";
-import { jwtVerify } from "jose";
 import { redirect } from "next/navigation";
-import { sanitizeEnv } from "@/lib/env";
+import {
+  ADMIN_SESSION_COOKIE,
+  verifyAdminToken,
+} from "@/lib/adminAuth";
+import AdminSessionGuard from "./AdminSessionGuard";
 import { Button } from "@/app/components/ui/button";
 import { LogOut, Package, MapPin, Settings, FolderTree, ShoppingCart, BookOpen, Clock, CircleHelp, Percent, MessageSquare, Images } from "lucide-react";
 import Link from "next/link";
@@ -14,24 +17,18 @@ export default async function AdminLayout({
   children: React.ReactNode;
 }) {
   const cookieStore = await cookies();
-  const token = cookieStore.get("admin_session")?.value;
+  const token = cookieStore.get(ADMIN_SESSION_COOKIE)?.value;
 
-  if (!token) {
-    redirect("/login");
-  }
-
-  try {
-    const secretStr = sanitizeEnv(process.env.JWT_SECRET);
-    if (!secretStr) throw new Error("JWT_SECRET missing");
-    const secret = new TextEncoder().encode(secretStr);
-    await jwtVerify(token, secret);
-  } catch {
-    redirect("/login");
+  if (!(await verifyAdminToken(token))) {
+    // Expired as well as missing: either way the panel is not usable, so go
+    // straight back to the login screen rather than rendering it with data
+    // the visitor can no longer save or refresh.
+    redirect("/login?expired=1");
   }
 
   return (
     <div className="min-h-screen bg-muted/20 flex flex-col sm:flex-row">
-      {}
+      <AdminSessionGuard />
       <aside className="w-full sm:w-64 bg-card border-r border-border p-6 flex flex-col h-screen sticky top-0">
         <Link href="/" className="flex items-center gap-2 group mb-8">
           <img

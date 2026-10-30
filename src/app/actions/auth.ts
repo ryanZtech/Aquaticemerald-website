@@ -2,10 +2,14 @@
 
 import { cookies, headers } from "next/headers";
 import { compareSync } from "bcrypt-ts";
-import { SignJWT } from "jose";
 import { pool } from "@/lib/db";
 import { getClientIp } from "@/lib/rateLimit";
 import { sanitizeEnv } from "@/lib/env";
+import {
+  ADMIN_SESSION_COOKIE,
+  adminCookieOptions,
+  signAdminToken,
+} from "@/lib/adminAuth";
 
 export async function loginAdmin(formData: FormData) {
   const password = formData.get("password") as string;
@@ -61,21 +65,12 @@ export async function loginAdmin(formData: FormData) {
     }
 
     // 3. Create JWT Token payload
-    const secret = new TextEncoder().encode(jwtSecret);
-    const token = await new SignJWT({ role: "admin" })
-      .setProtectedHeader({ alg: "HS256" })
-      .setIssuedAt()
-      .setExpirationTime("2h")
-      .sign(secret);
+    const token = await signAdminToken();
+    if (!token) return { error: "Server configuration error. Check environment variables." };
 
     // 4. Set httpOnly Cookie
     const cookieStore = await cookies();
-    cookieStore.set("admin_session", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-    });
+    cookieStore.set(ADMIN_SESSION_COOKIE, token, adminCookieOptions());
 
     return { success: true };
   } catch (error) {
@@ -86,6 +81,6 @@ export async function loginAdmin(formData: FormData) {
 
 export async function logoutAdmin(formData: FormData) {
   const cookieStore = await cookies();
-  cookieStore.delete("admin_session");
+  cookieStore.delete(ADMIN_SESSION_COOKIE);
   return;
 }

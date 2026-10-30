@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Input } from "@/app/components/ui/input";
+import { Button } from "@/app/components/ui/button";
 import {
   Settings,
   MessageSquare,
@@ -11,6 +12,10 @@ import {
   Check,
   Loader2,
   AlertCircle,
+  ShieldCheck,
+  Play,
+  CheckCircle2,
+  XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -20,6 +25,7 @@ import {
   DEFAULT_STOCK_LIMITS,
   type StockLevel,
 } from "@/lib/stockLimits";
+import SellerPhoneInput from "./SellerPhoneInput";
 
 const LEVEL_DESCRIPTIONS: Record<StockLevel, string> = {
   none: "Forced to 0 — customers cannot order.",
@@ -32,6 +38,29 @@ const LEVEL_DESCRIPTIONS: Record<StockLevel, string> = {
 };
 
 type SaveState = "idle" | "saving" | "saved" | "error";
+
+/**
+ * Rows in a group sit a few pixels apart, so the corners that touch each other
+ * use a smaller radius than the outer ones — the stack reads as one block
+ * instead of a pile of separate cards.
+ */
+type RowPosition = "single" | "first" | "middle" | "last";
+
+const CORNER_CLASSES: Record<RowPosition, string> = {
+  single: "rounded-2xl",
+  first: "rounded-t-2xl rounded-b-md",
+  middle: "rounded-md",
+  last: "rounded-t-md rounded-b-2xl",
+};
+
+function rowPositions(count: number): RowPosition[] {
+  if (count <= 1) return ["single"];
+  return Array.from({ length: count }, (_, index) => {
+    if (index === 0) return "first";
+    if (index === count - 1) return "last";
+    return "middle";
+  });
+}
 
 function SectionHeader({
   Icon,
@@ -61,15 +90,19 @@ function SettingRow({
   Icon,
   title,
   description,
+  position = "single",
   children,
 }: {
   Icon: typeof MessageSquare;
   title: string;
   description: string;
+  position?: RowPosition;
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center gap-4 bg-card border border-border rounded-2xl px-4 py-3.5 hover:border-primary/30 transition-colors">
+    <div
+      className={`flex items-center gap-4 bg-card border border-border px-4 py-3.5 hover:border-primary/30 transition-colors ${CORNER_CLASSES[position]}`}
+    >
       <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
         <Icon className="w-4 h-4 text-primary" />
       </div>
@@ -82,6 +115,8 @@ function SettingRow({
   );
 }
 
+type TestResult = { ok: boolean; message: string };
+
 export default function AdminSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [loaded, setLoaded] = useState(false);
@@ -91,6 +126,8 @@ export default function AdminSettingsPage() {
   const [whatsapp, setWhatsapp] = useState("");
   const [email, setEmail] = useState("");
   const [turnstileHealth, setTurnstileHealth] = useState<{ siteKeyConfigured: boolean; secretKeyConfigured: boolean } | null>(null);
+  const [testResult, setTestResult] = useState<TestResult | null>(null);
+  const [testingTurnstile, setTestingTurnstile] = useState(false);
 
   // One quantity field per stock level, keyed by the level itself.
   const [maxQtyByLevel, setMaxQtyByLevel] = useState<Record<StockLevel, string>>(
@@ -107,24 +144,50 @@ export default function AdminSettingsPage() {
     setLoading(true);
     setLoadFailed(false);
     try {
-      const response = await fetch("/api/settings");
+      const response = await fetch("/api/settings", {
+        cache: "no-store",
+        credentials: "same-origin",
+      });
+      if (response.status === 401) {
+        // The session guard in the admin layout shows the signed-out screen;
+        // don't overwrite real settings with defaults in the meantime.
+        setLoaded(false);
+        setLoadFailed(true);
+        return;
+      }
       if (!response.ok) {
         throw new Error(`Settings request failed (${response.status})`);
       }
       const data = await response.json();
       setTurnstileHealth(data.turnstile_health || null);
-      if (data.seller_whatsapp) setWhatsapp(data.seller_whatsapp);
-      if (data.seller_email) setEmail(data.seller_email);
 
-      setMaxQtyByLevel((prev) => {
-        const next = { ...prev };
-        STOCK_LEVELS.forEach((level) => {
-          const settingsKey = STOCK_LEVEL_SETTINGS_KEYS[level];
-          if (data[settingsKey] !== undefined) {
-            next[level] = String(data[settingsKey]);
-          }
-        });
-        return next;
+      const loadedWhatsapp = String(data.seller_whatsapp || "").replace(/\D/g, "");
+      const loadedEmail = String(data.seller_email || "").trim();
+      const loadedStock = {} as Record<StockLevel, string>;
+      STOCK_LEVELS.forEach((level) => {
+        const settingsKey = STOCK_LEVEL_SETTINGS_KEYS[level];
+        loadedStock[level] =
+          data[settingsKey] !== undefined
+            ? String(data[settingsKey])
+            : String(DEFAULT_STOCK_LIMITS[level]);
+      });
+
+      setWhatsapp(loadedWhatsapp);
+      setEmail(loadedEmail);
+      setMaxQtyByLevel(loadedStock);
+
+      // Record what is stored right now, so autosave only fires for real edits.
+      persisted.current = JSON.stringify({
+        seller_whatsapp: loadedWhatsapp,
+        seller_email: loadedEmail,
+        ...Object.fromEntries(
+          STOCK_LEVELS.map((level) => [
+            STOCK_LEVEL_SETTINGS_KEYS[level],
+            level === "none"
+              ? "0"
+              : String(Math.max(0, parseInt(loadedStock[level], 10) || 0)),
+          ]),
+        ),
       });
       setLoaded(true);
     } catch (error) {
@@ -145,31 +208,48 @@ export default function AdminSettingsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const saveQueue = useRef<Promise<void>>(Promise.resolve());
-  const saveVersion = useRef(0);
-  const saveSettings = async (version: number) => {
-    setSaveState("saving");
-    try {
-      const stockLimitPayload: Record<string, string> = {};
-      STOCK_LEVELS.forEach((level) => {
-        const settingsKey = STOCK_LEVEL_SETTINGS_KEYS[level];
-        stockLimitPayload[settingsKey] =
+  // Exactly what a save would write, as one comparable string. Autosave only
+  // fires when this differs from what is already in the database, so a slow
+  // load (or React re-running effects in dev) can never write placeholder
+  // values over the store's real settings.
+  const settingsSnapshot = () =>
+    JSON.stringify({
+      seller_whatsapp: whatsapp.replace(/\D/g, ""),
+      seller_email: email.trim(),
+      ...Object.fromEntries(
+        STOCK_LEVELS.map((level) => [
+          STOCK_LEVEL_SETTINGS_KEYS[level],
           level === "none"
             ? "0"
-            : String(Math.max(0, parseInt(maxQtyByLevel[level], 10) || 0));
-      });
+            : String(Math.max(0, parseInt(maxQtyByLevel[level], 10) || 0)),
+        ]),
+      ),
+    });
 
+  const saveQueue = useRef<Promise<void>>(Promise.resolve());
+  const saveVersion = useRef(0);
+  /** The settings currently stored server-side (last successful load/save). */
+  const persisted = useRef<string | null>(null);
+
+  const saveSettings = async (version: number, snapshot: string) => {
+    setSaveState("saving");
+    try {
       const response = await fetch("/api/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          seller_whatsapp: whatsapp.replace(/\D/g, ""),
-          seller_email: email.trim(),
-          ...stockLimitPayload,
-        }),
+        credentials: "same-origin",
+        body: snapshot,
       });
 
+      if (response.status === 401) {
+        // Expired session: the guard takes the admin back to the login screen
+        // rather than this page quietly claiming the change was saved.
+        if (version === saveVersion.current) setSaveState("error");
+        return;
+      }
+
       if (response.ok) {
+        persisted.current = snapshot;
         if (version === saveVersion.current) setSaveState("saved");
       } else {
         if (version === saveVersion.current) setSaveState("error");
@@ -183,21 +263,46 @@ export default function AdminSettingsPage() {
   };
 
   // Autosave: every change is written shortly after you stop typing.
-  const skipFirstChange = useRef(true);
   useEffect(() => {
     if (loading || !loaded) return;
-    if (skipFirstChange.current) {
-      skipFirstChange.current = false;
-      return;
-    }
+    const snapshot = settingsSnapshot();
+    if (snapshot === persisted.current) return;
     const version = ++saveVersion.current;
     setSaveState("saving");
     const timer = setTimeout(() => {
-      saveQueue.current = saveQueue.current.then(() => saveSettings(version));
+      saveQueue.current = saveQueue.current.then(() =>
+        saveSettings(version, snapshot),
+      );
     }, 800);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [whatsapp, email, maxQtyByLevel, loading, loaded]);
+
+  const runTurnstileTest = async () => {
+    setTestingTurnstile(true);
+    setTestResult(null);
+    try {
+      const response = await fetch("/api/settings/turnstile-test", {
+        method: "POST",
+        credentials: "same-origin",
+      });
+      if (response.status === 401) return;
+      const data = await response.json().catch(() => null);
+      if (!data) {
+        setTestResult({ ok: false, message: "The test endpoint returned an unreadable response." });
+        return;
+      }
+      setTestResult({ ok: Boolean(data.ok), message: String(data.message || "") });
+    } catch (error) {
+      console.error("Turnstile test failed:", error);
+      setTestResult({ ok: false, message: "The test request could not be completed." });
+    } finally {
+      setTestingTurnstile(false);
+    }
+  };
+
+  const keysPresent =
+    turnstileHealth?.siteKeyConfigured && turnstileHealth?.secretKeyConfigured;
 
   if (loading) {
     return (
@@ -210,8 +315,11 @@ export default function AdminSettingsPage() {
     );
   }
 
+  const contactPositions = rowPositions(2);
+  const stockPositions = rowPositions(STOCK_LEVELS.length);
+
   return (
-    <div className="space-y-8 max-w-3xl">
+    <div className="space-y-8 max-w-3xl w-full mx-auto">
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-11 h-11 rounded-2xl bg-card border border-border flex items-center justify-center">
@@ -280,42 +388,97 @@ export default function AdminSettingsPage() {
           title="Contact & Communication"
           description="Where order messages and receipts are sent"
         />
-        <SettingRow
-          Icon={MessageSquare}
-          title="Seller WhatsApp Number"
-          description='Used for the "Message on WhatsApp" button after checkout. Include country code without "+" or spaces.'
-        >
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center px-2.5 h-9 rounded-l-md border border-input bg-muted text-muted-foreground text-sm">
-              +
-            </span>
-            <Input
+        <div className="space-y-1">
+          <SettingRow
+            Icon={MessageSquare}
+            title="Seller WhatsApp Number"
+            description='Used for the "Message on WhatsApp" button after checkout. Type the country code first — the flag shows the country detected.'
+            position={contactPositions[0]}
+          >
+            <SellerPhoneInput
+              id="seller-whatsapp"
               value={whatsapp}
-              onChange={(e) => setWhatsapp(e.target.value)}
+              onChange={setWhatsapp}
               placeholder="61400000000"
-              className="w-44 rounded-l-none"
+              className="w-52"
             />
-          </div>
-        </SettingRow>
-        <SettingRow
-          Icon={Mail}
-          title="Seller Email Address"
-          description="Order confirmation receipts are carbon-copied to this address automatically."
-        >
-          <Input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="seller@example.com"
-            className="w-56"
-          />
-        </SettingRow>
+          </SettingRow>
+          <SettingRow
+            Icon={Mail}
+            title="Seller Email Address"
+            description="Order confirmation receipts are carbon-copied to this address automatically."
+            position={contactPositions[1]}
+          >
+            <Input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="seller@example.com"
+              className="w-56"
+            />
+          </SettingRow>
+        </div>
       </div>
 
-      <div className="bg-card border border-border rounded-2xl p-4 text-sm">
-        <strong>Turnstile configuration:</strong>{" "}
-        {turnstileHealth ? (turnstileHealth.siteKeyConfigured && turnstileHealth.secretKeyConfigured ? "Both keys are present." : "Missing site key or secret key; checkout and contact verification will fail.") : "Unable to check configuration."}
-        <p className="text-xs text-muted-foreground mt-1">Key presence only; this does not test whether the keys match or the service is reachable.</p>
+      <div className="space-y-3">
+        <SectionHeader
+          Icon={ShieldCheck}
+          title="Bot Protection (Turnstile)"
+          description="Cloudflare verifies checkout and contact submissions"
+        />
+        <div className="flex flex-col sm:flex-row items-start gap-4 sm:gap-6 bg-card border border-border rounded-2xl p-4 sm:p-5">
+          <div className="flex-1 min-w-0">
+            <p className="text-sm">
+              {turnstileHealth
+                ? keysPresent
+                  ? "Both keys are present."
+                  : "Missing site key or secret key; checkout and contact verification will fail."
+                : "Unable to check configuration."}
+            </p>
+            <p className="text-xs text-muted-foreground font-light mt-1">
+              Key presence alone proves nothing — the test asks Cloudflare whether it accepts these keys.
+            </p>
+            <div className="flex items-center gap-3 mt-3">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => void runTurnstileTest()}
+                disabled={testingTurnstile}
+                className="cursor-pointer"
+              >
+                {testingTurnstile ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Play className="w-4 h-4 mr-2" />
+                )}
+                Test configuration
+              </Button>
+            </div>
+            {testResult && (
+              <div
+                role="status"
+                className={`mt-3 flex items-start gap-2 rounded-xl border px-3 py-2 text-xs ${
+                  testResult.ok
+                    ? "border-primary/30 bg-primary/10 text-primary"
+                    : "border-destructive/30 bg-destructive/10 text-destructive"
+                }`}
+              >
+                {testResult.ok ? (
+                  <CheckCircle2 className="w-4 h-4 shrink-0 mt-px" />
+                ) : (
+                  <XCircle className="w-4 h-4 shrink-0 mt-px" />
+                )}
+                <span>{testResult.message}</span>
+              </div>
+            )}
+          </div>
+          <img
+            src="/cloudflare-logo.png"
+            alt="Cloudflare"
+            className="h-7 w-auto shrink-0 self-start sm:self-center opacity-90"
+          />
+        </div>
       </div>
 
       <div className="space-y-3">
@@ -324,28 +487,31 @@ export default function AdminSettingsPage() {
           title="Stock Ordering Limits"
           description="Maximum quantity a customer can order of a variant, based on its manually-set stock level"
         />
-        {STOCK_LEVELS.map((level) => (
-          <SettingRow
-            key={level}
-            Icon={Package}
-            title={`${STOCK_LEVEL_LABELS[level]} stock`}
-            description={LEVEL_DESCRIPTIONS[level]}
-          >
-            <Input
-              type="number"
-              min="0"
-              value={maxQtyByLevel[level]}
-              onChange={(e) =>
-                setMaxQtyByLevel((prev) => ({
-                  ...prev,
-                  [level]: e.target.value,
-                }))
-              }
-              disabled={level === "none"}
-              className="w-20 text-center"
-            />
-          </SettingRow>
-        ))}
+        <div className="space-y-1">
+          {STOCK_LEVELS.map((level, index) => (
+            <SettingRow
+              key={level}
+              Icon={Package}
+              title={`${STOCK_LEVEL_LABELS[level]} stock`}
+              description={LEVEL_DESCRIPTIONS[level]}
+              position={stockPositions[index]}
+            >
+              <Input
+                type="number"
+                min="0"
+                value={maxQtyByLevel[level]}
+                onChange={(e) =>
+                  setMaxQtyByLevel((prev) => ({
+                    ...prev,
+                    [level]: e.target.value,
+                  }))
+                }
+                disabled={level === "none"}
+                className="w-20 text-center"
+              />
+            </SettingRow>
+          ))}
+        </div>
       </div>
     </div>
   );
