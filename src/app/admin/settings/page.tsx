@@ -95,12 +95,15 @@ function SettingRow({
   title,
   description,
   position = "single",
+  htmlFor,
   children,
 }: {
   Icon: typeof MessageSquare;
   title: string;
   description: string;
   position?: RowPosition;
+  /** Ties the row's title to its control, so the input has a real label. */
+  htmlFor?: string;
   children: React.ReactNode;
 }) {
   return (
@@ -111,7 +114,13 @@ function SettingRow({
         <Icon className="w-4 h-4 text-primary" />
       </div>
       <div className="flex-1 min-w-0">
-        <div className="font-medium text-sm">{title}</div>
+        {htmlFor ? (
+          <label htmlFor={htmlFor} className="font-medium text-sm cursor-pointer">
+            {title}
+          </label>
+        ) : (
+          <div className="font-medium text-sm">{title}</div>
+        )}
         <div className="text-xs text-muted-foreground font-light">{description}</div>
       </div>
       <div className="flex-shrink-0">{children}</div>
@@ -274,7 +283,13 @@ export default function AdminSettingsPage() {
   useEffect(() => {
     if (loading || !loaded) return;
     const snapshot = settingsSnapshot();
-    if (snapshot === persisted.current) return;
+    if (snapshot === persisted.current) {
+      // Editing back to the stored value (e.g. undoing a character inside the
+      // debounce window) cancels the pending save. Clear the indicator, or it
+      // would sit on "Saving…" forever with nothing left to write.
+      setSaveState((prev) => (prev === "saving" ? "saved" : prev));
+      return;
+    }
     const version = ++saveVersion.current;
     setSaveState("saving");
     const timer = setTimeout(() => {
@@ -418,6 +433,7 @@ export default function AdminSettingsPage() {
             title="Seller WhatsApp Number"
             description='Used for the "Message on WhatsApp" button after checkout. Type the country code first — the flag shows the country detected.'
             position={contactPositions[0]}
+            htmlFor="seller-whatsapp"
           >
             <SellerPhoneInput
               id="seller-whatsapp"
@@ -432,8 +448,10 @@ export default function AdminSettingsPage() {
             title="Seller Email Address"
             description="Order confirmation receipts are carbon-copied to this address automatically."
             position={contactPositions[1]}
+            htmlFor="seller-email"
           >
             <Input
+              id="seller-email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -530,8 +548,10 @@ export default function AdminSettingsPage() {
               title={`${STOCK_LEVEL_LABELS[level]} stock`}
               description={LEVEL_DESCRIPTIONS[level]}
               position={stockPositions[index]}
+              htmlFor={`stock-limit-${level}`}
             >
               <Input
+                id={`stock-limit-${level}`}
                 type="number"
                 min="0"
                 value={maxQtyByLevel[level]}

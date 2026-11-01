@@ -241,7 +241,7 @@ export async function POST(request: NextRequest) {
     }> = [];
     for (let i = 0; i < newImages.length; i++) {
       const file = newImages[i];
-      const validation = validateImageFile(file);
+      const validation = await validateImageFile(file);
       if (!validation.valid) {
         return NextResponse.json({ error: validation.error }, { status: 400 });
       }
@@ -280,7 +280,7 @@ export async function POST(request: NextRequest) {
         // Same validation + safe storage key as the product-image uploads and
         // the PUT route below use: never trust the client-supplied filename
         // in a storage path, and never store an unvalidated file type/size.
-        const validation = validateImageFile(variantImageFile);
+        const validation = await validateImageFile(variantImageFile);
         if (!validation.valid) {
           return NextResponse.json({ error: validation.error }, { status: 400 });
         }

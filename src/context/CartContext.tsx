@@ -87,6 +87,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [stockLimits, setStockLimits] = useState<StockLimits>(
     DEFAULT_STOCK_LIMITS,
   );
+  // Limits are fetched below; until they arrive, `stockLimits` is only the
+  // built-in default and must not be used to shrink a restored cart.
+  const [limitsLoaded, setLimitsLoaded] = useState(false);
   const [autoDiscount, setAutoDiscount] = useState<{
     name: string;
     description: string | null;
@@ -126,7 +129,10 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         const res = await fetch("/api/settings/public", { cache: "no-store" });
         if (!res.ok) return;
         const data = await res.json();
-        if (!cancelled) setStockLimits(parseStockLimitSettings(data));
+        if (!cancelled) {
+          setStockLimits(parseStockLimitSettings(data));
+          setLimitsLoaded(true);
+        }
       } catch (e) {
         console.error("Failed to load stock limits:", e);
       }
@@ -146,6 +152,30 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       console.error("Failed to persist cart to localStorage:", e);
     }
   }, [cart, isHydrated]);
+
+  // Quantities are only clamped when an item is added or changed, but the
+  // limits themselves arrive asynchronously and can be lowered by the store
+  // at any time. A cart restored from localStorage (or built before a limit
+  // was lowered) could therefore sit at 10 of a "single" item and only fail
+  // at checkout. Re-clamp whenever the real limits arrive/change. Items whose
+  // level is out of stock are left in place rather than silently dropped -
+  // the cart and checkout already block them, and dropping would also discard
+  // legacy carts that predate stock levels entirely.
+  useEffect(() => {
+    if (!isHydrated || !limitsLoaded) return;
+    setCart((prev) => {
+      let changed = false;
+      const next = prev.map((item) => {
+        const max = getMaxAllowedQty(item, stockLimits);
+        if (max > 0 && item.qty > max) {
+          changed = true;
+          return { ...item, qty: max };
+        }
+        return item;
+      });
+      return changed ? next : prev;
+    });
+  }, [stockLimits, limitsLoaded, isHydrated]);
 
   // Evaluate auto-discounts whenever cart changes
   useEffect(() => {

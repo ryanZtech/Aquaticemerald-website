@@ -6,14 +6,54 @@ export interface FileValidationResult {
   error?: string;
 }
 
-/** Validate an uploaded image's MIME type and size before storing it. */
-export function validateImageFile(file: File): FileValidationResult {
+const startsWith = (bytes: Uint8Array, offset: number, signature: number[]) =>
+  signature.every((byte, index) => bytes[offset + index] === byte);
+
+/**
+ * Identify an image from its actual leading bytes. The browser-supplied
+ * `File.type` is just a string the client chose, so it proves nothing about
+ * the content — anything (an HTML page, a script, a zip) can be uploaded with
+ * `Content-Type: image/png` and would then be served publicly from blob
+ * storage.
+ */
+export function sniffImageType(bytes: Uint8Array): string | null {
+  if (startsWith(bytes, 0, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) return "image/png";
+  if (startsWith(bytes, 0, [0xff, 0xd8, 0xff])) return "image/jpeg";
+  if (startsWith(bytes, 0, [0x47, 0x49, 0x46, 0x38])) return "image/gif";
+  // RIFF....WEBP
+  if (startsWith(bytes, 0, [0x52, 0x49, 0x46, 0x46]) && startsWith(bytes, 8, [0x57, 0x45, 0x42, 0x50])) {
+    return "image/webp";
+  }
+  return null;
+}
+
+/** Validate an uploaded image's size, declared MIME type and real content. */
+export async function validateImageFile(file: File): Promise<FileValidationResult> {
   if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
     return { valid: false, error: "Unsupported file type. Please upload a PNG, JPEG, WEBP, or GIF image." };
   }
   if (file.size > MAX_IMAGE_BYTES) {
     return { valid: false, error: "File is too large. Maximum size is 5MB." };
   }
+
+  let head: Uint8Array;
+  try {
+    head = new Uint8Array(await file.slice(0, 16).arrayBuffer());
+  } catch {
+    return { valid: false, error: "The uploaded file could not be read." };
+  }
+
+  const actualType = sniffImageType(head);
+  if (!actualType) {
+    return { valid: false, error: "That file is not a real PNG, JPEG, WEBP, or GIF image." };
+  }
+  if (actualType !== file.type) {
+    return {
+      valid: false,
+      error: `The file's contents are ${actualType.replace("image/", "").toUpperCase()}, not ${file.type.replace("image/", "").toUpperCase()}.`,
+    };
+  }
+
   return { valid: true };
 }
 

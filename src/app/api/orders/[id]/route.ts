@@ -22,10 +22,19 @@ export async function PUT(
 
   try {
     const { id } = await params;
-    const body = await request.json();
-    const { status } = body;
+    // A non-numeric id used to reach Postgres as NaN and blow up as a 500.
+    const orderId = Number(id);
+    if (!Number.isInteger(orderId) || orderId < 1) {
+      return NextResponse.json({ error: "Order id must be a positive integer" }, { status: 400 });
+    }
 
-    if (!ALLOWED_STATUSES.includes(status)) {
+    const body = await request.json().catch(() => null);
+    if (typeof body !== "object" || body === null) {
+      return NextResponse.json({ error: "Request body must be a JSON object" }, { status: 400 });
+    }
+    const { status } = body as { status?: unknown };
+
+    if (typeof status !== "string" || !ALLOWED_STATUSES.includes(status)) {
       return NextResponse.json(
         { error: `Invalid status. Must be one of: ${ALLOWED_STATUSES.join(", ")}` },
         { status: 400 },
@@ -36,7 +45,7 @@ export async function PUT(
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
-      const existing = await client.query("SELECT status, pickup_location_id, pickup_slot_at FROM orders WHERE id = $1 FOR UPDATE", [parseInt(id, 10)]);
+      const existing = await client.query("SELECT status, pickup_location_id, pickup_slot_at FROM orders WHERE id = $1 FOR UPDATE", [orderId]);
       if (!existing.rows.length) {
         await client.query("ROLLBACK");
         return NextResponse.json({ error: "Order not found" }, { status: 404 });
@@ -58,7 +67,7 @@ export async function PUT(
           }
         }
       }
-      await client.query("UPDATE orders SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2", [status, parseInt(id, 10)]);
+      await client.query("UPDATE orders SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2", [status, orderId]);
       await client.query("COMMIT");
     } catch (error) {
       await client.query("ROLLBACK").catch(() => {});
@@ -75,7 +84,7 @@ export async function PUT(
             coalesce(json_agg(json_build_object('id', oi.id, 'snapshot_product_name', oi.snapshot_product_name, 'snapshot_variant_label', oi.snapshot_variant_label, 'snapshot_unit_price', oi.snapshot_unit_price, 'quantity', oi.quantity)) FILTER (WHERE oi.id IS NOT NULL), '[]') as items
           FROM orders o
           LEFT JOIN order_items oi ON oi.order_id = o.id
-          WHERE o.id = ${parseInt(id)}
+          WHERE o.id = ${orderId}
           GROUP BY o.id
         `;
 
@@ -162,7 +171,10 @@ export async function DELETE(
 
   try {
     const { id } = await params;
-    const orderId = parseInt(id);
+    const orderId = Number(id);
+    if (!Number.isInteger(orderId) || orderId < 1) {
+      return NextResponse.json({ error: "Order id must be a positive integer" }, { status: 400 });
+    }
 
     if (!pool) return NextResponse.json({ error: "Database not configured" }, { status: 500 });
     const client = await pool.connect();

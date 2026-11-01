@@ -136,7 +136,7 @@ export async function PUT(
     const formData = await request.formData();
     const heroImage = formData.get("heroImage");
     if (heroImage instanceof File) {
-      const validation = validateImageFile(heroImage);
+      const validation = await validateImageFile(heroImage);
       if (!validation.valid) return NextResponse.json({ error: validation.error }, { status: 400 });
       if (!pool) return NextResponse.json({ error: "Database not configured" }, { status: 500 });
       const blob = await put(safeImageKey(`products/${id}`, heroImage), heroImage, { access: "public", addRandomSuffix: true });
@@ -300,7 +300,7 @@ export async function PUT(
         `variantImage_${variant.id}`,
       ) as File | null;
       if (variantImageFile) {
-        const validation = validateImageFile(variantImageFile);
+        const validation = await validateImageFile(variantImageFile);
         if (!validation.valid) {
           return NextResponse.json({ error: validation.error }, { status: 400 });
         }
@@ -409,7 +409,7 @@ export async function PUT(
       }> = [];
       for (let i = 0; i < newImages.length; i++) {
         const file = newImages[i];
-        const validation = validateImageFile(file);
+        const validation = await validateImageFile(file);
         if (!validation.valid) {
           return NextResponse.json({ error: validation.error }, { status: 400 });
         }

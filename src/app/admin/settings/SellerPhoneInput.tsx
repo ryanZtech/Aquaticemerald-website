@@ -66,7 +66,6 @@ export default function SellerPhoneInput({
           )}
         </span>
       </div>
-      <span className="sr-only">{label}</span>
       <input
         id={id}
         type="tel"
