@@ -57,34 +57,39 @@ function loadDatabaseUrl() {
   if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
 
   // This project keeps its credentials in `.env` (Next.js also loads
-  // `.env.local` when present) — try both before giving up.
-  const envPath = ["./.env.local", "./.env"].find((p) => existsSync(p));
-  if (!envPath) {
+  // `.env.local` when present) — try both before giving up. Check every
+  // existing file rather than only the first one: `.env.local` often exists
+  // just for auth secrets while DATABASE_URL lives in `.env`, so stopping at
+  // the first file that exists would make this tool unusable.
+  const envPaths = ["./.env.local", "./.env"].filter((p) => existsSync(p));
+  if (envPaths.length === 0) {
     throw new Error(
       `DATABASE_URL is not set and neither .env.local nor .env was found in the current directory.\n` +
         `Run this script from the folder that contains your env file (your project root).`,
     );
   }
 
-  const contents = readFileSync(envPath, "utf8");
-  for (const rawLine of contents.split("\n")) {
-    const line = rawLine.trim();
-    if (!line || line.startsWith("#")) continue;
-    const eq = line.indexOf("=");
-    if (eq === -1) continue;
-    const key = line.slice(0, eq).trim();
-    if (key !== "DATABASE_URL") continue;
-    let value = line.slice(eq + 1).trim();
-    if (
-      (value.startsWith('"') && value.endsWith('"')) ||
-      (value.startsWith("'") && value.endsWith("'"))
-    ) {
-      value = value.slice(1, -1);
+  for (const envPath of envPaths) {
+    const contents = readFileSync(envPath, "utf8");
+    for (const rawLine of contents.split("\n")) {
+      const line = rawLine.trim();
+      if (!line || line.startsWith("#")) continue;
+      const eq = line.indexOf("=");
+      if (eq === -1) continue;
+      const key = line.slice(0, eq).trim();
+      if (key !== "DATABASE_URL") continue;
+      let value = line.slice(eq + 1).trim();
+      if (
+        (value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'"))
+      ) {
+        value = value.slice(1, -1);
+      }
+      return value;
     }
-    return value;
   }
 
-  throw new Error(`Could not find DATABASE_URL in ${envPath}.`);
+  throw new Error(`Could not find DATABASE_URL in ${envPaths.join(" or ")}.`);
 }
 
 function printTable(rows, columns) {
