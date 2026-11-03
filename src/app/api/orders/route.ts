@@ -5,6 +5,7 @@ import { requireAdmin } from "@/lib/adminAuth";
 import { rateLimit, getClientIp } from "@/lib/rateLimit";
 import { verifyTurnstileToken } from "@/lib/turnstile";
 import { STORE_TIMEZONE } from "@/lib/pickupSlots";
+import { ORDER_REFERENCE_PATTERN } from "@/lib/orderNumber";
 import { isValidEmail, isValidPhone } from "@/lib/contactValidation";
 import { createHash } from "node:crypto";
 import type { PoolClient } from "@neondatabase/serverless";
@@ -133,7 +134,7 @@ export async function POST(request: NextRequest) {
       turnstile_token,
     } = body || {};
 
-    if (typeof orderRef !== "string" || !/^AE-[A-Z0-9]{4}(?:-[A-Z0-9]{4}){3}$/.test(orderRef)) {
+    if (typeof orderRef !== "string" || !ORDER_REFERENCE_PATTERN.test(orderRef)) {
       return NextResponse.json({ error: "Invalid order reference. Please reload checkout." }, { status: 400 });
     }
     if (!customer_name || String(customer_name).trim().length < 2) {

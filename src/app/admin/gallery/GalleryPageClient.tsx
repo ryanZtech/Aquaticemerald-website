@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 import { Textarea } from "@/app/components/ui/textarea";
@@ -115,6 +115,16 @@ export default function GalleryPageClient() {
   const [description, setDescription] = useState("");
   const [images, setImages] = useState<ImageDraft[]>([]);
   const [saving, setSaving] = useState(false);
+  const descriptionRef = useRef<HTMLTextAreaElement>(null);
+
+  // Let a long project write-up use the room it needs: the textarea grows
+  // with its content instead of trapping the text in a small scrolling box.
+  useEffect(() => {
+    const field = descriptionRef.current;
+    if (!field) return;
+    field.style.height = "auto";
+    field.style.height = `${field.scrollHeight}px`;
+  }, [description, dialogOpen]);
 
   const fetchItems = async () => {
     try {
@@ -386,8 +396,10 @@ export default function GalleryPageClient() {
       )}
 
       <Dialog open={dialogOpen} onOpenChange={handleDialogChange}>
-        <DialogContent className="sm:max-w-lg max-h-[92dvh] overflow-y-auto">
-          <DialogHeader>
+        {/* The dialog itself never scrolls — an inner column does — so the
+            rounded corners stay intact around the scrollbar on both sides. */}
+        <DialogContent className="sm:max-w-lg max-h-[92dvh] overflow-hidden flex flex-col gap-4">
+          <DialogHeader className="flex-shrink-0">
             <DialogTitle>{editing ? "Edit Entry" : "Add Entry"}</DialogTitle>
             <DialogDescription>
               Add one or more photos of the same project, then drag them into
@@ -396,7 +408,7 @@ export default function GalleryPageClient() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 mt-4">
+          <div className="space-y-4 mt-4 flex-1 min-h-0 overflow-y-auto pr-1">
             <div className="space-y-2">
               <label className="text-sm font-medium block">
                 Photos ({images.length}/{MAX_GALLERY_IMAGES})
@@ -467,15 +479,16 @@ export default function GalleryPageClient() {
                 Description
               </label>
               <Textarea
+                ref={descriptionRef}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="What's in this project?"
-                rows={4}
+                className="min-h-[6.5rem] overflow-hidden"
               />
             </div>
           </div>
 
-          <DialogFooter className="mt-6">
+          <DialogFooter className="mt-6 flex-shrink-0">
             <Button variant="ghost" onClick={() => handleDialogChange(false)}>
               Cancel
             </Button>

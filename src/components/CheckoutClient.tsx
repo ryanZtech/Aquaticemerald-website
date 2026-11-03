@@ -79,10 +79,29 @@ function formatClockValue(date: Date) {
   return date.toLocaleTimeString("en-US", { timeZone: STORE_TIMEZONE, hour: "numeric", minute: "2-digit" });
 }
 
-function createOrderReference() {
-  const bytes = crypto.getRandomValues(new Uint8Array(8));
-  const id = Array.from(bytes, (b) => b.toString(16).padStart(2, "0").toUpperCase()).join("");
-  return `AE-${id.slice(0, 4)}-${id.slice(4, 8)}-${id.slice(8, 12)}-${id.slice(12, 16)}`;
+/** Six-digit fallback used only if the store can't hand out a number. */
+function createFallbackOrderReference() {
+  const bytes = crypto.getRandomValues(new Uint32Array(1));
+  return `AE-${String(bytes[0] % 1_000_000).padStart(6, "0")}`;
+}
+
+/**
+ * Order numbers are allocated by the server so a new checkout can never reuse
+ * a code a past order already has.
+ */
+async function requestOrderReference(): Promise<string> {
+  try {
+    const res = await fetch("/api/orders/next-number", { cache: "no-store" });
+    if (res.ok) {
+      const data = await res.json();
+      if (typeof data.orderRef === "string" && /^AE-\d{6}$/.test(data.orderRef)) {
+        return data.orderRef;
+      }
+    }
+  } catch (error) {
+    console.error("Could not get an order number from the server:", error);
+  }
+  return createFallbackOrderReference();
 }
 
 function buildSlotsForDate(
@@ -213,8 +232,13 @@ export default function CheckoutClient({
         clearSession("aquatic_emerald_pending_order");
       }
     }
-    setOrderId(createOrderReference());
-
+    let cancelled = false;
+    void requestOrderReference().then((reference) => {
+      if (!cancelled) setOrderId(reference);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // The confirmation screen is the last step of an order, and it only offers
@@ -505,6 +529,7 @@ export default function CheckoutClient({
   };
 
   const canConfirm =
+    Boolean(orderId) &&
     name.trim().length >= 2 &&
     isValidPhone(phone) &&
     isValidEmail(email) &&
@@ -546,6 +571,11 @@ export default function CheckoutClient({
 
     if (pendingOrder) hasError = false;
     if (hasError) return;
+
+    if (!pendingOrder && !orderId) {
+      alert("Your order number is still being created. Please try again in a moment.");
+      return;
+    }
 
     if (!pendingOrder && !isValidEmail(email)) {
       alert("Please enter a valid email address");
@@ -664,7 +694,7 @@ export default function CheckoutClient({
   }
 
   if (pendingOrder) {
-    const startNewOrder = () => {
+    const startNewOrder = async () => {
       // Escape hatch for a reference the server will never let through
       // (for example a hash mismatch). Only the pending marker and local
       // reference are reset — no request is sent, so this cannot create a
@@ -676,7 +706,8 @@ export default function CheckoutClient({
       }
       setPendingOrder(null);
       setTurnstileToken(null);
-      setOrderId(createOrderReference());
+      setOrderId("");
+      setOrderId(await requestOrderReference());
     };
 
     return <div className="pt-24 pb-16 px-4 max-w-xl mx-auto text-center min-h-screen flex flex-col justify-center items-center gap-4">
@@ -728,7 +759,9 @@ export default function CheckoutClient({
         <p className="text-sm font-semibold mb-1">
           Your order reference
         </p>
-        <p className="font-mono text-lg font-bold tracking-wider">{orderId}</p>
+        <p className="font-mono text-lg font-bold tracking-wider">
+          {orderId || "Creating your order number…"}
+        </p>
       </div>
 
       <div className="space-y-6">
@@ -1122,7 +1155,9 @@ export default function CheckoutClient({
                 <span>Confirm & Message on WhatsApp</span>
               </>
             ) : (
-              <span className="capitalize">{missingFieldsText}</span>
+              <span className="capitalize">
+                {missingFieldsText || "Preparing your order number…"}
+              </span>
             )}
           </button>
           {canConfirm && (
