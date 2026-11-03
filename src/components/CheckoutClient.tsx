@@ -152,7 +152,12 @@ export default function CheckoutClient({
   hasPromoCodes,
 }: CheckoutClientProps) {
   const { cart, cartTotal, clearCart, autoDiscount, isHydrated } = useCart();
-  const [confirmation, setConfirmation] = useState<{ orderRef: string; url: string | null; total: number } | null>(null);
+  const [confirmation, setConfirmation] = useState<{
+    orderRef: string;
+    url: string | null;
+    total: number;
+    email?: string;
+  } | null>(null);
   const [pendingOrder, setPendingOrder] = useState<Record<string, any> | null>(null);
   const [quote, setQuote] = useState<{ fingerprint: string; subtotal: number; discountAmount: number; total: number; items: Array<{ productId: string; variantId: string; price: number }> } | null>(null);
 
@@ -232,13 +237,6 @@ export default function CheckoutClient({
         clearSession("aquatic_emerald_pending_order");
       }
     }
-    let cancelled = false;
-    void requestOrderReference().then((reference) => {
-      if (!cancelled) setOrderId(reference);
-    });
-    return () => {
-      cancelled = true;
-    };
   }, []);
 
   // The confirmation screen is the last step of an order, and it only offers
@@ -529,7 +527,6 @@ export default function CheckoutClient({
   };
 
   const canConfirm =
-    Boolean(orderId) &&
     name.trim().length >= 2 &&
     isValidPhone(phone) &&
     isValidEmail(email) &&
@@ -572,11 +569,6 @@ export default function CheckoutClient({
     if (pendingOrder) hasError = false;
     if (hasError) return;
 
-    if (!pendingOrder && !orderId) {
-      alert("Your order number is still being created. Please try again in a moment.");
-      return;
-    }
-
     if (!pendingOrder && !isValidEmail(email)) {
       alert("Please enter a valid email address");
       return;
@@ -597,9 +589,15 @@ export default function CheckoutClient({
     let pendingPayload: Record<string, any> | null = null;
     try {
       const pickup_slot_at = isCustomLocation ? null : timeWindow;
+      // The store allocates the number now, not when the page loaded: it is
+      // only shown to the customer once the order actually exists.
+      const orderRef = pendingOrder
+        ? String(pendingOrder.orderRef)
+        : orderId || (await requestOrderReference());
+      if (!pendingOrder) setOrderId(orderRef);
 
       const payload = pendingOrder ? { ...pendingOrder, turnstile_token: turnstileToken } : {
-        orderRef: orderId,
+        orderRef,
         customer_name: name || "",
         customer_email: email,
         customer_phone: phone,
@@ -660,7 +658,15 @@ export default function CheckoutClient({
         ? `my order number is ${ref}, please confirm my order. I would like to arrange a custom pickup location and time with you.${meetupNote}`
         : `my order number is ${ref}, please confirm my order${meetupNote}`;
       const phoneNumber = whatsapp.replace(/\D/g, "");
-      const confirmed = { orderRef: ref, total: Number(result.total), url: phoneNumber ? `https://wa.me/${phoneNumber}?text=${encodeURIComponent(msg)}` : null };
+      const confirmed = {
+        orderRef: ref,
+        total: Number(result.total),
+        url: phoneNumber ? `https://wa.me/${phoneNumber}?text=${encodeURIComponent(msg)}` : null,
+        // The order only succeeds with an email address the store accepts,
+        // and the response arrives after the confirmation email has been
+        // sent, so the address typed here is the one to show back.
+        email: String(payload.customer_email || ""),
+      };
       sessionStorage.setItem("aquatic_emerald_order_confirmation", JSON.stringify(confirmed));
       sessionStorage.removeItem("aquatic_emerald_pending_order");
       setPendingOrder(null);
@@ -682,19 +688,25 @@ export default function CheckoutClient({
     return (
       <div className="pt-24 pb-16 px-4 max-w-xl mx-auto text-center min-h-screen flex flex-col justify-center items-center gap-4">
         <h1 className="font-serif text-3xl">Order received</h1>
-        <p>Your order reference is <strong>{confirmation.orderRef}</strong>.</p>
+        <p>Your order number is <strong>{confirmation.orderRef}</strong>.</p>
         <p>Order total: ${confirmation.total.toFixed(2)}</p>
-        {confirmation.url ? <a href={confirmation.url} target="_blank" rel="noopener noreferrer" className="px-6 py-3 bg-primary text-primary-foreground rounded-full">Confirm on WhatsApp</a> : <p>WhatsApp is unavailable. Please contact the store with your order reference.</p>}
+        {confirmation.url ? <a href={confirmation.url} target="_blank" rel="noopener noreferrer" className="px-6 py-3 bg-primary text-primary-foreground rounded-full">Confirm on WhatsApp</a> : <p>WhatsApp is unavailable. Please contact the store with your order number.</p>}
+        {confirmation.email && (
+          <p className="text-sm text-muted-foreground">
+            A confirmation email has been sent to{" "}
+            <strong className="text-foreground font-medium">{confirmation.email}</strong>.
+          </p>
+        )}
         <p className="text-xs text-muted-foreground max-w-sm leading-relaxed font-light">
           Your order is not complete until we confirm it on WhatsApp. Please send
-          us the message with your order reference so we can confirm your pickup.
+          us the message with your order number so we can confirm your pickup.
         </p>
       </div>
     );
   }
 
   if (pendingOrder) {
-    const startNewOrder = async () => {
+    const startNewOrder = () => {
       // Escape hatch for a reference the server will never let through
       // (for example a hash mismatch). Only the pending marker and local
       // reference are reset — no request is sent, so this cannot create a
@@ -707,7 +719,6 @@ export default function CheckoutClient({
       setPendingOrder(null);
       setTurnstileToken(null);
       setOrderId("");
-      setOrderId(await requestOrderReference());
     };
 
     return <div className="pt-24 pb-16 px-4 max-w-xl mx-auto text-center min-h-screen flex flex-col justify-center items-center gap-4">
@@ -754,15 +765,6 @@ export default function CheckoutClient({
         Fill in your details and choose a pickup slot. {"You'll"} then message
         us on WhatsApp to confirm.
       </p>
-
-      <div className="bg-primary/10 border border-primary/20 text-primary rounded-2xl p-4 mb-8 text-center">
-        <p className="text-sm font-semibold mb-1">
-          Your order reference
-        </p>
-        <p className="font-mono text-lg font-bold tracking-wider">
-          {orderId || "Creating your order number…"}
-        </p>
-      </div>
 
       <div className="space-y-6">
         <div className="bg-card border border-border rounded-2xl p-5 shadow-sm">
@@ -1155,9 +1157,7 @@ export default function CheckoutClient({
                 <span>Confirm & Message on WhatsApp</span>
               </>
             ) : (
-              <span className="capitalize">
-                {missingFieldsText || "Preparing your order number…"}
-              </span>
+              <span className="capitalize">{missingFieldsText}</span>
             )}
           </button>
           {canConfirm && (
