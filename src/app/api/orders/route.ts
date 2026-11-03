@@ -372,6 +372,29 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Please choose a pickup date and time." }, { status: 400 });
     }
 
+    // Collection is never scheduled for the same calendar day the order is
+    // placed (store time), so reject a same-day slot even if one is submitted
+    // directly rather than through the checkout calendar.
+    if (!isCustomLocation && slotStart) {
+      const sydneyDay = (value: Date) =>
+        new Intl.DateTimeFormat("en-CA", {
+          timeZone: STORE_TIMEZONE,
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+        }).format(value);
+      const slotDate = new Date(slotStart);
+      if (
+        !Number.isNaN(slotDate.getTime()) &&
+        sydneyDay(slotDate) === sydneyDay(new Date())
+      ) {
+        return NextResponse.json(
+          { error: "Same-day pickup is not available. Please choose the next available day." },
+          { status: 400 },
+        );
+      }
+    }
+
     // If custom location, resolve it to the 'Custom' pickup_location entry in DB
     let resolvedLocationId: number | null = pickupLocationId;
     if (isCustomLocation && !pickupLocationId) {

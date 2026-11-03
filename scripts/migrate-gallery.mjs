@@ -3,8 +3,10 @@
  * migrate-gallery.mjs
  * -------------------
  * Creates the `gallery_items` table used by the public Gallery page and its
- * admin screen. Every statement is idempotent (IF NOT EXISTS), so running it
- * again is safe. The same statement also lives in src/app/api/seed/route.ts.
+ * admin screen, including the `image_urls` array that lets one gallery entry
+ * hold several photos. Every statement is idempotent (IF NOT EXISTS), so
+ * running it again is safe. The same statements also live in
+ * src/app/api/seed/route.ts.
  *
  * Usage: node scripts/migrate-gallery.mjs
  */
@@ -38,9 +40,15 @@ await sql`
     title TEXT NOT NULL,
     description TEXT,
     image_url TEXT NOT NULL,
+    image_urls TEXT[],
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
   );
 `;
+
+// `CREATE TABLE IF NOT EXISTS` does nothing to a table that already exists, so
+// add the multi-image column to existing installs. `image_url` stays as the
+// cover/first image for older rows.
+await sql`ALTER TABLE gallery_items ADD COLUMN IF NOT EXISTS image_urls TEXT[];`;
 
 const cols = await sql`
   SELECT column_name FROM information_schema.columns

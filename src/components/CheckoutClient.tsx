@@ -217,6 +217,20 @@ export default function CheckoutClient({
 
   }, []);
 
+  // The confirmation screen is the last step of an order, and it only offers
+  // the WhatsApp confirmation. Once the customer starts a new order (their
+  // cart has items again), a restored confirmation must not stand in front of
+  // the checkout form.
+  useEffect(() => {
+    if (!isHydrated || !confirmation || cart.length === 0) return;
+    try {
+      sessionStorage.removeItem("aquatic_emerald_order_confirmation");
+    } catch (error) {
+      console.error("Could not clear the stored order confirmation:", error);
+    }
+    setConfirmation(null);
+  }, [isHydrated, confirmation, cart]);
+
   const initialPromoHandled = useRef(false);
   useEffect(() => {
     if (!isHydrated || initialPromoHandled.current) return;
@@ -338,38 +352,6 @@ export default function CheckoutClient({
   const totalDays = daysInMonth(year, month);
   const firstDay = firstDayOfMonth(year, month);
 
-  const isDayDisabled = (d: number) => {
-    // Block past dates
-    if (year < todayY) return true;
-    if (year === todayY && month < todayM) return true;
-    if (year === todayY && month === todayM && d < todayD) return true;
-    
-    // If no location selected, allow all future dates
-    if (!location || isCustomLocation) return false;
-    
-    // If location selected but rules not loaded yet, allow all future dates temporarily
-    if (timeRules.length === 0) return false;
-    
-    // Block dates with no time rules for selected location
-    if (!Number.isNaN(selectedLocationId)) {
-      const testDate = new Date(year, month, d);
-      const dow = testDate.getDay();
-      const hasRules = timeRules.some(
-        (rule) =>
-          rule.active &&
-          rule.pickup_location_id === selectedLocationId &&
-          rule.weekday === dow
-      );
-      if (!hasRules) return true;
-      if (year === todayY && month === todayM && d === todayD) {
-        const rules = timeRules.filter((rule) => rule.active && rule.pickup_location_id === selectedLocationId && rule.weekday === dow);
-        return !buildSlotsForDate(rules, year, month, d).some((slot) => new Date(slot.pickupSlotAt).getTime() > Date.now());
-      }
-    }
-    
-    return false;
-  };
-
   const selectedDow = day !== null ? new Date(year, month, day).getDay() : -1;
   const isCustomLocation = location === "custom";
   const selectedLocationId = !isCustomLocation && location ? parseInt(location, 10) : NaN;
@@ -390,6 +372,52 @@ export default function CheckoutClient({
     bookedCount: bookedSlotCounts[slot.pickupSlotAt] || 0,
     disabled: loadingSlots || new Date(slot.pickupSlotAt).getTime() <= Date.now() || (bookedSlotCounts[slot.pickupSlotAt] || 0) >= slot.maxPickups,
   }));
+
+  // Collection is always booked for a later day, never the same day the
+  // order is placed — so today (like every past date) is unavailable.
+  const isDayUnavailable = (y: number, m: number, d: number) => {
+    if (y < todayY) return true;
+    if (y === todayY && m < todayM) return true;
+    if (y === todayY && m === todayM && d <= todayD) return true;
+
+    // Without a location (or before its opening rules load) any later date
+    // can be browsed; choosing a location narrows it down below.
+    if (Number.isNaN(selectedLocationId) || timeRules.length === 0) return false;
+
+    const dow = new Date(y, m, d).getDay();
+    return !timeRules.some(
+      (rule) =>
+        rule.active &&
+        rule.pickup_location_id === selectedLocationId &&
+        rule.weekday === dow,
+    );
+  };
+
+  const isDayDisabled = (d: number) => isDayUnavailable(year, month, d);
+
+  // Open the calendar on the first day a pickup can actually happen, and
+  // re-evaluate it whenever the customer changes pickup location.
+  useEffect(() => {
+    if (isCustomLocation) return;
+    for (let i = 0; i < 180; i++) {
+      const candidate = new Date(todayY, todayM, todayD + 1 + i);
+      if (
+        !isDayUnavailable(
+          candidate.getFullYear(),
+          candidate.getMonth(),
+          candidate.getDate(),
+        )
+      ) {
+        setYear(candidate.getFullYear());
+        setMonth(candidate.getMonth());
+        setDay(candidate.getDate());
+        setTimeWindow("");
+        return;
+      }
+    }
+    // `isDayUnavailable` reads the current location rules from state above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location, timeRules]);
 
   useEffect(() => {
     if (day === null || Number.isNaN(selectedLocationId)) {
@@ -596,9 +624,11 @@ export default function CheckoutClient({
       console.log("Order created successfully:", result);
 
       const ref = String(payload.orderRef);
+      const meetupNote =
+        " (Please do not proceed to meetup if your order has not been confirmed by text)";
       const msg = !payload.pickup_location_id
-        ? `my order number is ${ref}, please confirm my order. I would like to arrange a custom pickup location and time with you.`
-        : `my order number is ${ref}, please confirm my order`;
+        ? `my order number is ${ref}, please confirm my order. I would like to arrange a custom pickup location and time with you.${meetupNote}`
+        : `my order number is ${ref}, please confirm my order${meetupNote}`;
       const phoneNumber = whatsapp.replace(/\D/g, "");
       const confirmed = { orderRef: ref, total: Number(result.total), url: phoneNumber ? `https://wa.me/${phoneNumber}?text=${encodeURIComponent(msg)}` : null };
       sessionStorage.setItem("aquatic_emerald_order_confirmation", JSON.stringify(confirmed));
@@ -625,7 +655,10 @@ export default function CheckoutClient({
         <p>Your order reference is <strong>{confirmation.orderRef}</strong>.</p>
         <p>Order total: ${confirmation.total.toFixed(2)}</p>
         {confirmation.url ? <a href={confirmation.url} target="_blank" rel="noopener noreferrer" className="px-6 py-3 bg-primary text-primary-foreground rounded-full">Confirm on WhatsApp</a> : <p>WhatsApp is unavailable. Please contact the store with your order reference.</p>}
-        <Link href="/products" className="underline" onClick={() => { sessionStorage.removeItem("aquatic_emerald_order_confirmation"); setConfirmation(null); }}>Continue shopping</Link>
+        <p className="text-xs text-muted-foreground max-w-sm leading-relaxed font-light">
+          Your order is not complete until we confirm it on WhatsApp. Please send
+          us the message with your order reference so we can confirm your pickup.
+        </p>
       </div>
     );
   }

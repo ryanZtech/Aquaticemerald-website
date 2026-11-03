@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
+import { normalizeGalleryImages } from "@/lib/galleryImages";
 
 export async function GET() {
   if (!sql) {
@@ -8,7 +9,7 @@ export async function GET() {
 
   try {
     const rows = await sql`
-      SELECT id, title, description, image_url, created_at
+      SELECT id, title, description, image_url, image_urls, created_at
       FROM gallery_items
       ORDER BY created_at DESC
     `;
@@ -29,23 +30,25 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { title, description, image_url } = await request.json();
+    const { title, description, image_url, image_urls } = await request.json();
 
     if (!title || !String(title).trim()) {
       return NextResponse.json({ error: "Title is required" }, { status: 400 });
     }
-    if (!image_url || !String(image_url).trim()) {
-      return NextResponse.json({ error: "Image is required" }, { status: 400 });
+    const images = normalizeGalleryImages(image_urls, image_url);
+    if (images.length === 0) {
+      return NextResponse.json({ error: "At least one image is required" }, { status: 400 });
     }
 
     const result = await sql`
-      INSERT INTO gallery_items (title, description, image_url)
+      INSERT INTO gallery_items (title, description, image_url, image_urls)
       VALUES (
         ${String(title).trim()},
         ${description && String(description).trim() ? String(description).trim() : null},
-        ${String(image_url).trim()}
+        ${images[0]},
+        ${images}
       )
-      RETURNING id, title, description, image_url, created_at
+      RETURNING id, title, description, image_url, image_urls, created_at
     `;
 
     return NextResponse.json(result[0], { status: 201 });

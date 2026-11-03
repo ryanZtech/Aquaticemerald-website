@@ -12,15 +12,98 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/app/components/ui/dialog";
-import { Plus, Edit, Trash2, Images, Upload } from "lucide-react";
+import { Plus, Edit, Trash2, Images, Upload, X, GripVertical } from "lucide-react";
+import { Reorder, useDragControls } from "motion/react";
 import { toast } from "sonner";
+import { MAX_GALLERY_IMAGES } from "@/lib/galleryImages";
 
 interface GalleryItem {
   id: number;
   title: string;
   description: string | null;
   image_url: string;
+  image_urls: string[] | null;
   created_at: string;
+}
+
+/** One photo in the editor: an already-saved URL or a file to upload on save. */
+interface ImageDraft {
+  id: string;
+  url?: string;
+  file?: File;
+  /** Object URL for a new file, or the existing image URL. */
+  preview: string;
+}
+
+function draftId() {
+  return typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function imagesOf(item: GalleryItem): string[] {
+  const saved = Array.isArray(item.image_urls) ? item.image_urls.filter(Boolean) : [];
+  return saved.length > 0 ? saved : [item.image_url].filter(Boolean);
+}
+
+function SortableImageRow({
+  draft,
+  index,
+  onRemove,
+}: {
+  draft: ImageDraft;
+  index: number;
+  onRemove: () => void;
+}) {
+  const controls = useDragControls();
+
+  return (
+    <Reorder.Item
+      value={draft}
+      dragListener={false}
+      dragControls={controls}
+      whileDrag={{
+        scale: 1.015,
+        boxShadow: "0 12px 28px rgba(13, 31, 16, 0.14)",
+        zIndex: 30,
+      }}
+      className="flex items-center gap-3 bg-card border border-border rounded-2xl px-2 py-2 list-none cursor-default"
+    >
+      <button
+        type="button"
+        onPointerDown={(e) => controls.start(e)}
+        className="w-6 h-9 flex items-center justify-center text-muted-foreground hover:text-primary active:text-primary transition-colors cursor-grab active:cursor-grabbing touch-none flex-shrink-0"
+        aria-label={`Reorder photo ${index + 1}`}
+      >
+        <GripVertical className="w-4 h-4" />
+      </button>
+
+      <img
+        src={draft.preview}
+        alt={`Photo ${index + 1}`}
+        className="w-14 h-14 rounded-xl object-cover border border-border flex-shrink-0"
+      />
+
+      <div className="flex-1 min-w-0">
+        <div className="text-sm font-medium truncate">
+          {index === 0 ? "Cover photo" : `Photo ${index + 1}`}
+        </div>
+        <div className="text-xs text-muted-foreground font-light truncate">
+          {draft.file ? draft.file.name : "Saved photo"}
+        </div>
+      </div>
+
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 flex-shrink-0"
+        onClick={onRemove}
+        aria-label={`Remove photo ${index + 1}`}
+      >
+        <X className="w-4 h-4" />
+      </Button>
+    </Reorder.Item>
+  );
 }
 
 export default function GalleryPageClient() {
@@ -30,8 +113,7 @@ export default function GalleryPageClient() {
   const [editing, setEditing] = useState<GalleryItem | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [file, setFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState("");
+  const [images, setImages] = useState<ImageDraft[]>([]);
   const [saving, setSaving] = useState(false);
 
   const fetchItems = async () => {
@@ -52,10 +134,16 @@ export default function GalleryPageClient() {
     fetchItems();
   }, []);
 
-  const clearPreview = () => {
-    setPreview((prev) => {
-      if (prev.startsWith("blob:")) URL.revokeObjectURL(prev);
-      return "";
+  const releasePreviews = (drafts: ImageDraft[]) => {
+    drafts.forEach((draft) => {
+      if (draft.preview.startsWith("blob:")) URL.revokeObjectURL(draft.preview);
+    });
+  };
+
+  const resetImages = (next: ImageDraft[] = []) => {
+    setImages((prev) => {
+      releasePreviews(prev);
+      return next;
     });
   };
 
@@ -63,8 +151,7 @@ export default function GalleryPageClient() {
     setEditing(null);
     setTitle("");
     setDescription("");
-    setFile(null);
-    clearPreview();
+    resetImages();
     setDialogOpen(true);
   };
 
@@ -72,9 +159,9 @@ export default function GalleryPageClient() {
     setEditing(item);
     setTitle(item.title);
     setDescription(item.description || "");
-    setFile(null);
-    clearPreview();
-    setPreview(item.image_url);
+    resetImages(
+      imagesOf(item).map((url) => ({ id: draftId(), url, preview: url })),
+    );
     setDialogOpen(true);
   };
 
@@ -82,20 +169,50 @@ export default function GalleryPageClient() {
     setDialogOpen(open);
     if (!open) {
       setEditing(null);
-      setFile(null);
-      clearPreview();
+      resetImages();
     }
   };
 
-  const handleFileChange = (next: File | null) => {
-    setFile(next);
-    if (next) {
-      clearPreview();
-      setPreview(URL.createObjectURL(next));
-    } else {
-      clearPreview();
-      if (editing) setPreview(editing.image_url);
+  const handleAddFiles = (fileList: FileList | null) => {
+    if (!fileList || fileList.length === 0) return;
+    const added: ImageDraft[] = Array.from(fileList).map((file) => ({
+      id: draftId(),
+      file,
+      preview: URL.createObjectURL(file),
+    }));
+    setImages((prev) => {
+      const next = [...prev, ...added];
+      if (next.length > MAX_GALLERY_IMAGES) {
+        toast.error(`You can add up to ${MAX_GALLERY_IMAGES} images per entry`);
+        // Keep whatever fits and release the object URLs we are dropping.
+        releasePreviews(next.slice(MAX_GALLERY_IMAGES));
+        return next.slice(0, MAX_GALLERY_IMAGES);
+      }
+      return next;
+    });
+  };
+
+  const handleRemoveImage = (id: string) => {
+    setImages((prev) => {
+      const removed = prev.find((draft) => draft.id === id);
+      if (removed?.preview.startsWith("blob:")) URL.revokeObjectURL(removed.preview);
+      return prev.filter((draft) => draft.id !== id);
+    });
+  };
+
+  const uploadFile = async (file: File): Promise<string | null> => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const uploadResponse = await fetch("/api/gallery/upload", {
+      method: "POST",
+      body: formData,
+    });
+    const uploadData = await uploadResponse.json().catch(() => ({}));
+    if (!uploadResponse.ok) {
+      toast.error(uploadData.error || "Failed to upload image");
+      return null;
     }
+    return uploadData.url as string;
   };
 
   const handleSave = async () => {
@@ -103,28 +220,25 @@ export default function GalleryPageClient() {
       toast.error("Please add a title");
       return;
     }
-    if (!file && !editing) {
-      toast.error("Please choose an image to upload");
+    if (images.length === 0) {
+      toast.error("Please choose at least one image");
       return;
     }
 
     setSaving(true);
     try {
-      let imageUrl = editing?.image_url || "";
+      const imageUrls: string[] = [];
 
-      if (file) {
-        const formData = new FormData();
-        formData.append("file", file);
-        const uploadResponse = await fetch("/api/gallery/upload", {
-          method: "POST",
-          body: formData,
-        });
-        const uploadData = await uploadResponse.json().catch(() => ({}));
-        if (!uploadResponse.ok) {
-          toast.error(uploadData.error || "Failed to upload image");
-          return;
+      // Upload in the arranged order so the first photo stays the cover.
+      for (const draft of images) {
+        if (draft.url) {
+          imageUrls.push(draft.url);
+          continue;
         }
-        imageUrl = uploadData.url;
+        if (!draft.file) continue;
+        const uploadedUrl = await uploadFile(draft.file);
+        if (!uploadedUrl) return;
+        imageUrls.push(uploadedUrl);
       }
 
       const response = await fetch(
@@ -135,33 +249,39 @@ export default function GalleryPageClient() {
           body: JSON.stringify({
             title: title.trim(),
             description: description.trim(),
-            image_url: imageUrl,
+            image_urls: imageUrls,
           }),
         },
       );
       const data = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        toast.error(data.error || "Failed to save image");
+        toast.error(data.error || "Failed to save entry");
         return;
       }
 
-      toast.success(editing ? "Image updated" : "Image added");
+      toast.success(editing ? "Entry updated" : "Entry added");
       setDialogOpen(false);
       setEditing(null);
-      setFile(null);
-      clearPreview();
+      resetImages();
       fetchItems();
     } catch (error) {
       console.error("Error saving gallery item:", error);
-      toast.error("Failed to save image");
+      toast.error("Failed to save entry");
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = async (item: GalleryItem) => {
-    if (!confirm(`Delete "${item.title}"? This removes the image from the gallery.`))
+    const count = imagesOf(item).length;
+    if (
+      !confirm(
+        `Delete "${item.title}"? This removes ${
+          count > 1 ? `all ${count} photos` : "the photo"
+        } from the gallery.`,
+      )
+    )
       return;
 
     try {
@@ -171,14 +291,14 @@ export default function GalleryPageClient() {
       const data = await response.json().catch(() => ({}));
 
       if (response.ok) {
-        toast.success("Image deleted");
+        toast.success("Entry deleted");
         fetchItems();
       } else {
-        toast.error(data.error || "Failed to delete image");
+        toast.error(data.error || "Failed to delete entry");
       }
     } catch (error) {
       console.error("Error deleting gallery item:", error);
-      toast.error("Failed to delete image");
+      toast.error("Failed to delete entry");
     }
   };
 
@@ -196,117 +316,140 @@ export default function GalleryPageClient() {
         <div>
           <h1 className="font-serif text-3xl font-medium">Gallery</h1>
           <p className="text-muted-foreground text-sm">
-            Upload photos for the public gallery. Each image has a title shown
-            under it and a description shown when it&apos;s opened.
+            Upload photos for the public gallery. Each entry can hold several
+            photos of one project — drag them into the order you want, and the
+            first one is the cover. The title shows under the cover and the
+            description shows when an entry is opened.
           </p>
         </div>
         <Button className="gap-2" onClick={openUpload}>
-          <Plus className="w-4 h-4" /> Upload Image
+          <Plus className="w-4 h-4" /> Add Entry
         </Button>
       </div>
 
       {items.length === 0 ? (
         <div className="bg-card rounded-2xl border border-border py-12 text-center text-muted-foreground font-light">
-          No images yet. Upload your first photo!
+          No entries yet. Upload your first project!
         </div>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
-          {items.map((item) => (
-            <div
-              key={item.id}
-              className="group bg-card border border-border rounded-2xl overflow-hidden"
-            >
-              <div className="aspect-square bg-muted relative overflow-hidden">
-                <img
-                  src={item.image_url}
-                  alt={item.title}
-                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
-                />
-              </div>
-              <div className="p-3 flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="text-sm font-medium truncate">
-                    {item.title}
-                  </div>
-                  {item.description && (
-                    <div className="text-xs text-muted-foreground font-light truncate">
-                      {item.description}
+          {items.map((item) => {
+            const itemImages = imagesOf(item);
+            return (
+              <div
+                key={item.id}
+                className="group bg-card border border-border rounded-2xl overflow-hidden"
+              >
+                <div className="aspect-square bg-muted relative overflow-hidden">
+                  <img
+                    src={itemImages[0]}
+                    alt={item.title}
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+                  />
+                </div>
+                <div className="p-3 flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium truncate">
+                      {item.title}
                     </div>
-                  )}
-                </div>
-                <div className="flex gap-1 flex-shrink-0">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10"
-                    onClick={() => openEdit(item)}
-                    aria-label={`Edit ${item.title}`}
-                  >
-                    <Edit className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                    onClick={() => handleDelete(item)}
-                    aria-label={`Delete ${item.title}`}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
+                    {item.description && (
+                      <div className="text-xs text-muted-foreground font-light truncate">
+                        {item.description}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex gap-1 flex-shrink-0">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10"
+                      onClick={() => openEdit(item)}
+                      aria-label={`Edit ${item.title}`}
+                    >
+                      <Edit className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                      onClick={() => handleDelete(item)}
+                      aria-label={`Delete ${item.title}`}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
       <Dialog open={dialogOpen} onOpenChange={handleDialogChange}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-lg max-h-[92dvh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editing ? "Edit Image" : "Upload Image"}</DialogTitle>
+            <DialogTitle>{editing ? "Edit Entry" : "Add Entry"}</DialogTitle>
             <DialogDescription>
-              The title appears under the photo in the gallery. The description
-              appears when a visitor opens it.
+              Add one or more photos of the same project, then drag them into
+              order. The first photo is the cover in the gallery; the rest are
+              shown when a visitor opens it.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 mt-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium block">Image</label>
-              {preview ? (
-                <div className="relative rounded-xl overflow-hidden border border-border bg-muted">
-                  <img
-                    src={preview}
-                    alt="Preview"
-                    className="w-full h-56 object-cover"
-                  />
-                </div>
-              ) : (
-                <label className="flex flex-col items-center justify-center gap-2 h-40 rounded-xl border border-dashed border-border text-muted-foreground hover:border-primary/50 hover:text-primary transition-colors cursor-pointer">
-                  <Images className="w-6 h-6" />
-                  <span className="text-sm">Choose an image</span>
+              <label className="text-sm font-medium block">
+                Photos ({images.length}/{MAX_GALLERY_IMAGES})
+              </label>
+
+              {images.length > 0 && (
+                <Reorder.Group
+                  axis="y"
+                  values={images}
+                  onReorder={setImages}
+                  className="space-y-2 max-h-[34vh] overflow-y-auto pr-1"
+                >
+                  {images.map((draft, index) => (
+                    <SortableImageRow
+                      key={draft.id}
+                      draft={draft}
+                      index={index}
+                      onRemove={() => handleRemoveImage(draft.id)}
+                    />
+                  ))}
+                </Reorder.Group>
+              )}
+
+              {images.length < MAX_GALLERY_IMAGES && (
+                <label className="flex flex-col items-center justify-center gap-2 h-28 rounded-xl border border-dashed border-border text-muted-foreground hover:border-primary/50 hover:text-primary transition-colors cursor-pointer">
+                  {images.length === 0 ? (
+                    <Images className="w-6 h-6" />
+                  ) : (
+                    <Upload className="w-5 h-5" />
+                  )}
+                  <span className="text-sm">
+                    {images.length === 0 ? "Choose photos" : "Add more photos"}
+                  </span>
                   <span className="text-xs font-light">
-                    PNG, JPEG, WEBP or GIF · max 5MB
+                    PNG, JPEG, WEBP or GIF · max 5MB each
                   </span>
                   <input
                     type="file"
                     accept="image/*"
+                    multiple
                     className="hidden"
-                    onChange={(e) => handleFileChange(e.target.files?.[0] || null)}
+                    onChange={(e) => {
+                      handleAddFiles(e.target.files);
+                      e.target.value = "";
+                    }}
                   />
                 </label>
               )}
-              {preview && (
-                <label className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors cursor-pointer">
-                  <Upload className="w-4 h-4" />
-                  Replace image
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => handleFileChange(e.target.files?.[0] || null)}
-                  />
-                </label>
+
+              {images.length > 1 && (
+                <p className="text-xs text-muted-foreground font-light">
+                  Drag the handle to change the order.
+                </p>
               )}
             </div>
 
@@ -326,7 +469,7 @@ export default function GalleryPageClient() {
               <Textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="What's in this photo?"
+                placeholder="What's in this project?"
                 rows={4}
               />
             </div>
@@ -337,7 +480,7 @@ export default function GalleryPageClient() {
               Cancel
             </Button>
             <Button onClick={handleSave} disabled={saving}>
-              {saving ? "Saving..." : editing ? "Update" : "Add Image"}
+              {saving ? "Saving..." : editing ? "Update" : "Add Entry"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -372,7 +372,10 @@ export interface GalleryItem {
   id: number;
   title: string;
   description: string;
+  /** Cover image — the first entry of `images`. */
   image_url: string;
+  /** Every photo in the entry, in display order. */
+  images: string[];
   created_at: string;
 }
 
@@ -384,18 +387,29 @@ export async function getGalleryItems(): Promise<GalleryItem[]> {
 
   try {
     const rows = await sql`
-      SELECT id, title, description, image_url, created_at
+      SELECT id, title, description, image_url, image_urls, created_at
       FROM gallery_items
       ORDER BY created_at DESC
     `;
 
-    return rows.map((row: any) => ({
-      id: Number(row.id),
-      title: row.title,
-      description: row.description || "",
-      image_url: row.image_url,
-      created_at: row.created_at,
-    }));
+    return rows.map((row: any) => {
+      const urls = Array.isArray(row.image_urls)
+        ? row.image_urls.map((url: unknown) => String(url || "").trim()).filter(Boolean)
+        : [];
+      // Rows saved before multi-image support only have the single cover.
+      const images = urls.length > 0
+        ? urls
+        : [String(row.image_url || "")].filter(Boolean);
+
+      return {
+        id: Number(row.id),
+        title: row.title,
+        description: row.description || "",
+        image_url: images[0] || String(row.image_url || ""),
+        images,
+        created_at: row.created_at,
+      };
+    });
   } catch (error) {
     console.error("Neon Database query failed for gallery:", error);
     return [];
