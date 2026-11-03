@@ -181,6 +181,7 @@ export default function CheckoutClient({
   const [phoneError, setPhoneError] = useState(false);
   const [nameError, setNameError] = useState(false);
   const [orderId, setOrderId] = useState("");
+  const confirmationRef = useRef<HTMLDivElement>(null);
   const [timeRules, setTimeRules] = useState<TimeRule[]>([]);
   const [bookedSlotCounts, setBookedSlotCounts] = useState<
     Record<string, number>
@@ -238,6 +239,18 @@ export default function CheckoutClient({
       }
     }
   }, []);
+
+  // The form is long and the confirm button sits at its end, so the browser
+  // can keep that scroll offset when the screen switches to the shorter
+  // confirmation — leaving the customer looking at the footer. Bring the
+  // confirmation itself into view so the order number, the WhatsApp button
+  // and the email note are what they land on. The storefront scrolls inside
+  // SiteChrome's container rather than the window, which is what
+  // `scrollIntoView` walks up to.
+  useEffect(() => {
+    if (!confirmation) return;
+    confirmationRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+  }, [confirmation]);
 
   // The confirmation screen is the last step of an order, and it only offers
   // the WhatsApp confirmation. Once the customer starts a new order (their
@@ -686,7 +699,10 @@ export default function CheckoutClient({
 
   if (confirmation) {
     return (
-      <div className="pt-24 pb-16 px-4 max-w-xl mx-auto text-center min-h-screen flex flex-col justify-center items-center gap-4">
+      <div
+        ref={confirmationRef}
+        className="pt-24 pb-16 px-4 max-w-xl mx-auto text-center min-h-screen flex flex-col justify-center items-center gap-4"
+      >
         <h1 className="font-serif text-3xl">Order received</h1>
         <p>Your order number is <strong>{confirmation.orderRef}</strong>.</p>
         <p>Order total: ${confirmation.total.toFixed(2)}</p>
