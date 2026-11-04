@@ -11,7 +11,7 @@ export default async function FaqPage() {
     <div className="pt-24 pb-20 px-4 max-w-4xl mx-auto min-h-screen">
       <div className="mb-12">
         <h1 className="font-serif text-4xl sm:text-5xl font-medium mb-5">FAQ</h1>
-        <p className="text-muted-foreground text-lg leading-relaxed max-w-2xl font-light">
+        <p className="text-[#00BC7D] text-2xl leading-relaxed max-w-2xl font-medium">
           Answers to common questions about our products and ordering process.
         </p>
       </div>

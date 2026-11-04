@@ -43,7 +43,7 @@ export default async function ContactPage() {
         <h1 className="font-serif text-4xl sm:text-5xl font-medium mb-5">
           Contact Us
         </h1>
-        <p className="text-muted-foreground text-lg leading-relaxed max-w-2xl font-light">
+        <p className="text-[#00BC7D] text-2xl leading-relaxed max-w-2xl font-medium">
           Questions about a plant, shrimp, or an order? Reach out on
           WhatsApp for the quickest reply, or find us on Instagram and
           Facebook.

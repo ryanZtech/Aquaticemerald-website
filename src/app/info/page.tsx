@@ -53,7 +53,7 @@ export default async function InfoPage() {
         <h1 className="font-serif text-4xl sm:text-5xl font-medium mb-5">
           Aquatic Emerald
         </h1>
-        <p className="text-muted-foreground text-lg leading-relaxed max-w-2xl font-light">
+        <p className="text-[#00BC7D] text-2xl leading-relaxed max-w-2xl font-medium">
           A small Hills District operation supplying healthy, home-grown
           freshwater plants, shrimp and snails to planted aquarium hobbyists
           across Sydney. Every specimen leaves our tanks thriving.
