@@ -54,9 +54,7 @@ export default async function InfoPage() {
           Aquatic Emerald
         </h1>
         <p className="text-[#00BC7D] text-2xl leading-relaxed max-w-2xl font-medium">
-          A small Hills District operation supplying healthy, home-grown
-          freshwater plants, shrimp and snails to planted aquarium hobbyists
-          across Sydney. Every specimen leaves our tanks thriving.
+          A trusted Sydney aquarium service and provider supplying healthy, organically grown freshwater plants, fish and shrimp. Expertising in aquarium services, we provide aquarium maintenance, refurbishing, rescaping, and installation, check our gallery for our designed tanks!
         </p>
       </div>
 

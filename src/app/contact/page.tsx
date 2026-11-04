@@ -46,7 +46,7 @@ export default async function ContactPage() {
         <p className="text-[#00BC7D] text-2xl leading-relaxed max-w-2xl font-medium">
           Questions about a plant, shrimp, or an order? Reach out on
           WhatsApp for the quickest reply, or find us on Instagram and
-          Facebook.
+          Facebook
         </p>
       </div>
 

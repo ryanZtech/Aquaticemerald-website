@@ -14,7 +14,7 @@ export default async function GalleryPage() {
           Designed Works
         </h1>
         <p className="text-[#00BC7D] text-2xl leading-relaxed max-w-2xl font-medium">
-          Scaping a slice of nature.
+          Scaping a slice of nature
         </p>
       </div>
 
