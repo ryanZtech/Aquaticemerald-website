@@ -27,6 +27,24 @@ export function sniffImageType(bytes: Uint8Array): string | null {
   return null;
 }
 
+/**
+ * Photos are uploaded one request at a time by the admin forms, which then
+ * pass us the resulting URL. Only accept URLs that live in this project's own
+ * public blob store — never an arbitrary external address.
+ */
+export function ownBlobImageUrl(value: unknown): string | null {
+  if (typeof value !== "string" || !value) return null;
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "https:") return null;
+    return /\.public\.blob\.vercel-storage\.com$/i.test(url.hostname)
+      ? url.toString()
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Validate an uploaded image's size, declared MIME type and real content. */
 export async function validateImageFile(file: File): Promise<FileValidationResult> {
   if (!ALLOWED_IMAGE_TYPES.has(file.type)) {

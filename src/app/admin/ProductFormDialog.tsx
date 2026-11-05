@@ -30,6 +30,7 @@ import {
 import { Plus, Trash2, Upload, Info, GripVertical } from "lucide-react";
 import { toast } from "sonner";
 import { ProductImage, Variant } from "@/lib/staticData";
+import { uploadImageFile } from "@/lib/clientImageUpload";
 
 interface Category {
   id: number;
@@ -95,6 +96,7 @@ export default function ProductFormDialog({
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [primaryNewImage, setPrimaryNewImage] = useState<number | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
   
   const [variantOptions, setVariantOptions] = useState<VariantOption[]>([]);
   const [variants, setVariants] = useState<Array<Variant & { imageFile?: File; imagePreview?: string }>>([]);
@@ -256,6 +258,7 @@ export default function ProductFormDialog({
     setImageFiles([]);
     setImagePreviews([]);
     setPrimaryNewImage(null);
+    setUploadProgress({});
     setVariantOptions([]);
     setVariants([]);
     setCareLevel("");
@@ -286,15 +289,13 @@ export default function ProductFormDialog({
 
   const handleProductImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    const newPreviews: string[] = [];
-    for (let file of files) {
-      const reader = new FileReader();
-      reader.onload = () => {
-        setImagePreviews(prev => [...prev, reader.result as string]);
-        setImageFiles(prev => [...prev, file]);
-      };
-      reader.readAsDataURL(file);
-    }
+    if (files.length === 0) return;
+    // Build the previews synchronously so a preview always stays paired with
+    // its file: FileReader callbacks can finish out of order, which would
+    // upload one photo under another's progress bar (and primary slot).
+    const previews = files.map((file) => URL.createObjectURL(file));
+    setImagePreviews((prev) => [...prev, ...previews]);
+    setImageFiles((prev) => [...prev, ...files]);
   };
 
   const handleVariantImageChange = (variantId: string, e: React.ChangeEvent<HTMLInputElement>) => {
@@ -544,8 +545,27 @@ export default function ProductFormDialog({
     }
 
     setLoading(true);
+    setUploadProgress({});
 
     try {
+      // Vercel rejects a request body over ~4.5MB, so every photo is sent on
+      // its own first and only the resulting URLs travel with the product.
+      const newImageUrls = await Promise.all(
+        imageFiles.map(async (file, index) => {
+          const key = `image:${imagePreviews[index]}`;
+          const result = await uploadImageFile(
+            file,
+            "/api/products/upload",
+            (percent) =>
+              setUploadProgress((prev) => ({ ...prev, [key]: percent })),
+          );
+          if (!result.url) {
+            throw new Error(result.error || "Failed to upload image");
+          }
+          return result.url;
+        }),
+      );
+
       const formData = new FormData();
       formData.append("name", name);
       formData.append("slug", slug);
@@ -555,15 +575,22 @@ export default function ProductFormDialog({
       
       formData.append("productImages", JSON.stringify(productImages));
       if (primaryNewImage !== null) formData.append("primaryNewImage", String(primaryNewImage));
-      for (let i = 0; i < imageFiles.length; i++) {
-        formData.append("newImages", imageFiles[i]);
-      }
+      formData.append("newImageUrls", JSON.stringify(newImageUrls));
       
       formData.append("variants", JSON.stringify(variants));
       for (const variant of variants) {
-        if (variant.imageFile) {
-          formData.append(`variantImage_${variant.id}`, variant.imageFile);
+        if (!variant.imageFile) continue;
+        const key = `variant:${variant.id}`;
+        const result = await uploadImageFile(
+          variant.imageFile,
+          "/api/products/upload",
+          (percent) =>
+            setUploadProgress((prev) => ({ ...prev, [key]: percent })),
+        );
+        if (!result.url) {
+          throw new Error(result.error || "Failed to upload variant image");
         }
+        formData.append(`variantImageUrl_${variant.id}`, result.url);
       }
 
       formData.append("valuePack", isValuePack ? "true" : "false");
@@ -620,7 +647,7 @@ export default function ProductFormDialog({
       }
     } catch (error) {
       console.error("Error saving product:", error);
-      toast.error("Failed to save product");
+      toast.error(error instanceof Error ? error.message : "Failed to save product");
     } finally {
       setLoading(false);
     }
@@ -724,7 +751,11 @@ export default function ProductFormDialog({
             <div className="space-y-2">
               <Label>Product Images</Label>
               <div className="grid grid-cols-4 gap-4 mb-4">
-                {allImages.map((img, index) => (
+                {allImages.map((img, index) => {
+                  const newIndex = index - productImages.length;
+                  const preview = newIndex >= 0 ? imagePreviews[newIndex] : undefined;
+                  const progress = preview ? uploadProgress[`image:${preview}`] : undefined;
+                  return (
                   <div key={index} className="relative group">
                     <img
                       src={img.image_url}
@@ -758,8 +789,17 @@ export default function ProductFormDialog({
                         Primary
                       </div>
                     )}
+                    {typeof progress === "number" && progress < 100 && (
+                      <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-secondary">
+                        <div
+                          className="h-full bg-primary transition-all duration-200"
+                          style={{ width: `${progress}%` }}
+                        />
+                      </div>
+                    )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
               <label className="cursor-pointer">
                 <div className="flex items-center gap-2 px-4 py-2 border rounded-lg hover:bg-muted">
@@ -1039,7 +1079,9 @@ export default function ProductFormDialog({
               </Button>
             </div>
 
-            {variants.map((variant) => (
+            {variants.map((variant) => {
+              const variantProgress = uploadProgress[`variant:${variant.id}`];
+              return (
               <div key={variant.id} className="flex gap-4 items-center p-4 border rounded-lg">
                 <div className="flex-1 grid grid-cols-5 gap-4">
                   <Input
@@ -1069,13 +1111,23 @@ export default function ProductFormDialog({
                     ))}
                   </select>
                   <div className="flex items-center gap-2">
-                    {(variant.imagePreview || variant.image_url) && (
-                      <img
-                        src={variant.imagePreview || variant.image_url}
-                        alt={variant.label}
-                        className="w-12 h-12 object-cover rounded"
-                      />
-                    )}
+                    <div className="flex flex-col gap-1">
+                      {(variant.imagePreview || variant.image_url) && (
+                        <img
+                          src={variant.imagePreview || variant.image_url}
+                          alt={variant.label}
+                          className="w-12 h-12 object-cover rounded"
+                        />
+                      )}
+                      {typeof variantProgress === "number" && variantProgress < 100 && (
+                        <div className="h-1.5 w-12 overflow-hidden rounded-full bg-secondary">
+                          <div
+                            className="h-full bg-primary transition-all duration-200"
+                            style={{ width: `${variantProgress}%` }}
+                          />
+                        </div>
+                      )}
+                    </div>
                     <label className="cursor-pointer">
                       <div className="flex items-center gap-1 px-2 py-1 border rounded hover:bg-muted text-xs">
                         <Upload className="w-3 h-3" />
@@ -1099,7 +1151,8 @@ export default function ProductFormDialog({
                   <Trash2 className="w-4 h-4" />
                 </Button>
               </div>
-            ))}
+              );
+            })}
           </div>
           </>
           )}

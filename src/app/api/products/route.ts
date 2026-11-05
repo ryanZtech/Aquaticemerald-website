@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql, pool, transactionSql } from "@/lib/db";
 import { requireAdmin } from "@/lib/adminAuth";
-import { put, del } from "@vercel/blob";
-import { validateImageFile, safeImageKey } from "@/lib/fileValidation";
+import { del } from "@vercel/blob";
+import { ownBlobImageUrl } from "@/lib/fileValidation";
 import { normalizeStockLevel } from "@/lib/stockLimits";
 import {
   normalizePackItems,
@@ -193,7 +193,24 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: `Invalid price for variant "${v?.label || "?"}"` }, { status: 400 });
       }
     }
-    const newImages = formData.getAll("newImages") as File[];
+    const parsedNewImageUrls: unknown = (() => {
+      try {
+        return JSON.parse((formData.get("newImageUrls") as string) || "[]");
+      } catch {
+        return null;
+      }
+    })();
+    if (!Array.isArray(parsedNewImageUrls)) {
+      return NextResponse.json({ error: "Invalid newImageUrls" }, { status: 400 });
+    }
+    const newImageUrls: string[] = [];
+    for (const value of parsedNewImageUrls) {
+      const url = ownBlobImageUrl(value);
+      if (!url) {
+        return NextResponse.json({ error: "Invalid newImageUrls" }, { status: 400 });
+      }
+      newImageUrls.push(url);
+    }
 
     const productId = `prod_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
@@ -229,33 +246,19 @@ export async function POST(request: NextRequest) {
 
     if (!pool) return NextResponse.json({ error: "Database not configured" }, { status: 500 });
     const client = await pool.connect();
-    const uploadedUrls: string[] = [];
     let committed = false;
     try {
     await client.query("BEGIN");
     const sql = transactionSql(client);
-    const uploadedProductImages: Array<{
-      image_url: string;
-      alt_text: string;
-      is_primary: boolean;
-    }> = [];
-    for (let i = 0; i < newImages.length; i++) {
-      const file = newImages[i];
-      const validation = await validateImageFile(file);
-      if (!validation.valid) {
-        return NextResponse.json({ error: validation.error }, { status: 400 });
-      }
-      const blob = await put(safeImageKey(`products/${productId}`, file), file, {
-        access: "public",
-        addRandomSuffix: true,
-      });
-      uploadedUrls.push(blob.url);
-      uploadedProductImages.push({
-        image_url: blob.url,
-        alt_text: `${name} Image ${i + 1}`,
-        is_primary: formData.has("primaryNewImage") ? Number(formData.get("primaryNewImage")) === i : i === 0 && productImages.length === 0,
-      });
-    }
+    // Photos arrive already stored (one request each), so this only has to
+    // record them in the order the admin arranged.
+    const uploadedProductImages = newImageUrls.map((url, i) => ({
+      image_url: url,
+      alt_text: `${name} Image ${i + 1}`,
+      is_primary: formData.has("primaryNewImage")
+        ? Number(formData.get("primaryNewImage")) === i
+        : i === 0 && productImages.length === 0,
+    }));
 
     await sql`
       INSERT INTO products (id, name, slug, short_description, full_description, category_id, active, value_pack, value_pack_sync_stock)
@@ -273,29 +276,13 @@ export async function POST(request: NextRequest) {
         VALUES (${variantId}, ${productId}, ${variant.label}, ${variant.price}, ${stockLevel}, TRUE)
       `;
 
-      const variantImageFile = formData.get(
-        `variantImage_${variant.id}`,
-      ) as File | null;
-      if (variantImageFile) {
-        // Same validation + safe storage key as the product-image uploads and
-        // the PUT route below use: never trust the client-supplied filename
-        // in a storage path, and never store an unvalidated file type/size.
-        const validation = await validateImageFile(variantImageFile);
-        if (!validation.valid) {
-          return NextResponse.json({ error: validation.error }, { status: 400 });
-        }
-        const blob = await put(
-          safeImageKey(`products/${productId}/variants/${variantId}`, variantImageFile),
-          variantImageFile,
-          {
-            access: "public",
-            addRandomSuffix: true,
-          },
-        );
-        uploadedUrls.push(blob.url);
+      const variantImageUrl = ownBlobImageUrl(
+        formData.get(`variantImageUrl_${variant.id}`),
+      );
+      if (variantImageUrl) {
         await sql`
           INSERT INTO variant_images (variant_id, image_url, alt_text, is_primary)
-          VALUES (${variantId}, ${blob.url}, ${variant.label}, TRUE)
+          VALUES (${variantId}, ${variantImageUrl}, ${variant.label}, TRUE)
         `;
       }
     }
@@ -350,7 +337,11 @@ export async function POST(request: NextRequest) {
     } finally {
       if (!committed) {
         await client.query("ROLLBACK").catch(() => {});
-        for (const url of uploadedUrls) await del(url).catch((error) => console.error("Failed to clean up upload:", error));
+        // The form uploaded these before saving, so a rejected save must not
+        // leave orphaned photos behind.
+        for (const url of newImageUrls) {
+          await del(url).catch((error) => console.error("Failed to clean up upload:", error));
+        }
       }
       client.release();
     }

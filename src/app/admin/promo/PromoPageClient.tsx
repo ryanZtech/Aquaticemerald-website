@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/app/components/ui/select";
 import { Plus, Edit, Trash2, Ticket, Zap, Megaphone, Upload, Copy } from "lucide-react";
 import { toast } from "sonner";
+import { uploadImageFile } from "@/lib/clientImageUpload";
 
 interface DiscountCode {
   id: number;
@@ -122,6 +123,7 @@ export default function PromoPageClient() {
     active: true,
   });
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
 
   // Products for dropdowns
   const [products, setProducts] = useState<Product[]>([]);
@@ -406,27 +408,27 @@ export default function PromoPageClient() {
     if (!file) return;
 
     setUploadingImage(true);
+    setUploadProgress(1);
     try {
-      const formData = new FormData();
-      formData.append("file", file);
+      const result = await uploadImageFile(
+        file,
+        "/api/promo-popups/upload",
+        setUploadProgress,
+      );
 
-      const res = await fetch("/api/promo-popups/upload", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        setPopupForm((prev) => ({ ...prev, image_url: data.url }));
-        toast.success("Image uploaded");
-      } else {
-        toast.error("Failed to upload image");
+      if (!result.url) {
+        toast.error(result.error || "Failed to upload image");
+        return;
       }
+
+      setPopupForm((prev) => ({ ...prev, image_url: result.url as string }));
+      toast.success("Image uploaded");
     } catch (error) {
       console.error("Error uploading image:", error);
       toast.error("Failed to upload image");
     } finally {
       setUploadingImage(false);
+      setUploadProgress(null);
     }
   };
 
@@ -1094,6 +1096,14 @@ export default function PromoPageClient() {
               {popupForm.image_url && (
                 <div className="mb-2">
                   <img src={popupForm.image_url} alt="Preview" className="w-32 h-32 object-cover rounded-lg border" />
+                  {uploadProgress !== null && uploadProgress < 100 && (
+                    <div className="mt-1.5 h-1.5 w-32 overflow-hidden rounded-full bg-secondary">
+                      <div
+                        className="h-full bg-primary transition-all duration-200"
+                        style={{ width: `${uploadProgress}%` }}
+                      />
+                    </div>
+                  )}
                 </div>
               )}
               <label className="cursor-pointer">

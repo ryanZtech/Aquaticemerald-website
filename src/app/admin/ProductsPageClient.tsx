@@ -31,6 +31,7 @@ import Link from "next/link";
 import ProductFormDialog from "./ProductFormDialog";
 import { toast } from "sonner";
 import { getLucideIconByName } from "@/lib/lucideIcon";
+import { postFormWithProgress, prepareImageForUpload } from "@/lib/clientImageUpload";
 
 interface Product {
   id: string;
@@ -77,6 +78,7 @@ export default function ProductsPageClient() {
     string | null
   >(null);
   const [tempStockLevel, setTempStockLevel] = useState("");
+  const [heroUploadProgress, setHeroUploadProgress] = useState<number | null>(null);
 
   const [selectedCategory, setSelectedCategory] = useState("all");
 
@@ -352,27 +354,40 @@ export default function ProductsPageClient() {
                             const file = e.target.files?.[0];
                             if (!file) return;
                             try {
+                              setHeroUploadProgress(1);
+                              const payload = await prepareImageForUpload(file);
                               const fd = new FormData();
-                              fd.append("heroImage", file);
-                              const res = await fetch(
+                              fd.append("heroImage", payload);
+                              const result = await postFormWithProgress(
+                                fd,
                                 `/api/products/${detailProduct.id}`,
-                                { method: "PUT", body: fd },
+                                setHeroUploadProgress,
                               );
-                              if (res.ok) {
-                                toast.success("Hero image updated");
-                                fetchProducts();
-                              } else {
-                                toast.error("Failed to update image");
+                              if (result.error) {
+                                toast.error(result.error);
+                                return;
                               }
+                              toast.success("Hero image updated");
+                              fetchProducts();
                             } catch (err) {
                               console.error(err);
                               toast.error("Failed to upload");
+                            } finally {
+                              setHeroUploadProgress(null);
                             }
                           }}
                         />
                         <span className="text-sm">Change Hero Image</span>
                       </label>
                     </div>
+                    {heroUploadProgress !== null && heroUploadProgress < 100 && (
+                      <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-black/30">
+                        <div
+                          className="h-full bg-primary transition-all duration-200"
+                          style={{ width: `${heroUploadProgress}%` }}
+                        />
+                      </div>
+                    )}
                     <div className="absolute top-4 left-4 bg-black/60 backdrop-blur-sm text-white text-[10px] font-semibold tracking-widest uppercase px-3 py-1.5 rounded-full flex items-center gap-1.5">
                       {(() => {
                         const DetailCatIcon = getCategoryIcon(

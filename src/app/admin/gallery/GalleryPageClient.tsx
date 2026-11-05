@@ -16,6 +16,7 @@ import { Plus, Edit, Trash2, Images, Upload, X, GripVertical } from "lucide-reac
 import { Reorder, useDragControls } from "motion/react";
 import { toast } from "sonner";
 import { MAX_GALLERY_IMAGES } from "@/lib/galleryImages";
+import { uploadImageFile } from "@/lib/clientImageUpload";
 
 interface GalleryItem {
   id: number;
@@ -49,10 +50,12 @@ function imagesOf(item: GalleryItem): string[] {
 function SortableImageRow({
   draft,
   index,
+  progress,
   onRemove,
 }: {
   draft: ImageDraft;
   index: number;
+  progress?: number;
   onRemove: () => void;
 }) {
   const controls = useDragControls();
@@ -67,8 +70,9 @@ function SortableImageRow({
         boxShadow: "0 12px 28px rgba(13, 31, 16, 0.14)",
         zIndex: 30,
       }}
-      className="flex items-center gap-3 bg-card border border-border rounded-2xl px-2 py-2 list-none cursor-default"
+      className="bg-card border border-border rounded-2xl px-2 py-2 list-none cursor-default"
     >
+      <div className="flex items-center gap-3">
       <button
         type="button"
         onPointerDown={(e) => controls.start(e)}
@@ -102,6 +106,21 @@ function SortableImageRow({
       >
         <X className="w-4 h-4" />
       </Button>
+      </div>
+
+      {typeof progress === "number" && progress < 100 && (
+        <div className="mt-2 flex items-center gap-2">
+          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-secondary">
+            <div
+              className="h-full bg-primary transition-all duration-200"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+          <span className="w-8 text-right text-[10px] font-medium tabular-nums text-primary">
+            {progress}%
+          </span>
+        </div>
+      )}
     </Reorder.Item>
   );
 }
@@ -115,6 +134,7 @@ export default function GalleryPageClient() {
   const [description, setDescription] = useState("");
   const [images, setImages] = useState<ImageDraft[]>([]);
   const [saving, setSaving] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
   const descriptionRef = useRef<HTMLTextAreaElement>(null);
 
   // Let a long project write-up use the room it needs: the textarea grows
@@ -151,6 +171,7 @@ export default function GalleryPageClient() {
   };
 
   const resetImages = (next: ImageDraft[] = []) => {
+    setUploadProgress({});
     setImages((prev) => {
       releasePreviews(prev);
       return next;
@@ -210,21 +231,6 @@ export default function GalleryPageClient() {
     });
   };
 
-  const uploadFile = async (file: File): Promise<string | null> => {
-    const formData = new FormData();
-    formData.append("file", file);
-    const uploadResponse = await fetch("/api/gallery/upload", {
-      method: "POST",
-      body: formData,
-    });
-    const uploadData = await uploadResponse.json().catch(() => ({}));
-    if (!uploadResponse.ok) {
-      toast.error(uploadData.error || "Failed to upload image");
-      return null;
-    }
-    return uploadData.url as string;
-  };
-
   const handleSave = async () => {
     if (!title.trim()) {
       toast.error("Please add a title");
@@ -236,20 +242,32 @@ export default function GalleryPageClient() {
     }
 
     setSaving(true);
+    setUploadProgress({});
     try {
-      const imageUrls: string[] = [];
+      // Every photo travels in its own request — Vercel rejects a body over
+      // ~4.5MB — and each row shows its own progress while it uploads.
+      const uploaded = await Promise.all(
+        images.map(async (draft) => {
+          if (draft.url) return draft.url;
+          if (!draft.file) return null;
+          const result = await uploadImageFile(
+            draft.file,
+            "/api/gallery/upload",
+            (percent) =>
+              setUploadProgress((prev) => ({ ...prev, [draft.id]: percent })),
+          );
+          if (!result.url) {
+            throw new Error(result.error || "Failed to upload image");
+          }
+          return result.url;
+        }),
+      );
 
-      // Upload in the arranged order so the first photo stays the cover.
-      for (const draft of images) {
-        if (draft.url) {
-          imageUrls.push(draft.url);
-          continue;
-        }
-        if (!draft.file) continue;
-        const uploadedUrl = await uploadFile(draft.file);
-        if (!uploadedUrl) return;
-        imageUrls.push(uploadedUrl);
+      if (uploaded.some((url) => !url)) {
+        toast.error("Please choose at least one image");
+        return;
       }
+      const imageUrls = uploaded as string[];
 
       const response = await fetch(
         editing ? `/api/gallery/${editing.id}` : "/api/gallery",
@@ -277,7 +295,7 @@ export default function GalleryPageClient() {
       fetchItems();
     } catch (error) {
       console.error("Error saving gallery item:", error);
-      toast.error("Failed to save entry");
+      toast.error(error instanceof Error ? error.message : "Failed to save entry");
     } finally {
       setSaving(false);
     }
@@ -426,6 +444,7 @@ export default function GalleryPageClient() {
                       key={draft.id}
                       draft={draft}
                       index={index}
+                      progress={uploadProgress[draft.id]}
                       onRemove={() => handleRemoveImage(draft.id)}
                     />
                   ))}
